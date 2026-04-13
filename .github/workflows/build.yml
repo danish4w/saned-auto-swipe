@@ -13,15 +13,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create Project Structure
+      - name: Build Project
         run: |
+          # Structure
           mkdir -p app/src/main/java/com/saned/autoswipe
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/xml
-
-      - name: Create Gradle Wrapper manually
-        run: |
           mkdir -p gradle/wrapper
+
+          # settings.gradle
+          echo "include ':app'" > settings.gradle
+
+          # gradle-wrapper.properties (yahi Gradle download karta hai)
           cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
@@ -30,46 +33,24 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
 
-          cat > gradlew << 'EOF'
-          #!/bin/sh
-          exec gradle "$@"
-          EOF
+          # gradlew script
+          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
           chmod +x gradlew
 
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.9'
-
-      - name: Create settings.gradle
-        run: echo "include ':app'" > settings.gradle
-
-      - name: Create root build.gradle
-        run: |
+          # root build.gradle
           cat > build.gradle << 'EOF'
           buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.3.2'
-              }
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
           allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
+              repositories { google(); mavenCentral() }
           }
           EOF
 
-      - name: Create app/build.gradle
-        run: |
+          # app/build.gradle
           cat > app/build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application'
-          }
+          plugins { id 'com.android.application' }
           android {
               namespace 'com.saned.autoswipe'
               compileSdk 34
@@ -86,18 +67,13 @@ jobs:
           }
           EOF
 
-      - name: Create AndroidManifest.xml
-        run: |
+          # AndroidManifest.xml
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-              <application
-                  android:label="Saned Auto"
-                  android:theme="@style/Theme.AppCompat">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true">
+              <application android:label="Saned Auto" android:theme="@style/Theme.AppCompat">
+                  <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
@@ -118,32 +94,29 @@ jobs:
           </manifest>
           EOF
 
-      - name: Create XML and Layout files
-        run: |
+          # acc_config.xml
           cat > app/src/main/res/xml/acc_config.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <accessibility-service
               xmlns:android="http://schemas.android.com/apk/res/android"
-              android:canPerformGestures="true" />
+              android:canPerformGestures="true"/>
           EOF
 
+          # activity_main.xml
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout
-              xmlns:android="http://schemas.android.com/apk/res/android"
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:gravity="center">
-              <Button
-                  android:id="@+id/btn"
+              <Button android:id="@+id/btn"
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
                   android:text="Start"/>
           </LinearLayout>
           EOF
 
-      - name: Create Java Files
-        run: |
+          # MainActivity.java
           cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
           package com.saned.autoswipe;
           import android.os.Bundle;
@@ -157,20 +130,19 @@ jobs:
           }
           EOF
 
+          # AutoSwipeService.java
           cat > app/src/main/java/com/saned/autoswipe/AutoSwipeService.java << 'EOF'
           package com.saned.autoswipe;
           import android.accessibilityservice.AccessibilityService;
           import android.view.accessibility.AccessibilityEvent;
           public class AutoSwipeService extends AccessibilityService {
-              @Override
-              public void onAccessibilityEvent(AccessibilityEvent event) {}
-              @Override
-              public void onInterrupt() {}
+              @Override public void onAccessibilityEvent(AccessibilityEvent e) {}
+              @Override public void onInterrupt() {}
           }
           EOF
 
-      - name: Build APK
-        run: gradle assembleDebug --no-daemon
+          # Build
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
