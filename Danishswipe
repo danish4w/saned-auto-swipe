@@ -1,4 +1,4 @@
-name: danish Saned Auto Swipe
+name: danishSwipe
 on: workflow_dispatch
 jobs:
   build:
