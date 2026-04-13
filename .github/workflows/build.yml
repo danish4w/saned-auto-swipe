@@ -13,53 +13,54 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Manual Terminal Build
+      - name: Absolute Final Build
         run: |
-          # 1. Structure Setup
+          # 1. Purana kachra saaf karna
+          rm -rf *
+          
+          # 2. Structure setup
           mkdir -p app/src/main/java/com/saned/autoswipe
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/xml
 
-          # 2. Minimal Settings
+          # 3. Create Files (Sabse stable versions ke saath)
           echo "include ':app'" > settings.gradle
           
-          # 3. Simple Build Script (Pichle error ko fix karne ke liye)
           cat <<EOF > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
-              dependencies { classpath 'com.android.tools.build:gradle:7.4.2' }
+              dependencies { classpath 'com.android.tools.build:gradle:8.1.1' }
           }
-          allprojects {
-              repositories { google(); mavenCentral() }
-          }
+          allprojects { repositories { google(); mavenCentral() } }
           EOF
 
           cat <<EOF > app/build.gradle
           plugins { id 'com.android.application' }
           android {
               namespace 'com.saned.autoswipe'
-              compileSdk 33
+              compileSdk 34
               defaultConfig {
                   applicationId 'com.saned.autoswipe'
                   minSdk 26
-                  targetSdk 33
+                  targetSdk 34
                   versionCode 1
                   versionName '1.0'
               }
           }
           EOF
 
-          # 4. App Files
+          # 4. Resources
           echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/><application android:label="Saned Auto"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity><service android:name=".AutoSwipeService" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"><intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter><meta-data android:name="android.accessibilityservice" android:resource="@xml/acc_config"/></service></application></manifest>' > app/src/main/AndroidManifest.xml
           echo '<?xml version="1.0" encoding="utf-8"?><accessibility-service xmlns:android="http://schemas.android.com/apk/res/android" android:canPerformGestures="true" />' > app/src/main/res/xml/acc_config.xml
           echo '<?xml version="1.0" encoding="utf-8"?><LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center"><Button android:id="@+id/btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Start"/></LinearLayout>' > app/src/main/res/layout/activity_main.xml
 
+          # 5. Java Code (Minimalist)
           cat <<EOF > app/src/main/java/com/saned/autoswipe/MainActivity.java
           package com.saned.autoswipe;
           import android.os.Bundle;
           import androidx.appcompat.app.AppCompatActivity;
-          public class MainActivity extends androidx.activity.ComponentActivity {
-              @Override protected void onCreate(Bundle s) { super.onCreate(s); }
+          public class MainActivity extends AppCompatActivity {
+              @Override protected void onCreate(Bundle s) { super.onCreate(s); setContentView(R.layout.activity_main); }
           }
           EOF
 
@@ -73,8 +74,10 @@ jobs:
           }
           EOF
 
-          # 5. Build with force-clean
-          gradle assembleDebug --stacktrace --no-daemon
+          # 6. Build using Force-Version (Taaki GitHub ki apni version interfere na kare)
+          gradle wrapper --gradle-version 8.1.1
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
