@@ -13,16 +13,33 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.1.1'
-
       - name: Create Project Structure
         run: |
           mkdir -p app/src/main/java/com/saned/autoswipe
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/xml
+
+      - name: Create Gradle Wrapper manually
+        run: |
+          mkdir -p gradle/wrapper
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.9-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+
+          cat > gradlew << 'EOF'
+          #!/bin/sh
+          exec gradle "$@"
+          EOF
+          chmod +x gradlew
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.9'
 
       - name: Create settings.gradle
         run: echo "include ':app'" > settings.gradle
@@ -36,7 +53,7 @@ jobs:
                   mavenCentral()
               }
               dependencies {
-                  classpath 'com.android.tools.build:gradle:8.1.1'
+                  classpath 'com.android.tools.build:gradle:8.3.2'
               }
           }
           allprojects {
@@ -75,7 +92,9 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-              <application android:label="Saned Auto" android:theme="@style/Theme.AppCompat">
+              <application
+                  android:label="Saned Auto"
+                  android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
@@ -99,7 +118,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Create acc_config.xml
+      - name: Create XML and Layout files
         run: |
           cat > app/src/main/res/xml/acc_config.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -108,8 +127,6 @@ jobs:
               android:canPerformGestures="true" />
           EOF
 
-      - name: Create activity_main.xml
-        run: |
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout
@@ -125,7 +142,7 @@ jobs:
           </LinearLayout>
           EOF
 
-      - name: Create MainActivity.java
+      - name: Create Java Files
         run: |
           cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
           package com.saned.autoswipe;
@@ -140,8 +157,6 @@ jobs:
           }
           EOF
 
-      - name: Create AutoSwipeService.java
-        run: |
           cat > app/src/main/java/com/saned/autoswipe/AutoSwipeService.java << 'EOF'
           package com.saned.autoswipe;
           import android.accessibilityservice.AccessibilityService;
@@ -154,13 +169,8 @@ jobs:
           }
           EOF
 
-      - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.1.1
-
       - name: Build APK
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
