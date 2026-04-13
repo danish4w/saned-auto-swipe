@@ -13,55 +13,49 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Final Build Script
+      - name: Build APK
         run: |
-          # 1. Structure Cleanup
-          rm -rf app build.gradle settings.gradle
+          # 1. Sabse pehle basic structure banana
           mkdir -p app/src/main/java/com/saned/autoswipe
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/xml
 
-          # 2. Setup Gradle Wrapper (Force Version 8.0 to avoid the error)
-          gradle wrapper --gradle-version 8.0
-
-          # 3. Root Build Script
+          # 2. Files create karna (No complicated logic)
+          echo "include ':app'" > settings.gradle
+          
           cat <<EOF > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
-              dependencies { classpath "com.android.tools.build:gradle:8.0.2" }
+              dependencies { classpath 'com.android.tools.build:gradle:7.4.2' }
           }
           allprojects { repositories { google(); mavenCentral() } }
           EOF
 
-          echo 'include ":app"' > settings.gradle
-
-          # 4. App Build Script
           cat <<EOF > app/build.gradle
-          plugins { id "com.android.application" }
+          plugins { id 'com.android.application' }
           android {
-              namespace "com.saned.autoswipe"
+              namespace 'com.saned.autoswipe'
               compileSdk 33
               defaultConfig {
-                  applicationId "com.saned.autoswipe"
+                  applicationId 'com.saned.autoswipe'
                   minSdk 26
                   targetSdk 33
                   versionCode 1
-                  versionName "1.0"
+                  versionName '1.0'
               }
           }
           dependencies {
-              implementation "androidx.appcompat:appcompat:1.6.1"
-              implementation "com.google.android.material:material:1.8.0"
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.8.0'
           }
           EOF
 
-          # 5. Manifest & Resources
+          # 3. Resources aur Code
           echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/><application android:label="Saned Auto" android:theme="@style/Theme.AppCompat.Light.NoActionBar"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity><service android:name=".AutoSwipeService" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"><intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter><meta-data android:name="android.accessibilityservice" android:resource="@xml/acc_config"/></service></application></manifest>' > app/src/main/AndroidManifest.xml
           echo '<?xml version="1.0" encoding="utf-8"?><accessibility-service xmlns:android="http://schemas.android.com/apk/res/android" android:accessibilityEventTypes="typeWindowStateChanged" android:accessibilityFeedbackType="feedbackGeneric" android:canPerformGestures="true" />' > app/src/main/res/xml/acc_config.xml
           echo '<?xml version="1.0" encoding="utf-8"?><LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center"><Button android:id="@+id/btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Start Service"/></LinearLayout>' > app/src/main/res/layout/activity_main.xml
 
-          # 6. Java Code
           cat <<EOF > app/src/main/java/com/saned/autoswipe/MainActivity.java
           package com.saned.autoswipe;
           import android.content.Intent;
@@ -87,9 +81,8 @@ jobs:
           }
           EOF
 
-          # 7. Execute Build using the local wrapper
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          # 4. Build - No wrapper, direct gradle
+          gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
