@@ -15,22 +15,23 @@ jobs:
 
       - name: Build Project
         run: |
-          # Structure
           mkdir -p app/src/main/java/com/saned/autoswipe
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/xml
           mkdir -p gradle/wrapper
 
-          # Gradle wrapper files (dono - script + jar)
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.properties -o gradle/wrapper/gradle-wrapper.properties
           chmod +x gradlew
 
-          # settings.gradle
           echo "include ':app'" > settings.gradle
 
-          # root build.gradle
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
+
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
@@ -41,7 +42,6 @@ jobs:
           }
           EOF
 
-          # app/build.gradle
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
@@ -60,7 +60,6 @@ jobs:
           }
           EOF
 
-          # AndroidManifest.xml
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -87,7 +86,6 @@ jobs:
           </manifest>
           EOF
 
-          # acc_config.xml
           cat > app/src/main/res/xml/acc_config.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <accessibility-service
@@ -95,7 +93,6 @@ jobs:
               android:canPerformGestures="true"/>
           EOF
 
-          # activity_main.xml
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -109,7 +106,6 @@ jobs:
           </LinearLayout>
           EOF
 
-          # MainActivity.java
           cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
           package com.saned.autoswipe;
           import android.os.Bundle;
@@ -123,7 +119,6 @@ jobs:
           }
           EOF
 
-          # AutoSwipeService.java
           cat > app/src/main/java/com/saned/autoswipe/AutoSwipeService.java << 'EOF'
           package com.saned.autoswipe;
           import android.accessibilityservice.AccessibilityService;
@@ -134,7 +129,6 @@ jobs:
           }
           EOF
 
-          # Build!
           ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
