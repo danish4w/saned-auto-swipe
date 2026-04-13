@@ -7,35 +7,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Absolute Final Build
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.1.1'
+
+      - name: Create Project Structure
         run: |
-          # 1. Purana kachra saaf karna
-          rm -rf *
-          
-          # 2. Structure setup
           mkdir -p app/src/main/java/com/saned/autoswipe
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/xml
 
-          # 3. Create Files (Sabse stable versions ke saath)
-          echo "include ':app'" > settings.gradle
-          
-          cat <<EOF > build.gradle
+      - name: Create settings.gradle
+        run: echo "include ':app'" > settings.gradle
+
+      - name: Create root build.gradle
+        run: |
+          cat > build.gradle << 'EOF'
           buildscript {
-              repositories { google(); mavenCentral() }
-              dependencies { classpath 'com.android.tools.build:gradle:8.1.1' }
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.1.1'
+              }
           }
-          allprojects { repositories { google(); mavenCentral() } }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
           EOF
 
-          cat <<EOF > app/build.gradle
-          plugins { id 'com.android.application' }
+      - name: Create app/build.gradle
+        run: |
+          cat > app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+          }
           android {
               namespace 'com.saned.autoswipe'
               compileSdk 34
@@ -47,35 +64,101 @@ jobs:
                   versionName '1.0'
               }
           }
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+          }
           EOF
 
-          # 4. Resources
-          echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/><application android:label="Saned Auto"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity><service android:name=".AutoSwipeService" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"><intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter><meta-data android:name="android.accessibilityservice" android:resource="@xml/acc_config"/></service></application></manifest>' > app/src/main/AndroidManifest.xml
-          echo '<?xml version="1.0" encoding="utf-8"?><accessibility-service xmlns:android="http://schemas.android.com/apk/res/android" android:canPerformGestures="true" />' > app/src/main/res/xml/acc_config.xml
-          echo '<?xml version="1.0" encoding="utf-8"?><LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center"><Button android:id="@+id/btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Start"/></LinearLayout>' > app/src/main/res/layout/activity_main.xml
+      - name: Create AndroidManifest.xml
+        run: |
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+              <application android:label="Saned Auto" android:theme="@style/Theme.AppCompat">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <service
+                      android:name=".AutoSwipeService"
+                      android:exported="true"
+                      android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+                      <intent-filter>
+                          <action android:name="android.accessibilityservice.AccessibilityService"/>
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.accessibilityservice"
+                          android:resource="@xml/acc_config"/>
+                  </service>
+              </application>
+          </manifest>
+          EOF
 
-          # 5. Java Code (Minimalist)
-          cat <<EOF > app/src/main/java/com/saned/autoswipe/MainActivity.java
+      - name: Create acc_config.xml
+        run: |
+          cat > app/src/main/res/xml/acc_config.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <accessibility-service
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              android:canPerformGestures="true" />
+          EOF
+
+      - name: Create activity_main.xml
+        run: |
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:gravity="center">
+              <Button
+                  android:id="@+id/btn"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Start"/>
+          </LinearLayout>
+          EOF
+
+      - name: Create MainActivity.java
+        run: |
+          cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
           package com.saned.autoswipe;
           import android.os.Bundle;
           import androidx.appcompat.app.AppCompatActivity;
           public class MainActivity extends AppCompatActivity {
-              @Override protected void onCreate(Bundle s) { super.onCreate(s); setContentView(R.layout.activity_main); }
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_main);
+              }
           }
           EOF
 
-          cat <<EOF > app/src/main/java/com/saned/autoswipe/AutoSwipeService.java
+      - name: Create AutoSwipeService.java
+        run: |
+          cat > app/src/main/java/com/saned/autoswipe/AutoSwipeService.java << 'EOF'
           package com.saned.autoswipe;
           import android.accessibilityservice.AccessibilityService;
           import android.view.accessibility.AccessibilityEvent;
           public class AutoSwipeService extends AccessibilityService {
-              @Override public void onAccessibilityEvent(AccessibilityEvent e) {}
-              @Override public void onInterrupt() {}
+              @Override
+              public void onAccessibilityEvent(AccessibilityEvent event) {}
+              @Override
+              public void onInterrupt() {}
           }
           EOF
 
-          # 6. Build using Force-Version (Taaki GitHub ki apni version interfere na kare)
-          gradle wrapper --gradle-version 8.1.1
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.1.1
+
+      - name: Build APK
+        run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
