@@ -19,7 +19,7 @@ jobs:
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
           mkdir -p gradle/wrapper
 
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
@@ -54,8 +54,8 @@ jobs:
                   applicationId 'com.saned.autoswipe'
                   minSdk 26
                   targetSdk 34
-                  versionCode 1
-                  versionName '1.0'
+                  versionCode 4
+                  versionName '4.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -67,13 +67,23 @@ jobs:
           }
           EOF
 
+          # Icon PNG base64 se generate karo
+          python3 - << 'PYEOF'
+          import base64, os
+          b64 = "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAA93klEQVR4nO3de5Al533e9+ft2zln7jN7wV5wJ0hcAi4ogXcCFiNREmlJVEm2K7JlOy5btqgkZTlx4sSWYpdvclVcSSl2iUWHtspViuIiTUlmkiraJkUyJEVTFCESIAEQ4GKBJYAFsAvszs7OzLl2d/44MzszOzM7Z2ZOd7/v299P1dTszs7s9vbpfn9P/973+xgBcNqpU2fyqv7tCxeeMFX92wAOh5MXsEyVBb1oBAbAHpyMQMl8LvCHRUAAysPJBhSAIj9+hANgvDihgEOi2FeHUAAcHCcPsA8Ue/sRCoDRcKIAu6DY+4NQAGzHSQGsoeDXB4EAIACgxij4WEcgQB1x0KM2KPgYFYEAdcBBDq9R9HFYhAH4igMb3qHooyiEAfiEgxnOo+CjKgQCuIyDF06i6MM2hAG4hgMWTqHww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSTqHww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHABezUcM/gAAAABJRU5ErkJggg=="
+          data = base64.b64decode(b64)
+          with open('app/src/main/res/mipmap-xxxhdpi/ic_launcher.png', 'wb') as f:
+              f.write(data)
+          print("Icon created!")
+          PYEOF
+
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
               <application
                   android:label="Saned Auto"
-                  android:icon="@drawable/ic_launcher"
+                  android:icon="@mipmap/ic_launcher"
                   android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
@@ -118,103 +128,215 @@ jobs:
           </resources>
           EOF
 
-          cat > app/src/main/res/drawable/ic_launcher.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android"
-              android:shape="oval">
-              <solid android:color="#1DB954"/>
-          </shape>
-          EOF
-
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
-              android:orientation="vertical"
-              android:gravity="center"
-              android:padding="24dp"
               android:background="#121212">
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical"
+                  android:gravity="center_horizontal"
+                  android:padding="24dp">
 
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Saned Auto Swipe"
-                  android:textSize="24sp"
-                  android:textColor="#FFFFFF"
-                  android:textStyle="bold"
-                  android:layout_marginBottom="8dp"/>
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Saned Auto Swipe"
+                      android:textSize="24sp"
+                      android:textColor="#FFFFFF"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="6dp"/>
 
-              <TextView
-                  android:id="@+id/tv_status"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Service OFF"
-                  android:textSize="16sp"
-                  android:textColor="#FF5555"
-                  android:layout_marginBottom="32dp"/>
+                  <TextView
+                      android:id="@+id/tv_status"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Service OFF"
+                      android:textSize="15sp"
+                      android:textColor="#FF5555"
+                      android:layout_marginBottom="28dp"/>
 
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Min Distance (Km)"
-                  android:textColor="#AAAAAA"
-                  android:textSize="14sp"/>
-              <EditText
-                  android:id="@+id/et_min"
-                  android:layout_width="200dp"
-                  android:layout_height="wrap_content"
-                  android:inputType="numberDecimal"
-                  android:text="0.1"
-                  android:textColor="#FFFFFF"
-                  android:backgroundTint="#444444"
-                  android:gravity="center"
-                  android:layout_marginBottom="16dp"/>
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Pickup Distance (From You)"
+                      android:textColor="#1DB954"
+                      android:textSize="15sp"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="10dp"/>
 
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Max Distance (Km)"
-                  android:textColor="#AAAAAA"
-                  android:textSize="14sp"/>
-              <EditText
-                  android:id="@+id/et_max"
-                  android:layout_width="200dp"
-                  android:layout_height="wrap_content"
-                  android:inputType="numberDecimal"
-                  android:text="10.0"
-                  android:textColor="#FFFFFF"
-                  android:backgroundTint="#444444"
-                  android:gravity="center"
-                  android:layout_marginBottom="32dp"/>
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:orientation="horizontal"
+                      android:layout_marginBottom="6dp">
+                      <LinearLayout
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:orientation="vertical"
+                          android:gravity="center"
+                          android:layout_marginEnd="8dp">
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Min (Km)"
+                              android:textColor="#AAAAAA"
+                              android:textSize="13sp"/>
+                          <EditText
+                              android:id="@+id/et_pickup_min"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:inputType="numberDecimal"
+                              android:text="0.1"
+                              android:textColor="#FFFFFF"
+                              android:backgroundTint="#333333"
+                              android:gravity="center"
+                              android:padding="8dp"/>
+                      </LinearLayout>
+                      <LinearLayout
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:orientation="vertical"
+                          android:gravity="center"
+                          android:layout_marginStart="8dp">
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Max (Km)"
+                              android:textColor="#AAAAAA"
+                              android:textSize="13sp"/>
+                          <EditText
+                              android:id="@+id/et_pickup_max"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:inputType="numberDecimal"
+                              android:text="5.0"
+                              android:textColor="#FFFFFF"
+                              android:backgroundTint="#333333"
+                              android:gravity="center"
+                              android:padding="8dp"/>
+                      </LinearLayout>
+                  </LinearLayout>
 
-              <Switch
-                  android:id="@+id/switch_service"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Auto Accept"
-                  android:textColor="#FFFFFF"
-                  android:textSize="18sp"
-                  android:layout_marginBottom="24dp"/>
+                  <View
+                      android:layout_width="match_parent"
+                      android:layout_height="1dp"
+                      android:background="#333333"
+                      android:layout_marginVertical="16dp"/>
 
-              <TextView
-                  android:id="@+id/tv_info"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Pehle Accessibility Service enable karein"
-                  android:textColor="#FFAA00"
-                  android:textSize="13sp"
-                  android:gravity="center"/>
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Drop Distance (From Pickup)"
+                      android:textColor="#FF9500"
+                      android:textSize="15sp"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="10dp"/>
 
-              <Button
-                  android:id="@+id/btn_accessibility"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Open Accessibility Settings"
-                  android:layout_marginTop="16dp"
-                  android:backgroundTint="#1DB954"/>
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:orientation="horizontal"
+                      android:layout_marginBottom="6dp">
+                      <LinearLayout
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:orientation="vertical"
+                          android:gravity="center"
+                          android:layout_marginEnd="8dp">
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Min (Km)"
+                              android:textColor="#AAAAAA"
+                              android:textSize="13sp"/>
+                          <EditText
+                              android:id="@+id/et_drop_min"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:inputType="numberDecimal"
+                              android:text="0.1"
+                              android:textColor="#FFFFFF"
+                              android:backgroundTint="#333333"
+                              android:gravity="center"
+                              android:padding="8dp"/>
+                      </LinearLayout>
+                      <LinearLayout
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:orientation="vertical"
+                          android:gravity="center"
+                          android:layout_marginStart="8dp">
+                          <TextView
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="Max (Km)"
+                              android:textColor="#AAAAAA"
+                              android:textSize="13sp"/>
+                          <EditText
+                              android:id="@+id/et_drop_max"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:inputType="numberDecimal"
+                              android:text="10.0"
+                              android:textColor="#FFFFFF"
+                              android:backgroundTint="#333333"
+                              android:gravity="center"
+                              android:padding="8dp"/>
+                      </LinearLayout>
+                  </LinearLayout>
 
-          </LinearLayout>
+                  <View
+                      android:layout_width="match_parent"
+                      android:layout_height="1dp"
+                      android:background="#333333"
+                      android:layout_marginVertical="16dp"/>
+
+                  <Switch
+                      android:id="@+id/switch_service"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Auto Accept"
+                      android:textColor="#FFFFFF"
+                      android:textSize="18sp"
+                      android:layout_marginBottom="16dp"/>
+
+                  <Button
+                      android:id="@+id/btn_save"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="OK - Save Settings"
+                      android:textSize="16sp"
+                      android:textStyle="bold"
+                      android:backgroundTint="#1DB954"
+                      android:layout_marginBottom="12dp"/>
+
+                  <TextView
+                      android:id="@+id/tv_info"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Pehle Accessibility Service enable karein"
+                      android:textColor="#FFAA00"
+                      android:textSize="13sp"
+                      android:gravity="center"
+                      android:layout_marginBottom="12dp"/>
+
+                  <Button
+                      android:id="@+id/btn_accessibility"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Open Accessibility Settings"
+                      android:backgroundTint="#444444"/>
+
+              </LinearLayout>
+          </ScrollView>
           EOF
 
           cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
@@ -223,19 +345,23 @@ jobs:
           import android.content.Intent;
           import android.content.SharedPreferences;
           import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
           import android.provider.Settings;
+          import android.view.inputmethod.InputMethodManager;
           import android.widget.Button;
           import android.widget.EditText;
           import android.widget.Switch;
           import android.widget.TextView;
+          import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
 
           public class MainActivity extends AppCompatActivity {
 
               Switch switchService;
-              EditText etMin, etMax;
+              EditText etPickupMin, etPickupMax, etDropMin, etDropMax;
               TextView tvStatus, tvInfo;
-              Button btnAccessibility;
+              Button btnSave, btnAccessibility;
               SharedPreferences prefs;
 
               @Override
@@ -243,46 +369,65 @@ jobs:
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
 
-                  prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
-                  switchService = findViewById(R.id.switch_service);
-                  etMin = findViewById(R.id.et_min);
-                  etMax = findViewById(R.id.et_max);
-                  tvStatus = findViewById(R.id.tv_status);
-                  tvInfo = findViewById(R.id.tv_info);
+                  prefs            = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  switchService    = findViewById(R.id.switch_service);
+                  etPickupMin      = findViewById(R.id.et_pickup_min);
+                  etPickupMax      = findViewById(R.id.et_pickup_max);
+                  etDropMin        = findViewById(R.id.et_drop_min);
+                  etDropMax        = findViewById(R.id.et_drop_max);
+                  tvStatus         = findViewById(R.id.tv_status);
+                  tvInfo           = findViewById(R.id.tv_info);
+                  btnSave          = findViewById(R.id.btn_save);
                   btnAccessibility = findViewById(R.id.btn_accessibility);
 
-                  float savedMin = prefs.getFloat("min_km", 0.1f);
-                  float savedMax = prefs.getFloat("max_km", 10.0f);
-                  etMin.setText(String.valueOf(savedMin));
-                  etMax.setText(String.valueOf(savedMax));
+                  etPickupMin.setText(String.valueOf(prefs.getFloat("pickup_min", 0.1f)));
+                  etPickupMax.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
+                  etDropMin.setText(String.valueOf(prefs.getFloat("drop_min", 0.1f)));
+                  etDropMax.setText(String.valueOf(prefs.getFloat("drop_max", 10.0f)));
+
+                  switchService.setOnCheckedChangeListener((btn, isChecked) ->
+                      updateStatus(isChecked)
+                  );
+
+                  btnSave.setOnClickListener(v -> {
+                      float pMin, pMax, dMin, dMax;
+                      try { pMin = Float.parseFloat(etPickupMin.getText().toString()); } catch (Exception e) { pMin = 0.1f; }
+                      try { pMax = Float.parseFloat(etPickupMax.getText().toString()); } catch (Exception e) { pMax = 5.0f; }
+                      try { dMin = Float.parseFloat(etDropMin.getText().toString());   } catch (Exception e) { dMin = 0.1f; }
+                      try { dMax = Float.parseFloat(etDropMax.getText().toString());   } catch (Exception e) { dMax = 10.0f; }
+
+                      prefs.edit()
+                          .putFloat("pickup_min", pMin)
+                          .putFloat("pickup_max", pMax)
+                          .putFloat("drop_min", dMin)
+                          .putFloat("drop_max", dMax)
+                          .putBoolean("enabled", switchService.isChecked())
+                          .apply();
+
+                      InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                      if (imm != null && getCurrentFocus() != null)
+                          imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+
+                      Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
+                      tvStatus.setText("Settings Saved!");
+                      tvStatus.setTextColor(0xFF1DB954);
+                      new Handler(Looper.getMainLooper()).postDelayed(() ->
+                          updateStatus(switchService.isChecked()), 1500);
+                  });
 
                   btnAccessibility.setOnClickListener(v ->
                       startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                   );
+              }
 
-                  switchService.setOnCheckedChangeListener((btn, isChecked) -> {
-                      float minKm, maxKm;
-                      try {
-                          minKm = Float.parseFloat(etMin.getText().toString());
-                          maxKm = Float.parseFloat(etMax.getText().toString());
-                      } catch (Exception e) {
-                          minKm = 0.1f;
-                          maxKm = 10.0f;
-                      }
-                      prefs.edit()
-                          .putFloat("min_km", minKm)
-                          .putFloat("max_km", maxKm)
-                          .putBoolean("enabled", isChecked)
-                          .apply();
-
-                      if (isChecked) {
-                          tvStatus.setText("Service ON - Waiting for order...");
-                          tvStatus.setTextColor(0xFF1DB954);
-                      } else {
-                          tvStatus.setText("Service OFF");
-                          tvStatus.setTextColor(0xFFFF5555);
-                      }
-                  });
+              private void updateStatus(boolean enabled) {
+                  if (enabled) {
+                      tvStatus.setText("Service ON - Waiting for order...");
+                      tvStatus.setTextColor(0xFF1DB954);
+                  } else {
+                      tvStatus.setText("Service OFF");
+                      tvStatus.setTextColor(0xFFFF5555);
+                  }
               }
 
               @Override
@@ -290,8 +435,9 @@ jobs:
                   super.onResume();
                   boolean enabled = prefs.getBoolean("enabled", false);
                   switchService.setChecked(enabled);
+                  updateStatus(enabled);
                   if (isAccessibilityEnabled()) {
-                      tvInfo.setText("Accessibility Service: Active ✓");
+                      tvInfo.setText("Accessibility Service: Active");
                       tvInfo.setTextColor(0xFF1DB954);
                   } else {
                       tvInfo.setText("Pehle Accessibility Service enable karein!");
@@ -301,14 +447,10 @@ jobs:
 
               private boolean isAccessibilityEnabled() {
                   try {
-                      String enabledServices = Settings.Secure.getString(
-                          getContentResolver(),
+                      String s = Settings.Secure.getString(getContentResolver(),
                           Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-                      return enabledServices != null &&
-                          enabledServices.contains(getPackageName());
-                  } catch (Exception e) {
-                      return false;
-                  }
+                      return s != null && s.contains(getPackageName());
+                  } catch (Exception e) { return false; }
               }
           }
           EOF
@@ -342,55 +484,56 @@ jobs:
               public void onAccessibilityEvent(AccessibilityEvent event) {
                   if (prefs == null) return;
                   if (!prefs.getBoolean("enabled", false)) return;
-
                   String pkg = String.valueOf(event.getPackageName());
                   if (!pkg.contains("saned")) return;
-
                   handler.postDelayed(this::checkAndAccept, 400);
               }
 
               private void checkAndAccept() {
                   AccessibilityNodeInfo root = getRootInActiveWindow();
                   if (root == null) return;
-
                   try {
                       List<AccessibilityNodeInfo> newOrderList =
                           root.findAccessibilityNodeInfosByText("New Order");
                       if (newOrderList == null || newOrderList.isEmpty()) return;
 
-                      float minKm = prefs.getFloat("min_km", 0.1f);
-                      float maxKm = prefs.getFloat("max_km", 10.0f);
+                      float pickupMin = prefs.getFloat("pickup_min", 0.1f);
+                      float pickupMax = prefs.getFloat("pickup_max", 5.0f);
+                      float dropMin   = prefs.getFloat("drop_min",   0.1f);
+                      float dropMax   = prefs.getFloat("drop_max",  10.0f);
 
-                      float pickupKm = getPickupDistance(root);
-                      Log.d(TAG, "Pickup: " + pickupKm + " km | Range: " + minKm + "-" + maxKm);
+                      float pickupKm = findDistance(root, "From You");
+                      float dropKm   = findDistance(root, "From Pickup");
 
-                      if (pickupKm < 0) return;
+                      Log.d(TAG, "Pickup: " + pickupKm + " | Drop: " + dropKm);
 
-                      if (pickupKm >= minKm && pickupKm <= maxKm) {
+                      if (pickupKm < 0 || dropKm < 0) return;
+
+                      boolean pickupOk = pickupKm >= pickupMin && pickupKm <= pickupMax;
+                      boolean dropOk   = dropKm   >= dropMin   && dropKm   <= dropMax;
+
+                      if (pickupOk && dropOk) {
                           if (clickAccept(root)) {
-                              Log.d(TAG, "ORDER ACCEPTED! " + pickupKm + " km");
+                              Log.d(TAG, "ORDER ACCEPTED!");
                               prefs.edit().putBoolean("enabled", false).apply();
                           }
+                      } else {
+                          Log.d(TAG, "IGNORED - pickup=" + pickupOk + " drop=" + dropOk);
                       }
                   } finally {
                       root.recycle();
                   }
               }
 
-              private float getPickupDistance(AccessibilityNodeInfo root) {
-                  String[] keywords = {"Km From You", "KM From You", "km from you"};
-                  for (String keyword : keywords) {
-                      List<AccessibilityNodeInfo> nodes =
-                          root.findAccessibilityNodeInfosByText(keyword);
-                      if (nodes != null && !nodes.isEmpty()) {
-                          for (AccessibilityNodeInfo node : nodes) {
-                              String text = node.getText() != null ?
-                                  node.getText().toString() : "";
-                              node.recycle();
-                              float km = parseKm(text);
-                              if (km >= 0) return km;
-                          }
-                      }
+              private float findDistance(AccessibilityNodeInfo root, String keyword) {
+                  List<AccessibilityNodeInfo> nodes =
+                      root.findAccessibilityNodeInfosByText(keyword);
+                  if (nodes == null || nodes.isEmpty()) return -1f;
+                  for (AccessibilityNodeInfo node : nodes) {
+                      String text = node.getText() != null ? node.getText().toString() : "";
+                      node.recycle();
+                      float km = parseKm(text);
+                      if (km >= 0) return km;
                   }
                   return -1f;
               }
@@ -398,11 +541,10 @@ jobs:
               private float parseKm(String text) {
                   try {
                       String[] parts = text.trim().split("\\s+");
-                      if (parts.length > 0) {
+                      if (parts.length > 0)
                           return Float.parseFloat(parts[0].replace(",", "."));
-                      }
                   } catch (Exception e) {
-                      Log.e(TAG, "Parse error: " + e.getMessage());
+                      Log.e(TAG, "Parse: " + e.getMessage());
                   }
                   return -1f;
               }
@@ -443,5 +585,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Auto-Swipe
+          name: Saned-Auto-Swipe-v4
           path: app/build/outputs/apk/debug/*.apk
