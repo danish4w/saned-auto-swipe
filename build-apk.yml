@@ -1,0 +1,13 @@
+name: Build APK
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Hello World"
+      - run: mkdir -p output
+      - run: echo "APK test" > output/app.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: my-apk
+          path: output/
