@@ -18,6 +18,8 @@ jobs:
           mkdir -p app/src/main/java/com/saned/autoswipe
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
           mkdir -p gradle/wrapper
 
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
@@ -57,15 +59,22 @@ jobs:
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.core:core:1.10.1'
           }
           EOF
 
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-              <application android:label="Saned Auto" android:theme="@style/Theme.AppCompat">
-                  <activity android:name=".MainActivity" android:exported="true">
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+              <application
+                  android:label="Saned Auto"
+                  android:icon="@drawable/ic_launcher"
+                  android:theme="@style/Theme.AppCompat">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
@@ -90,7 +99,21 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <accessibility-service
               xmlns:android="http://schemas.android.com/apk/res/android"
-              android:canPerformGestures="true"/>
+              android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+              android:accessibilityFeedbackType="feedbackGeneric"
+              android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows"
+              android:canPerformGestures="true"
+              android:canRetrieveWindowContent="true"
+              android:notificationTimeout="100"
+              android:packageNames="com.saned.delivery"/>
+          EOF
+
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">Saned Auto</string>
+              <string name="channel_name">Saned Auto Service</string>
+          </resources>
           EOF
 
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
@@ -98,34 +121,326 @@ jobs:
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
-              android:gravity="center">
-              <Button android:id="@+id/btn"
+              android:orientation="vertical"
+              android:gravity="center"
+              android:padding="24dp"
+              android:background="#121212">
+
+              <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="Start"/>
+                  android:text="Saned Auto Swipe"
+                  android:textSize="24sp"
+                  android:textColor="#FFFFFF"
+                  android:textStyle="bold"
+                  android:layout_marginBottom="8dp"/>
+
+              <TextView
+                  android:id="@+id/tv_status"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Service OFF"
+                  android:textSize="16sp"
+                  android:textColor="#FF5555"
+                  android:layout_marginBottom="32dp"/>
+
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Min Distance (Km)"
+                  android:textColor="#AAAAAA"
+                  android:textSize="14sp"/>
+              <EditText
+                  android:id="@+id/et_min"
+                  android:layout_width="200dp"
+                  android:layout_height="wrap_content"
+                  android:inputType="numberDecimal"
+                  android:text="0.1"
+                  android:textColor="#FFFFFF"
+                  android:backgroundTint="#444444"
+                  android:gravity="center"
+                  android:layout_marginBottom="16dp"/>
+
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Max Distance (Km)"
+                  android:textColor="#AAAAAA"
+                  android:textSize="14sp"/>
+              <EditText
+                  android:id="@+id/et_max"
+                  android:layout_width="200dp"
+                  android:layout_height="wrap_content"
+                  android:inputType="numberDecimal"
+                  android:text="10.0"
+                  android:textColor="#FFFFFF"
+                  android:backgroundTint="#444444"
+                  android:gravity="center"
+                  android:layout_marginBottom="32dp"/>
+
+              <Switch
+                  android:id="@+id/switch_service"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Auto Accept"
+                  android:textColor="#FFFFFF"
+                  android:textSize="18sp"
+                  android:layout_marginBottom="24dp"/>
+
+              <TextView
+                  android:id="@+id/tv_info"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Pehle Accessibility Service enable karein"
+                  android:textColor="#FFAA00"
+                  android:textSize="13sp"
+                  android:gravity="center"/>
+
+              <Button
+                  android:id="@+id/btn_accessibility"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Open Accessibility Settings"
+                  android:layout_marginTop="16dp"
+                  android:backgroundTint="#1DB954"/>
+
           </LinearLayout>
+          EOF
+
+          # Launcher icon (simple green circle)
+          cat > app/src/main/res/drawable/ic_launcher.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android"
+              android:shape="oval">
+              <solid android:color="#1DB954"/>
+          </shape>
           EOF
 
           cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
           package com.saned.autoswipe;
+
+          import android.content.Intent;
+          import android.content.SharedPreferences;
           import android.os.Bundle;
+          import android.provider.Settings;
+          import android.widget.Button;
+          import android.widget.CompoundButton;
+          import android.widget.EditText;
+          import android.widget.Switch;
+          import android.widget.TextView;
           import androidx.appcompat.app.AppCompatActivity;
+
           public class MainActivity extends AppCompatActivity {
+
+              Switch switchService;
+              EditText etMin, etMax;
+              TextView tvStatus, tvInfo;
+              Button btnAccessibility;
+              SharedPreferences prefs;
+
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
+
+                  prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  switchService = findViewById(R.id.switch_service);
+                  etMin = findViewById(R.id.et_min);
+                  etMax = findViewById(R.id.et_max);
+                  tvStatus = findViewById(R.id.tv_status);
+                  tvInfo = findViewById(R.id.tv_info);
+                  btnAccessibility = findViewById(R.id.btn_accessibility);
+
+                  float savedMin = prefs.getFloat("min_km", 0.1f);
+                  float savedMax = prefs.getFloat("max_km", 10.0f);
+                  etMin.setText(String.valueOf(savedMin));
+                  etMax.setText(String.valueOf(savedMax));
+
+                  btnAccessibility.setOnClickListener(v -> {
+                      startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                  });
+
+                  switchService.setOnCheckedChangeListener((btn, isChecked) -> {
+                      float minKm, maxKm;
+                      try {
+                          minKm = Float.parseFloat(etMin.getText().toString());
+                          maxKm = Float.parseFloat(etMax.getText().toString());
+                      } catch (Exception e) {
+                          minKm = 0.1f;
+                          maxKm = 10.0f;
+                      }
+                      prefs.edit()
+                          .putFloat("min_km", minKm)
+                          .putFloat("max_km", maxKm)
+                          .putBoolean("enabled", isChecked)
+                          .apply();
+
+                      if (isChecked) {
+                          tvStatus.setText("Service ON - Waiting for order...");
+                          tvStatus.setTextColor(0xFF1DB954);
+                      } else {
+                          tvStatus.setText("Service OFF");
+                          tvStatus.setTextColor(0xFFFF5555);
+                      }
+                  });
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  boolean enabled = prefs.getBoolean("enabled", false);
+                  switchService.setChecked(enabled);
+                  if (isAccessibilityEnabled()) {
+                      tvInfo.setText("Accessibility Service: Active");
+                      tvInfo.setTextColor(0xFF1DB954);
+                  } else {
+                      tvInfo.setText("Pehle Accessibility Service enable karein!");
+                      tvInfo.setTextColor(0xFFFFAA00);
+                  }
+              }
+
+              private boolean isAccessibilityEnabled() {
+                  try {
+                      String enabledServices = Settings.Secure.getString(
+                          getContentResolver(),
+                          Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+                      return enabledServices != null &&
+                          enabledServices.contains(getPackageName());
+                  } catch (Exception e) {
+                      return false;
+                  }
               }
           }
           EOF
 
           cat > app/src/main/java/com/saned/autoswipe/AutoSwipeService.java << 'EOF'
           package com.saned.autoswipe;
+
           import android.accessibilityservice.AccessibilityService;
+          import android.accessibilityservice.GestureDescription;
+          import android.content.SharedPreferences;
+          import android.graphics.Path;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.util.Log;
           import android.view.accessibility.AccessibilityEvent;
+          import android.view.accessibility.AccessibilityNodeInfo;
+          import java.util.List;
+
           public class AutoSwipeService extends AccessibilityService {
-              @Override public void onAccessibilityEvent(AccessibilityEvent e) {}
-              @Override public void onInterrupt() {}
+
+              private static final String TAG = "SanedAutoSwipe";
+              private SharedPreferences prefs;
+              private Handler handler = new Handler(Looper.getMainLooper());
+              private boolean orderAccepted = false;
+
+              @Override
+              public void onServiceConnected() {
+                  super.onServiceConnected();
+                  prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  Log.d(TAG, "Service Connected");
+              }
+
+              @Override
+              public void onAccessibilityEvent(AccessibilityEvent event) {
+                  if (orderAccepted) return;
+
+                  boolean enabled = prefs.getBoolean("enabled", false);
+                  if (!enabled) return;
+
+                  String packageName = String.valueOf(event.getPackageName());
+                  if (!packageName.contains("saned")) return;
+
+                  handler.postDelayed(() -> {
+                      try {
+                          checkAndAcceptOrder();
+                      } catch (Exception e) {
+                          Log.e(TAG, "Error: " + e.getMessage());
+                      }
+                  }, 300);
+              }
+
+              private void checkAndAcceptOrder() {
+                  AccessibilityNodeInfo root = getRootInActiveWindow();
+                  if (root == null) return;
+
+                  float minKm = prefs.getFloat("min_km", 0.1f);
+                  float maxKm = prefs.getFloat("max_km", 10.0f);
+
+                  // "New Order" screen check
+                  List<AccessibilityNodeInfo> newOrderNodes = root.findAccessibilityNodeInfosByText("New Order");
+                  if (newOrderNodes == null || newOrderNodes.isEmpty()) {
+                      root.recycle();
+                      return;
+                  }
+
+                  // Pickup distance dhundo "X.X Km From You"
+                  float pickupKm = -1f;
+                  List<AccessibilityNodeInfo> allNodes = root.findAccessibilityNodeInfosByText("Km From You");
+                  if (allNodes != null) {
+                      for (AccessibilityNodeInfo node : allNodes) {
+                          String text = node.getText() != null ? node.getText().toString() : "";
+                          pickupKm = extractKm(text);
+                          node.recycle();
+                          if (pickupKm >= 0) break;
+                      }
+                  }
+
+                  Log.d(TAG, "Pickup KM: " + pickupKm + " | Min: " + minKm + " | Max: " + maxKm);
+
+                  if (pickupKm < 0) {
+                      root.recycle();
+                      return;
+                  }
+
+                  // Distance check
+                  if (pickupKm >= minKm && pickupKm <= maxKm) {
+                      // Accept button dhundo
+                      List<AccessibilityNodeInfo> acceptNodes = root.findAccessibilityNodeInfosByText("Accept");
+                      if (acceptNodes != null && !acceptNodes.isEmpty()) {
+                          AccessibilityNodeInfo acceptBtn = acceptNodes.get(0);
+                          if (acceptBtn != null) {
+                              boolean clicked = acceptBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                              if (!clicked) {
+                                  // Parent ko click karo agar direct nahi hua
+                                  AccessibilityNodeInfo parent = acceptBtn.getParent();
+                                  if (parent != null) {
+                                      parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                                      parent.recycle();
+                                  }
+                              }
+                              Log.d(TAG, "Order Accepted! KM: " + pickupKm);
+                              orderAccepted = true;
+
+                              // Service disable karo after accept
+                              prefs.edit().putBoolean("enabled", false).apply();
+                              acceptBtn.recycle();
+                          }
+                      }
+                  } else {
+                      Log.d(TAG, "Order skip - Distance out of range: " + pickupKm);
+                  }
+
+                  root.recycle();
+              }
+
+              private float extractKm(String text) {
+                  try {
+                      // "3.7 Km From You" se 3.7 nikalna
+                      String[] parts = text.trim().split("\\s+");
+                      if (parts.length > 0) {
+                          return Float.parseFloat(parts[0]);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "KM parse error: " + e.getMessage());
+                  }
+                  return -1f;
+              }
+
+              @Override
+              public void onInterrupt() {
+                  Log.d(TAG, "Service Interrupted");
+              }
           }
           EOF
 
@@ -134,5 +449,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Auto-Final
+          name: Saned-Auto-Swipe
           path: app/build/outputs/apk/debug/*.apk
