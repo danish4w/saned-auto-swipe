@@ -31,7 +31,8 @@ jobs:
 
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
-          android.enableJetifier=true
+          android.enableJetifier=false
+          org.gradle.jvmargs=-Xmx2048m
           EOF
 
           cat > build.gradle << 'EOF'
@@ -56,10 +57,13 @@ jobs:
                   versionCode 1
                   versionName '1.0'
               }
+              packagingOptions {
+                  exclude 'META-INF/LICENSE.md'
+                  exclude 'META-INF/LICENSE-notice.md'
+              }
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'androidx.core:core:1.10.1'
           }
           EOF
 
@@ -67,7 +71,6 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
               <application
                   android:label="Saned Auto"
                   android:icon="@drawable/ic_launcher"
@@ -112,8 +115,15 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">Saned Auto</string>
-              <string name="channel_name">Saned Auto Service</string>
           </resources>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_launcher.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android"
+              android:shape="oval">
+              <solid android:color="#1DB954"/>
+          </shape>
           EOF
 
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
@@ -207,15 +217,6 @@ jobs:
           </LinearLayout>
           EOF
 
-          # Launcher icon (simple green circle)
-          cat > app/src/main/res/drawable/ic_launcher.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android"
-              android:shape="oval">
-              <solid android:color="#1DB954"/>
-          </shape>
-          EOF
-
           cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
           package com.saned.autoswipe;
 
@@ -224,7 +225,6 @@ jobs:
           import android.os.Bundle;
           import android.provider.Settings;
           import android.widget.Button;
-          import android.widget.CompoundButton;
           import android.widget.EditText;
           import android.widget.Switch;
           import android.widget.TextView;
@@ -256,9 +256,9 @@ jobs:
                   etMin.setText(String.valueOf(savedMin));
                   etMax.setText(String.valueOf(savedMax));
 
-                  btnAccessibility.setOnClickListener(v -> {
-                      startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                  });
+                  btnAccessibility.setOnClickListener(v ->
+                      startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                  );
 
                   switchService.setOnCheckedChangeListener((btn, isChecked) -> {
                       float minKm, maxKm;
@@ -291,7 +291,7 @@ jobs:
                   boolean enabled = prefs.getBoolean("enabled", false);
                   switchService.setChecked(enabled);
                   if (isAccessibilityEnabled()) {
-                      tvInfo.setText("Accessibility Service: Active");
+                      tvInfo.setText("Accessibility Service: Active ✓");
                       tvInfo.setTextColor(0xFF1DB954);
                   } else {
                       tvInfo.setText("Pehle Accessibility Service enable karein!");
@@ -317,9 +317,7 @@ jobs:
           package com.saned.autoswipe;
 
           import android.accessibilityservice.AccessibilityService;
-          import android.accessibilityservice.GestureDescription;
           import android.content.SharedPreferences;
-          import android.graphics.Path;
           import android.os.Handler;
           import android.os.Looper;
           import android.util.Log;
@@ -329,10 +327,9 @@ jobs:
 
           public class AutoSwipeService extends AccessibilityService {
 
-              private static final String TAG = "SanedAutoSwipe";
+              private static final String TAG = "SanedAuto";
               private SharedPreferences prefs;
-              private Handler handler = new Handler(Looper.getMainLooper());
-              private boolean orderAccepted = false;
+              private final Handler handler = new Handler(Looper.getMainLooper());
 
               @Override
               public void onServiceConnected() {
@@ -343,104 +340,101 @@ jobs:
 
               @Override
               public void onAccessibilityEvent(AccessibilityEvent event) {
-                  if (orderAccepted) return;
+                  if (prefs == null) return;
+                  if (!prefs.getBoolean("enabled", false)) return;
 
-                  boolean enabled = prefs.getBoolean("enabled", false);
-                  if (!enabled) return;
+                  String pkg = String.valueOf(event.getPackageName());
+                  if (!pkg.contains("saned")) return;
 
-                  String packageName = String.valueOf(event.getPackageName());
-                  if (!packageName.contains("saned")) return;
-
-                  handler.postDelayed(() -> {
-                      try {
-                          checkAndAcceptOrder();
-                      } catch (Exception e) {
-                          Log.e(TAG, "Error: " + e.getMessage());
-                      }
-                  }, 300);
+                  handler.postDelayed(this::checkAndAccept, 400);
               }
 
-              private void checkAndAcceptOrder() {
+              private void checkAndAccept() {
                   AccessibilityNodeInfo root = getRootInActiveWindow();
                   if (root == null) return;
 
-                  float minKm = prefs.getFloat("min_km", 0.1f);
-                  float maxKm = prefs.getFloat("max_km", 10.0f);
+                  try {
+                      List<AccessibilityNodeInfo> newOrderList =
+                          root.findAccessibilityNodeInfosByText("New Order");
+                      if (newOrderList == null || newOrderList.isEmpty()) return;
 
-                  // "New Order" screen check
-                  List<AccessibilityNodeInfo> newOrderNodes = root.findAccessibilityNodeInfosByText("New Order");
-                  if (newOrderNodes == null || newOrderNodes.isEmpty()) {
-                      root.recycle();
-                      return;
-                  }
+                      float minKm = prefs.getFloat("min_km", 0.1f);
+                      float maxKm = prefs.getFloat("max_km", 10.0f);
 
-                  // Pickup distance dhundo "X.X Km From You"
-                  float pickupKm = -1f;
-                  List<AccessibilityNodeInfo> allNodes = root.findAccessibilityNodeInfosByText("Km From You");
-                  if (allNodes != null) {
-                      for (AccessibilityNodeInfo node : allNodes) {
-                          String text = node.getText() != null ? node.getText().toString() : "";
-                          pickupKm = extractKm(text);
-                          node.recycle();
-                          if (pickupKm >= 0) break;
-                      }
-                  }
+                      float pickupKm = getPickupDistance(root);
+                      Log.d(TAG, "Pickup: " + pickupKm + " km | Range: " + minKm + "-" + maxKm);
 
-                  Log.d(TAG, "Pickup KM: " + pickupKm + " | Min: " + minKm + " | Max: " + maxKm);
+                      if (pickupKm < 0) return;
 
-                  if (pickupKm < 0) {
-                      root.recycle();
-                      return;
-                  }
-
-                  // Distance check
-                  if (pickupKm >= minKm && pickupKm <= maxKm) {
-                      // Accept button dhundo
-                      List<AccessibilityNodeInfo> acceptNodes = root.findAccessibilityNodeInfosByText("Accept");
-                      if (acceptNodes != null && !acceptNodes.isEmpty()) {
-                          AccessibilityNodeInfo acceptBtn = acceptNodes.get(0);
-                          if (acceptBtn != null) {
-                              boolean clicked = acceptBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                              if (!clicked) {
-                                  // Parent ko click karo agar direct nahi hua
-                                  AccessibilityNodeInfo parent = acceptBtn.getParent();
-                                  if (parent != null) {
-                                      parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                                      parent.recycle();
-                                  }
-                              }
-                              Log.d(TAG, "Order Accepted! KM: " + pickupKm);
-                              orderAccepted = true;
-
-                              // Service disable karo after accept
+                      if (pickupKm >= minKm && pickupKm <= maxKm) {
+                          if (clickAccept(root)) {
+                              Log.d(TAG, "ORDER ACCEPTED! " + pickupKm + " km");
                               prefs.edit().putBoolean("enabled", false).apply();
-                              acceptBtn.recycle();
                           }
                       }
-                  } else {
-                      Log.d(TAG, "Order skip - Distance out of range: " + pickupKm);
+                  } finally {
+                      root.recycle();
                   }
-
-                  root.recycle();
               }
 
-              private float extractKm(String text) {
-                  try {
-                      // "3.7 Km From You" se 3.7 nikalna
-                      String[] parts = text.trim().split("\\s+");
-                      if (parts.length > 0) {
-                          return Float.parseFloat(parts[0]);
+              private float getPickupDistance(AccessibilityNodeInfo root) {
+                  String[] keywords = {"Km From You", "KM From You", "km from you"};
+                  for (String keyword : keywords) {
+                      List<AccessibilityNodeInfo> nodes =
+                          root.findAccessibilityNodeInfosByText(keyword);
+                      if (nodes != null && !nodes.isEmpty()) {
+                          for (AccessibilityNodeInfo node : nodes) {
+                              String text = node.getText() != null ?
+                                  node.getText().toString() : "";
+                              node.recycle();
+                              float km = parseKm(text);
+                              if (km >= 0) return km;
+                          }
                       }
-                  } catch (Exception e) {
-                      Log.e(TAG, "KM parse error: " + e.getMessage());
                   }
                   return -1f;
               }
 
-              @Override
-              public void onInterrupt() {
-                  Log.d(TAG, "Service Interrupted");
+              private float parseKm(String text) {
+                  try {
+                      String[] parts = text.trim().split("\\s+");
+                      if (parts.length > 0) {
+                          return Float.parseFloat(parts[0].replace(",", "."));
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Parse error: " + e.getMessage());
+                  }
+                  return -1f;
               }
+
+              private boolean clickAccept(AccessibilityNodeInfo root) {
+                  String[] labels = {"Accept", "ACCEPT", "قبول"};
+                  for (String label : labels) {
+                      List<AccessibilityNodeInfo> nodes =
+                          root.findAccessibilityNodeInfosByText(label);
+                      if (nodes != null && !nodes.isEmpty()) {
+                          AccessibilityNodeInfo btn = nodes.get(0);
+                          if (btn != null) {
+                              boolean clicked = btn.performAction(
+                                  AccessibilityNodeInfo.ACTION_CLICK);
+                              if (!clicked) {
+                                  AccessibilityNodeInfo parent = btn.getParent();
+                                  if (parent != null) {
+                                      clicked = parent.performAction(
+                                          AccessibilityNodeInfo.ACTION_CLICK);
+                                      parent.recycle();
+                                  }
+                              }
+                              btn.recycle();
+                              if (clicked) return true;
+                          }
+                      }
+                  }
+                  return false;
+              }
+
+              @Override
+              public void onInterrupt() {}
           }
           EOF
 
