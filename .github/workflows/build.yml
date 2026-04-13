@@ -21,21 +21,14 @@ jobs:
           mkdir -p app/src/main/res/xml
           mkdir -p gradle/wrapper
 
+          # Gradle wrapper files (dono - script + jar)
+          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
+          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
+          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.properties -o gradle/wrapper/gradle-wrapper.properties
+          chmod +x gradlew
+
           # settings.gradle
           echo "include ':app'" > settings.gradle
-
-          # gradle-wrapper.properties (yahi Gradle download karta hai)
-          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.9-bin.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-
-          # gradlew script
-          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
-          chmod +x gradlew
 
           # root build.gradle
           cat > build.gradle << 'EOF'
@@ -141,7 +134,7 @@ jobs:
           }
           EOF
 
-          # Build
+          # Build!
           ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
