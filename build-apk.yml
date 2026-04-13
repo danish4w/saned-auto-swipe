@@ -4,10 +4,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Hello World"
-      - run: mkdir -p output
-      - run: echo "APK test" > output/app.apk
-      - uses: actions/upload-artifact@v4
+      - name: Create APK file
+        run: |
+          mkdir -p app/build/outputs/apk/debug
+          echo "Saned Auto Swipe - Test APK" > app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: my-apk
-          path: output/
+          name: Saned-Auto-Swipe
+          path: app/build/outputs/apk/debug/app-debug.apk
