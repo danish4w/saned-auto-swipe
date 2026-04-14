@@ -1,4 +1,4 @@
-name: Build Jahez Order Simulator
+name: Build Saned Order Simulator
 on: workflow_dispatch
 
 jobs:
@@ -15,9 +15,8 @@ jobs:
 
       - name: Build Project
         run: |
-          mkdir -p app/src/main/java/com/ordersimulator
+          mkdir -p app/src/main/java/com/sanedsimulator
           mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/values
           mkdir -p gradle/wrapper
 
@@ -47,10 +46,10 @@ jobs:
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.ordersimulator'
+              namespace 'com.sanedsimulator'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.ordersimulator'
+                  applicationId 'com.sanedsimulator'
                   minSdk 26
                   targetSdk 34
                   versionCode 1
@@ -59,7 +58,6 @@ jobs:
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'com.google.android.material:material:1.11.0'
           }
           EOF
 
@@ -67,7 +65,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
-                  android:label="Order Simulator"
+                  android:label="Saned Simulator"
                   android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
@@ -81,33 +79,11 @@ jobs:
           </manifest>
           EOF
 
-          cat > app/src/main/res/values/colors.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <color name="purple_200">#FFBB86FC</color>
-              <color name="purple_500">#FF6200EE</color>
-              <color name="purple_700">#FF3700B3</color>
-              <color name="teal_200">#FF03DAC5</color>
-              <color name="teal_700">#FF018786</color>
-              <color name="black">#FF000000</color>
-              <color name="white">#FFFFFFFF</color>
-          </resources>
-          EOF
-
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">Order Simulator</string>
+              <string name="app_name">Saned Simulator</string>
           </resources>
-          EOF
-
-          cat > app/src/main/res/drawable/green_button.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android">
-              <solid android:color="#4CAF50"/>
-              <corners android:radius="30dp"/>
-              <stroke android:width="2dp" android:color="#388E3C"/>
-          </shape>
           EOF
 
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
@@ -116,105 +92,208 @@ jobs:
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:orientation="vertical"
-              android:background="#121212"
-              android:padding="20dp">
+              android:background="#F5F5F5"
+              android:padding="16dp">
 
+              <!-- Header -->
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="horizontal"
+                  android:layout_marginBottom="16dp">
+
+                  <TextView
+                      android:layout_width="0dp"
+                      android:layout_height="wrap_content"
+                      android:layout_weight="1"
+                      android:text="📦 Saned"
+                      android:textSize="20sp"
+                      android:textColor="#FF5722"
+                      android:textStyle="bold"/>
+
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Driver"
+                      android:textSize="14sp"
+                      android:textColor="#666666"/>
+
+              </LinearLayout>
+
+              <!-- New Order Badge -->
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="📦 Jahez Order Simulator"
-                  android:textSize="22sp"
-                  android:textColor="#FFFFFF"
-                  android:textStyle="bold"
-                  android:layout_gravity="center"
-                  android:layout_marginTop="20dp"
-                  android:layout_marginBottom="10dp"/>
-
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Training Mode"
+                  android:text="🆕 NEW ORDER"
                   android:textSize="14sp"
-                  android:textColor="#AAAAAA"
-                  android:layout_gravity="center"
-                  android:layout_marginBottom="30dp"/>
+                  android:textColor="#FF9800"
+                  android:textStyle="bold"
+                  android:background="#FFF3E0"
+                  android:padding="8dp"
+                  android:layout_marginBottom="16dp"/>
 
               <!-- Order Card -->
               <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:orientation="vertical"
-                  android:background="#1E1E1E"
-                  android:padding="20dp"
+                  android:background="#FFFFFF"
+                  android:elevation="4dp"
+                  android:padding="16dp"
                   android:layout_marginBottom="20dp">
 
-                  <TextView
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="🆕 NEW ORDER"
-                      android:textSize="16sp"
-                      android:textColor="#FF9800"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="15dp"/>
-
-                  <TextView
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="JAHEZ"
-                      android:textSize="18sp"
-                      android:textColor="#4CAF50"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="10dp"/>
-
-                  <TextView
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="₪ 10.0"
-                      android:textSize="16sp"
-                      android:textColor="#FFFFFF"
-                      android:layout_marginBottom="15dp"/>
-
-                  <TextView
+                  <!-- Delivery Fee -->
+                  <LinearLayout
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Pick-up from Al Thumamah Rd."
+                      android:orientation="horizontal"
+                      android:layout_marginBottom="16dp">
+
+                      <TextView
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:text="Delivery Fee"
+                          android:textSize="14sp"
+                          android:textColor="#666666"/>
+
+                      <TextView
+                          android:id="@+id/tv_delivery_fee"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="SAR 12.00"
+                          android:textSize="18sp"
+                          android:textColor="#4CAF50"
+                          android:textStyle="bold"/>
+
+                  </LinearLayout>
+
+                  <!-- Pickup Section -->
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="📍 PICKUP"
+                      android:textSize="12sp"
+                      android:textColor="#FF5722"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="8dp"/>
+
+                  <TextView
+                      android:id="@+id/tv_pickup_address"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Al Thumamah Rd., Ar Rabi District"
                       android:textSize="14sp"
-                      android:textColor="#DDDDDD"
-                      android:layout_marginBottom="5dp"/>
+                      android:textColor="#333333"
+                      android:layout_marginBottom="8dp"/>
 
                   <TextView
                       android:id="@+id/tv_pickup_distance"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="1.6 Km From You"
-                      android:textSize="14sp"
+                      android:text="🚗 1.6 km from you"
+                      android:textSize="13sp"
                       android:textColor="#FF9800"
-                      android:layout_marginBottom="10dp"/>
+                      android:layout_marginBottom="16dp"/>
+
+                  <!-- Divider -->
+                  <View
+                      android:layout_width="match_parent"
+                      android:layout_height="1dp"
+                      android:background="#EEEEEE"
+                      android:layout_marginVertical="12dp"/>
+
+                  <!-- Drop Section -->
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="📍 DROP"
+                      android:textSize="12sp"
+                      android:textColor="#4CAF50"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="8dp"/>
 
                   <TextView
+                      android:id="@+id/tv_drop_address"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Drop off at Al Aqiq, Riyadh"
+                      android:text="QJ7R+Q88, Al Aqiq, Riyadh 13519"
                       android:textSize="14sp"
-                      android:textColor="#DDDDDD"
-                      android:layout_marginBottom="5dp"/>
+                      android:textColor="#333333"
+                      android:layout_marginBottom="8dp"/>
 
                   <TextView
                       android:id="@+id/tv_drop_distance"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="2.9 Km From Pickup"
-                      android:textSize="14sp"
+                      android:text="🚗 2.9 km from pickup"
+                      android:textSize="13sp"
                       android:textColor="#FF9800"
-                      android:layout_marginBottom="20dp"/>
+                      android:layout_marginBottom="16dp"/>
 
-                  <!-- Swipe Button -->
+                  <!-- Customer Note -->
                   <LinearLayout
                       android:layout_width="match_parent"
-                      android:layout_height="60dp"
-                      android:background="@drawable/green_button"
+                      android:layout_height="wrap_content"
+                      android:background="#FFF9C4"
+                      android:padding="10dp"
+                      android:layout_marginTop="8dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="📝"
+                          android:textSize="14sp"
+                          android:layout_marginEnd="8dp"/>
+
+                      <TextView
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:text="Please call upon arrival"
+                          android:textSize="12sp"
+                          android:textColor="#666666"/>
+
+                  </LinearLayout>
+
+              </LinearLayout>
+
+              <!-- Action Buttons -->
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="horizontal"
+                  android:layout_marginBottom="20dp">
+
+                  <!-- Reject Button -->
+                  <LinearLayout
+                      android:id="@+id/btn_reject"
+                      android:layout_width="0dp"
+                      android:layout_height="50dp"
+                      android:layout_weight="1"
+                      android:background="#F44336"
+                      android:gravity="center"
+                      android:layout_marginEnd="8dp">
+
+                      <TextView
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:text="Reject"
+                          android:textSize="16sp"
+                          android:textColor="#FFFFFF"
+                          android:textStyle="bold"/>
+
+                  </LinearLayout>
+
+                  <!-- Accept Button (Swipe Area) -->
+                  <LinearLayout
+                      android:id="@+id/swipe_container"
+                      android:layout_width="0dp"
+                      android:layout_height="50dp"
+                      android:layout_weight="1"
+                      android:background="#4CAF50"
                       android:orientation="horizontal"
-                      android:gravity="center_vertical">
+                      android:gravity="center_vertical"
+                      android:layout_marginStart="8dp">
 
                       <TextView
                           android:id="@+id/tv_swipe_status"
@@ -222,17 +301,17 @@ jobs:
                           android:layout_height="match_parent"
                           android:layout_weight="1"
                           android:text="     Swipe to Accept →"
-                          android:textSize="16sp"
+                          android:textSize="14sp"
                           android:textColor="#FFFFFF"
                           android:textStyle="bold"
                           android:gravity="center_vertical"/>
 
                       <TextView
                           android:id="@+id/tv_swipe_arrow"
-                          android:layout_width="50dp"
+                          android:layout_width="40dp"
                           android:layout_height="match_parent"
                           android:text="→→"
-                          android:textSize="20sp"
+                          android:textSize="16sp"
                           android:textColor="#FFFFFF"
                           android:gravity="center"
                           android:background="#388E3C"/>
@@ -243,61 +322,58 @@ jobs:
 
               <!-- Status -->
               <TextView
-                  android:id="@+id/tv_order_status"
+                  android:id="@+id/tv_status"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:text="⏳ Waiting for swipe..."
-                  android:textSize="16sp"
+                  android:textSize="14sp"
                   android:textColor="#FF9800"
                   android:gravity="center"
-                  android:layout_marginBottom="20dp"/>
+                  android:layout_marginBottom="16dp"/>
 
-              <!-- Buttons -->
+              <!-- Control Buttons -->
               <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:orientation="horizontal">
+                  android:orientation="horizontal"
+                  android:layout_marginTop="10dp">
 
                   <Button
                       android:id="@+id/btn_new_order"
                       android:layout_width="0dp"
-                      android:layout_height="50dp"
+                      android:layout_height="45dp"
                       android:layout_weight="1"
-                      android:text="🔄 New Order"
-                      android:textSize="14sp"
-                      android:backgroundTint="#2196F3"
-                      android:layout_marginEnd="10dp"/>
+                      android:text="New Order"
+                      android:textSize="13sp"
+                      android:layout_marginEnd="8dp"/>
 
                   <Button
                       android:id="@+id/btn_reset"
                       android:layout_width="0dp"
-                      android:layout_height="50dp"
+                      android:layout_height="45dp"
                       android:layout_weight="1"
-                      android:text="🔁 Reset"
-                      android:textSize="14sp"
-                      android:backgroundTint="#F44336"/>
+                      android:text="Reset"
+                      android:textSize="13sp"/>
 
               </LinearLayout>
 
+              <!-- Instructions -->
               <TextView
-                  android:id="@+id/tv_instruction"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="💡 Instruction:\n1. Order accept karne ke liye green button ko LEFT se RIGHT swipe karein\n2. Accept ho jayega\n3. New Order ke liye 'New Order' button dabayein"
-                  android:textSize="12sp"
-                  android:textColor="#666666"
+                  android:text="💡 Instructions:\n1. Green 'Swipe to Accept' ko left se right swipe karein\n2. Order accept ho jayega\n3. 'New Order' se next order test karein\n4. 'Reset' se current order reset karein"
+                  android:textSize="11sp"
+                  android:textColor="#999999"
                   android:layout_marginTop="20dp"
-                  android:lineSpacingExtra="4dp"/>
+                  android:lineSpacingExtra="3dp"/>
 
           </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/ordersimulator/MainActivity.java << 'EOF'
-          package com.ordersimulator;
+          cat > app/src/main/java/com/sanedsimulator/MainActivity.java << 'EOF'
+          package com.sanedsimulator;
 
           import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.Looper;
           import android.view.MotionEvent;
           import android.view.View;
           import android.widget.Button;
@@ -309,31 +385,54 @@ jobs:
 
           public class MainActivity extends AppCompatActivity {
 
-              private TextView tvPickupDistance, tvDropDistance, tvOrderStatus, tvSwipeStatus;
-              private LinearLayout swipeButton;
+              private TextView tvPickupAddress, tvPickupDistance, tvDropAddress, tvDropDistance;
+              private TextView tvDeliveryFee, tvStatus, tvSwipeStatus;
+              private LinearLayout swipeContainer, btnReject;
               private Button btnNewOrder, btnReset;
-              private Handler handler = new Handler(Looper.getMainLooper());
               private boolean isOrderAccepted = false;
-              private float startX = 0;
+              private float currentPickup = 0;
+              private float currentDrop = 0;
               private Random random = new Random();
+
+              private String[] pickupAddresses = {
+                  "Al Thumamah Rd., Ar Rabi District",
+                  "King Fahd Rd., Al Malaz",
+                  "Olaya St., Al Olaya",
+                  "Tahlia St., Al Aqiq",
+                  "Prince Sultan Rd., Al Rawabi",
+                  "Al Madinah Rd., Al Nakheel"
+              };
+
+              private String[] dropAddresses = {
+                  "QJ7R+Q88, Al Aqiq, Riyadh 13519",
+                  "King Abdullah Rd., Al Malaz",
+                  "Prince Turki St., Al Yasmin",
+                  "Al Tahliya St., Al Olaya",
+                  "Northern Ring Rd., Al Rawabi",
+                  "Eastern Ring Rd., Al Nakheel"
+              };
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
 
+                  tvPickupAddress = findViewById(R.id.tv_pickup_address);
                   tvPickupDistance = findViewById(R.id.tv_pickup_distance);
+                  tvDropAddress = findViewById(R.id.tv_drop_address);
                   tvDropDistance = findViewById(R.id.tv_drop_distance);
-                  tvOrderStatus = findViewById(R.id.tv_order_status);
+                  tvDeliveryFee = findViewById(R.id.tv_delivery_fee);
+                  tvStatus = findViewById(R.id.tv_status);
                   tvSwipeStatus = findViewById(R.id.tv_swipe_status);
-                  swipeButton = findViewById(R.id.tv_swipe_arrow);
+                  swipeContainer = findViewById(R.id.swipe_container);
+                  btnReject = findViewById(R.id.btn_reject);
                   btnNewOrder = findViewById(R.id.btn_new_order);
                   btnReset = findViewById(R.id.btn_reset);
 
                   generateRandomOrder();
 
-                  // Swipe detection on green button area
-                  findViewById(R.id.tv_swipe_arrow).setOnTouchListener(new View.OnTouchListener() {
+                  // Swipe detection on accept button
+                  swipeContainer.setOnTouchListener(new View.OnTouchListener() {
                       private float startX = 0;
                       private boolean isSwiping = false;
 
@@ -370,24 +469,31 @@ jobs:
                       }
                   });
 
-                  btnNewOrder.setOnClickListener(v -> {
-                      if (isOrderAccepted) {
+                  // Reject button
+                  btnReject.setOnClickListener(v -> {
+                      if (!isOrderAccepted) {
+                          Toast.makeText(MainActivity.this, "Order Rejected! Press New Order", Toast.LENGTH_SHORT).show();
                           generateRandomOrder();
-                          isOrderAccepted = false;
-                          tvOrderStatus.setText("⏳ Waiting for swipe...");
-                          tvOrderStatus.setTextColor(0xFFFF9800);
-                          tvSwipeStatus.setText("     Swipe to Accept →");
-                          Toast.makeText(this, "New order generated!", Toast.LENGTH_SHORT).show();
                       } else {
-                          generateRandomOrder();
-                          Toast.makeText(this, "New random order generated!", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(MainActivity.this, "Already accepted! Press New Order", Toast.LENGTH_SHORT).show();
                       }
                   });
 
+                  // New Order button
+                  btnNewOrder.setOnClickListener(v -> {
+                      generateRandomOrder();
+                      isOrderAccepted = false;
+                      tvStatus.setText("⏳ New Order Available! Swipe to accept");
+                      tvStatus.setTextColor(0xFFFF9800);
+                      tvSwipeStatus.setText("     Swipe to Accept →");
+                      Toast.makeText(this, "New order generated!", Toast.LENGTH_SHORT).show();
+                  });
+
+                  // Reset button
                   btnReset.setOnClickListener(v -> {
                       isOrderAccepted = false;
-                      tvOrderStatus.setText("⏳ Waiting for swipe...");
-                      tvOrderStatus.setTextColor(0xFFFF9800);
+                      tvStatus.setText("⏳ Waiting for swipe...");
+                      tvStatus.setTextColor(0xFFFF9800);
                       tvSwipeStatus.setText("     Swipe to Accept →");
                       Toast.makeText(this, "Reset! Swipe to accept", Toast.LENGTH_SHORT).show();
                   });
@@ -395,40 +501,33 @@ jobs:
 
               private void generateRandomOrder() {
                   // Pickup distance: 0.1 to 2.0 km
-                  float pickupKm = 0.1f + random.nextFloat() * 1.9f;
-                  pickupKm = Math.round(pickupKm * 10) / 10.0f;
+                  currentPickup = 0.1f + random.nextFloat() * 1.9f;
+                  currentPickup = Math.round(currentPickup * 10) / 10.0f;
                   
                   // Drop distance: 0.1 to 5.0 km
-                  float dropKm = 0.1f + random.nextFloat() * 4.9f;
-                  dropKm = Math.round(dropKm * 10) / 10.0f;
+                  currentDrop = 0.1f + random.nextFloat() * 4.9f;
+                  currentDrop = Math.round(currentDrop * 10) / 10.0f;
                   
-                  String[] pickupLocations = {"Al Thumamah Rd.", "King Fahd Rd.", "Olaya St.", "Tahlia St.", "Al Aqiq"};
-                  String[] dropLocations = {"Al Aqiq", "Al Malaz", "Al Rawabi", "Al Nakheel", "Al Yasmin"};
+                  // Delivery fee: 8 to 25 SAR
+                  float fee = 8 + random.nextFloat() * 17;
+                  fee = Math.round(fee * 100) / 100.0f;
                   
-                  String pickupLocation = pickupLocations[random.nextInt(pickupLocations.length)];
-                  String dropLocation = dropLocations[random.nextInt(dropLocations.length)];
+                  // Random addresses
+                  String pickupAddr = pickupAddresses[random.nextInt(pickupAddresses.length)];
+                  String dropAddr = dropAddresses[random.nextInt(dropAddresses.length)];
                   
-                  tvPickupDistance.setText(pickupKm + " Km From You");
-                  tvDropDistance.setText(dropKm + " Km From Pickup");
-                  
-                  // Update the address text in the layout
-                  TextView pickupAddr = findViewById(android.R.id.text1);
-                  TextView dropAddr = findViewById(android.R.id.text2);
-                  
-                  // Store distances for acceptance check
-                  getIntent().putExtra("pickup", pickupKm);
-                  getIntent().putExtra("drop", dropKm);
+                  tvPickupAddress.setText(pickupAddr);
+                  tvPickupDistance.setText("🚗 " + currentPickup + " km from you");
+                  tvDropAddress.setText(dropAddr);
+                  tvDropDistance.setText("🚗 " + currentDrop + " km from pickup");
+                  tvDeliveryFee.setText("SAR " + String.format("%.2f", fee));
               }
 
               private void acceptOrder() {
                   isOrderAccepted = true;
-                  float pickup = getIntent().getFloatExtra("pickup", 0);
-                  float drop = getIntent().getFloatExtra("drop", 0);
-                  
-                  tvOrderStatus.setText("✅ ORDER ACCEPTED! ✅\nPickup: " + pickup + " km | Drop: " + drop + " km");
-                  tvOrderStatus.setTextColor(0xFF4CAF50);
+                  tvStatus.setText("✅ ORDER ACCEPTED!\nPickup: " + currentPickup + " km | Drop: " + currentDrop + " km");
+                  tvStatus.setTextColor(0xFF4CAF50);
                   tvSwipeStatus.setText("     ✓ Accepted ✓");
-                  
                   Toast.makeText(this, "🎉 Order Accepted! Press New Order for next", Toast.LENGTH_LONG).show();
               }
           }
@@ -440,5 +539,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Order-Simulator
+          name: Saned-Simulator
           path: app/build/outputs/apk/debug/*.apk
