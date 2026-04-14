@@ -1,4 +1,4 @@
-name: Build Saned Order Simulator
+name: Build Jahez Simulator Final
 on: workflow_dispatch
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
 
       - name: Build Project
         run: |
-          mkdir -p app/src/main/java/com/sanedsimulator
+          mkdir -p app/src/main/java/com/jahezsimulator
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p gradle/wrapper
@@ -46,10 +46,10 @@ jobs:
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.sanedsimulator'
+              namespace 'com.jahezsimulator'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.sanedsimulator'
+                  applicationId 'com.jahezsimulator'
                   minSdk 26
                   targetSdk 34
                   versionCode 1
@@ -65,7 +65,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
-                  android:label="Saned Simulator"
+                  android:label="Jahez Simulator"
                   android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
@@ -82,8 +82,94 @@ jobs:
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">Saned Simulator</string>
+              <string name="app_name">Jahez Simulator</string>
           </resources>
+          EOF
+
+          cat > app/src/main/res/layout/popup_layout.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="vertical"
+              android:background="#1E1E1E"
+              android:padding="20dp"
+              android:elevation="10dp">
+
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="🆕 NEW ORDER"
+                  android:textSize="18sp"
+                  android:textColor="#FF9800"
+                  android:textStyle="bold"
+                  android:layout_gravity="center"
+                  android:layout_marginBottom="15dp"/>
+
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="JAHEZ"
+                  android:textSize="22sp"
+                  android:textColor="#4CAF50"
+                  android:textStyle="bold"
+                  android:layout_gravity="center"
+                  android:layout_marginBottom="10dp"/>
+
+              <TextView
+                  android:id="@+id/popup_pickup"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Pickup: -- km"
+                  android:textSize="14sp"
+                  android:textColor="#FFFFFF"
+                  android:layout_marginBottom="8dp"/>
+
+              <TextView
+                  android:id="@+id/popup_drop"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Drop: -- km"
+                  android:textSize="14sp"
+                  android:textColor="#FFFFFF"
+                  android:layout_marginBottom="15dp"/>
+
+              <TextView
+                  android:id="@+id/popup_timer"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Next order in: 5"
+                  android:textSize="16sp"
+                  android:textColor="#FF9800"
+                  android:textStyle="bold"
+                  android:layout_gravity="center"
+                  android:layout_marginBottom="15dp"/>
+
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="horizontal">
+
+                  <Button
+                      android:id="@+id/popup_accept"
+                      android:layout_width="0dp"
+                      android:layout_height="45dp"
+                      android:layout_weight="1"
+                      android:text="Accept Order"
+                      android:textSize="14sp"
+                      android:layout_marginEnd="8dp"/>
+
+                  <Button
+                      android:id="@+id/popup_reject"
+                      android:layout_width="0dp"
+                      android:layout_height="45dp"
+                      android:layout_weight="1"
+                      android:text="Skip"
+                      android:textSize="14sp"/>
+
+              </LinearLayout>
+
+          </LinearLayout>
           EOF
 
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
@@ -92,231 +178,100 @@ jobs:
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:orientation="vertical"
-              android:background="#F5F5F5"
-              android:padding="16dp">
+              android:background="#121212"
+              android:padding="20dp">
 
-              <!-- Header -->
-              <LinearLayout
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:orientation="horizontal"
-                  android:layout_marginBottom="16dp">
-
-                  <TextView
-                      android:layout_width="0dp"
-                      android:layout_height="wrap_content"
-                      android:layout_weight="1"
-                      android:text="📦 Saned"
-                      android:textSize="20sp"
-                      android:textColor="#FF5722"
-                      android:textStyle="bold"/>
-
-                  <TextView
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="Driver"
-                      android:textSize="14sp"
-                      android:textColor="#666666"/>
-
-              </LinearLayout>
-
-              <!-- New Order Badge -->
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="🆕 NEW ORDER"
-                  android:textSize="14sp"
-                  android:textColor="#FF9800"
+                  android:text="📦 Jahez Order Simulator"
+                  android:textSize="22sp"
+                  android:textColor="#FFFFFF"
                   android:textStyle="bold"
-                  android:background="#FFF3E0"
-                  android:padding="8dp"
-                  android:layout_marginBottom="16dp"/>
+                  android:layout_gravity="center"
+                  android:layout_marginTop="20dp"
+                  android:layout_marginBottom="10dp"/>
 
-              <!-- Order Card -->
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Testing Mode"
+                  android:textSize="14sp"
+                  android:textColor="#AAAAAA"
+                  android:layout_gravity="center"
+                  android:layout_marginBottom="30dp"/>
+
+              <!-- Main Order Card -->
               <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:orientation="vertical"
-                  android:background="#FFFFFF"
-                  android:elevation="4dp"
-                  android:padding="16dp"
+                  android:background="#1E1E1E"
+                  android:padding="20dp"
                   android:layout_marginBottom="20dp">
 
-                  <!-- Delivery Fee -->
-                  <LinearLayout
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:orientation="horizontal"
-                      android:layout_marginBottom="16dp">
-
-                      <TextView
-                          android:layout_width="0dp"
-                          android:layout_height="wrap_content"
-                          android:layout_weight="1"
-                          android:text="Delivery Fee"
-                          android:textSize="14sp"
-                          android:textColor="#666666"/>
-
-                      <TextView
-                          android:id="@+id/tv_delivery_fee"
-                          android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:text="SAR 12.00"
-                          android:textSize="18sp"
-                          android:textColor="#4CAF50"
-                          android:textStyle="bold"/>
-
-                  </LinearLayout>
-
-                  <!-- Pickup Section -->
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="📍 PICKUP"
-                      android:textSize="12sp"
-                      android:textColor="#FF5722"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="8dp"/>
-
-                  <TextView
-                      android:id="@+id/tv_pickup_address"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Al Thumamah Rd., Ar Rabi District"
-                      android:textSize="14sp"
-                      android:textColor="#333333"
-                      android:layout_marginBottom="8dp"/>
-
-                  <TextView
-                      android:id="@+id/tv_pickup_distance"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="🚗 1.6 km from you"
-                      android:textSize="13sp"
+                      android:text="🆕 CURRENT ORDER"
+                      android:textSize="16sp"
                       android:textColor="#FF9800"
-                      android:layout_marginBottom="16dp"/>
+                      android:textStyle="bold"
+                      android:layout_marginBottom="15dp"/>
 
-                  <!-- Divider -->
-                  <View
-                      android:layout_width="match_parent"
-                      android:layout_height="1dp"
-                      android:background="#EEEEEE"
-                      android:layout_marginVertical="12dp"/>
-
-                  <!-- Drop Section -->
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="📍 DROP"
-                      android:textSize="12sp"
+                      android:text="JAHEZ"
+                      android:textSize="18sp"
                       android:textColor="#4CAF50"
                       android:textStyle="bold"
-                      android:layout_marginBottom="8dp"/>
+                      android:layout_marginBottom="10dp"/>
 
                   <TextView
-                      android:id="@+id/tv_drop_address"
-                      android:layout_width="match_parent"
+                      android:id="@+id/tv_price"
+                      android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="QJ7R+Q88, Al Aqiq, Riyadh 13519"
-                      android:textSize="14sp"
-                      android:textColor="#333333"
-                      android:layout_marginBottom="8dp"/>
+                      android:text="₪ 10.0"
+                      android:textSize="16sp"
+                      android:textColor="#FFFFFF"
+                      android:layout_marginBottom="15dp"/>
 
                   <TextView
-                      android:id="@+id/tv_drop_distance"
+                      android:id="@+id/tv_pickup"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="🚗 2.9 km from pickup"
+                      android:text="Pick-up from Al Thumamah Rd."
+                      android:textSize="13sp"
+                      android:textColor="#DDDDDD"
+                      android:layout_marginBottom="5dp"/>
+
+                  <TextView
+                      android:id="@+id/tv_pickup_dist"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="1.6 Km From You"
                       android:textSize="13sp"
                       android:textColor="#FF9800"
-                      android:layout_marginBottom="16dp"/>
+                      android:layout_marginBottom="15dp"/>
 
-                  <!-- Customer Note -->
-                  <LinearLayout
+                  <TextView
+                      android:id="@+id/tv_drop"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:background="#FFF9C4"
-                      android:padding="10dp"
-                      android:layout_marginTop="8dp">
+                      android:text="Drop off at Al Aqiq"
+                      android:textSize="13sp"
+                      android:textColor="#DDDDDD"
+                      android:layout_marginBottom="5dp"/>
 
-                      <TextView
-                          android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:text="📝"
-                          android:textSize="14sp"
-                          android:layout_marginEnd="8dp"/>
-
-                      <TextView
-                          android:layout_width="match_parent"
-                          android:layout_height="wrap_content"
-                          android:text="Please call upon arrival"
-                          android:textSize="12sp"
-                          android:textColor="#666666"/>
-
-                  </LinearLayout>
-
-              </LinearLayout>
-
-              <!-- Action Buttons -->
-              <LinearLayout
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:orientation="horizontal"
-                  android:layout_marginBottom="20dp">
-
-                  <!-- Reject Button -->
-                  <LinearLayout
-                      android:id="@+id/btn_reject"
-                      android:layout_width="0dp"
-                      android:layout_height="50dp"
-                      android:layout_weight="1"
-                      android:background="#F44336"
-                      android:gravity="center"
-                      android:layout_marginEnd="8dp">
-
-                      <TextView
-                          android:layout_width="wrap_content"
-                          android:layout_height="wrap_content"
-                          android:text="Reject"
-                          android:textSize="16sp"
-                          android:textColor="#FFFFFF"
-                          android:textStyle="bold"/>
-
-                  </LinearLayout>
-
-                  <!-- Accept Button (Swipe Area) -->
-                  <LinearLayout
-                      android:id="@+id/swipe_container"
-                      android:layout_width="0dp"
-                      android:layout_height="50dp"
-                      android:layout_weight="1"
-                      android:background="#4CAF50"
-                      android:orientation="horizontal"
-                      android:gravity="center_vertical"
-                      android:layout_marginStart="8dp">
-
-                      <TextView
-                          android:id="@+id/tv_swipe_status"
-                          android:layout_width="0dp"
-                          android:layout_height="match_parent"
-                          android:layout_weight="1"
-                          android:text="     Swipe to Accept →"
-                          android:textSize="14sp"
-                          android:textColor="#FFFFFF"
-                          android:textStyle="bold"
-                          android:gravity="center_vertical"/>
-
-                      <TextView
-                          android:id="@+id/tv_swipe_arrow"
-                          android:layout_width="40dp"
-                          android:layout_height="match_parent"
-                          android:text="→→"
-                          android:textSize="16sp"
-                          android:textColor="#FFFFFF"
-                          android:gravity="center"
-                          android:background="#388E3C"/>
-
-                  </LinearLayout>
+                  <TextView
+                      android:id="@+id/tv_drop_dist"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="2.9 Km From Pickup"
+                      android:textSize="13sp"
+                      android:textColor="#FF9800"
+                      android:layout_marginBottom="20dp"/>
 
               </LinearLayout>
 
@@ -325,59 +280,60 @@ jobs:
                   android:id="@+id/tv_status"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="⏳ Waiting for swipe..."
+                  android:text="⏳ No active order"
                   android:textSize="14sp"
                   android:textColor="#FF9800"
                   android:gravity="center"
-                  android:layout_marginBottom="16dp"/>
+                  android:layout_marginBottom="20dp"/>
 
-              <!-- Control Buttons -->
+              <!-- Buttons -->
               <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:orientation="horizontal"
-                  android:layout_marginTop="10dp">
+                  android:layout_marginBottom="20dp">
 
                   <Button
-                      android:id="@+id/btn_new_order"
+                      android:id="@+id/btn_start_test"
                       android:layout_width="0dp"
-                      android:layout_height="45dp"
+                      android:layout_height="50dp"
                       android:layout_weight="1"
-                      android:text="New Order"
-                      android:textSize="13sp"
-                      android:layout_marginEnd="8dp"/>
+                      android:text="Start Test"
+                      android:textSize="14sp"
+                      android:layout_marginEnd="10dp"/>
 
                   <Button
                       android:id="@+id/btn_reset"
                       android:layout_width="0dp"
-                      android:layout_height="45dp"
+                      android:layout_height="50dp"
                       android:layout_weight="1"
                       android:text="Reset"
-                      android:textSize="13sp"/>
+                      android:textSize="14sp"/>
 
               </LinearLayout>
 
-              <!-- Instructions -->
               <TextView
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="💡 Instructions:\n1. Green 'Swipe to Accept' ko left se right swipe karein\n2. Order accept ho jayega\n3. 'New Order' se next order test karein\n4. 'Reset' se current order reset karein"
+                  android:text="💡 Rules:\n• Order aate hi popup khulega\n• 5 second countdown chalega\n• 5 second mein accept nahi kiya to NEXT ORDER aayega\n• Accept karne se order confirm hoga aur ruk jayega\n• Tumhara auto swipe app accept karega to bhi kaam karega"
                   android:textSize="11sp"
-                  android:textColor="#999999"
-                  android:layout_marginTop="20dp"
+                  android:textColor="#666666"
                   android:lineSpacingExtra="3dp"/>
 
           </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/sanedsimulator/MainActivity.java << 'EOF'
-          package com.sanedsimulator;
+          cat > app/src/main/java/com/jahezsimulator/MainActivity.java << 'EOF'
+          package com.jahezsimulator;
 
+          import android.app.Dialog;
           import android.os.Bundle;
-          import android.view.MotionEvent;
+          import android.os.CountDownTimer;
+          import android.os.Handler;
           import android.view.View;
+          import android.view.Window;
+          import android.view.WindowManager;
           import android.widget.Button;
-          import android.widget.LinearLayout;
           import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
@@ -385,31 +341,32 @@ jobs:
 
           public class MainActivity extends AppCompatActivity {
 
-              private TextView tvPickupAddress, tvPickupDistance, tvDropAddress, tvDropDistance;
-              private TextView tvDeliveryFee, tvStatus, tvSwipeStatus;
-              private LinearLayout swipeContainer, btnReject;
-              private Button btnNewOrder, btnReset;
-              private boolean isOrderAccepted = false;
+              private TextView tvPickup, tvPickupDist, tvDrop, tvDropDist, tvPrice, tvStatus;
+              private Button btnStartTest, btnReset;
+              private Dialog popupDialog;
+              private CountDownTimer nextOrderTimer;
+              private boolean isOrderActive = false;
+              private boolean isTestRunning = false;
               private float currentPickup = 0;
               private float currentDrop = 0;
               private Random random = new Random();
 
               private String[] pickupAddresses = {
-                  "Al Thumamah Rd., Ar Rabi District",
-                  "King Fahd Rd., Al Malaz",
-                  "Olaya St., Al Olaya",
-                  "Tahlia St., Al Aqiq",
-                  "Prince Sultan Rd., Al Rawabi",
-                  "Al Madinah Rd., Al Nakheel"
+                  "Pick-up from Al Thumamah Rd., Ar Rabi District",
+                  "Pick-up from QJJP+64P, Ibrahim bin neghaimish",
+                  "Pick-up from RRAA7381, RRAA7381, 7381 Al",
+                  "Pick-up from 6655 Al Bahr Al Moutaousset, Al",
+                  "Pick-up from RRAC6717, 6717, 3800 Al Bahr Al",
+                  "Pick-up from King Fahd Rd., Al Malaz"
               };
 
               private String[] dropAddresses = {
-                  "QJ7R+Q88, Al Aqiq, Riyadh 13519",
-                  "King Abdullah Rd., Al Malaz",
-                  "Prince Turki St., Al Yasmin",
-                  "Al Tahliya St., Al Olaya",
-                  "Northern Ring Rd., Al Rawabi",
-                  "Eastern Ring Rd., Al Nakheel"
+                  "Drop off at QJ7R+Q88, Al Aqiq, Riyadh 13519",
+                  "Drop off at RRMA6837, 4034, 459 رقم",
+                  "Drop off at RASB7966, 7966 Al Nafl, 3960",
+                  "Drop off at 7131 Al Ulaya, 2763, Al Ghadir",
+                  "Drop off at RALA7654, 7654 Al Hasna, 3627",
+                  "Drop off at King Abdullah Rd., Al Malaz"
               };
 
               @Override
@@ -417,118 +374,176 @@ jobs:
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
 
-                  tvPickupAddress = findViewById(R.id.tv_pickup_address);
-                  tvPickupDistance = findViewById(R.id.tv_pickup_distance);
-                  tvDropAddress = findViewById(R.id.tv_drop_address);
-                  tvDropDistance = findViewById(R.id.tv_drop_distance);
-                  tvDeliveryFee = findViewById(R.id.tv_delivery_fee);
+                  tvPickup = findViewById(R.id.tv_pickup);
+                  tvPickupDist = findViewById(R.id.tv_pickup_dist);
+                  tvDrop = findViewById(R.id.tv_drop);
+                  tvDropDist = findViewById(R.id.tv_drop_dist);
+                  tvPrice = findViewById(R.id.tv_price);
                   tvStatus = findViewById(R.id.tv_status);
-                  tvSwipeStatus = findViewById(R.id.tv_swipe_status);
-                  swipeContainer = findViewById(R.id.swipe_container);
-                  btnReject = findViewById(R.id.btn_reject);
-                  btnNewOrder = findViewById(R.id.btn_new_order);
+                  btnStartTest = findViewById(R.id.btn_start_test);
                   btnReset = findViewById(R.id.btn_reset);
 
-                  generateRandomOrder();
-
-                  // Swipe detection on accept button
-                  swipeContainer.setOnTouchListener(new View.OnTouchListener() {
-                      private float startX = 0;
-                      private boolean isSwiping = false;
-
-                      @Override
-                      public boolean onTouch(View v, MotionEvent event) {
-                          if (isOrderAccepted) {
-                              Toast.makeText(MainActivity.this, "Order already accepted! Press New Order", Toast.LENGTH_SHORT).show();
-                              return true;
-                          }
-
-                          switch (event.getAction()) {
-                              case MotionEvent.ACTION_DOWN:
-                                  startX = event.getRawX();
-                                  isSwiping = true;
-                                  tvSwipeStatus.setText("     →→→ Swipe →→→");
-                                  return true;
-
-                              case MotionEvent.ACTION_MOVE:
-                                  if (isSwiping) {
-                                      float deltaX = event.getRawX() - startX;
-                                      if (deltaX > 100) {
-                                          acceptOrder();
-                                          isSwiping = false;
-                                      }
-                                  }
-                                  return true;
-
-                              case MotionEvent.ACTION_UP:
-                                  isSwiping = false;
-                                  tvSwipeStatus.setText("     Swipe to Accept →");
-                                  return true;
-                          }
-                          return false;
-                      }
-                  });
-
-                  // Reject button
-                  btnReject.setOnClickListener(v -> {
-                      if (!isOrderAccepted) {
-                          Toast.makeText(MainActivity.this, "Order Rejected! Press New Order", Toast.LENGTH_SHORT).show();
-                          generateRandomOrder();
+                  btnStartTest.setOnClickListener(v -> {
+                      if (!isTestRunning) {
+                          isTestRunning = true;
+                          generateAndShowOrder();
+                          Toast.makeText(this, "Test started! Orders will come automatically", Toast.LENGTH_SHORT).show();
                       } else {
-                          Toast.makeText(MainActivity.this, "Already accepted! Press New Order", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Test already running!", Toast.LENGTH_SHORT).show();
                       }
                   });
 
-                  // New Order button
-                  btnNewOrder.setOnClickListener(v -> {
-                      generateRandomOrder();
-                      isOrderAccepted = false;
-                      tvStatus.setText("⏳ New Order Available! Swipe to accept");
-                      tvStatus.setTextColor(0xFFFF9800);
-                      tvSwipeStatus.setText("     Swipe to Accept →");
-                      Toast.makeText(this, "New order generated!", Toast.LENGTH_SHORT).show();
-                  });
-
-                  // Reset button
                   btnReset.setOnClickListener(v -> {
-                      isOrderAccepted = false;
-                      tvStatus.setText("⏳ Waiting for swipe...");
+                      stopAllTimers();
+                      if (popupDialog != null && popupDialog.isShowing()) {
+                          popupDialog.dismiss();
+                      }
+                      isOrderActive = false;
+                      isTestRunning = false;
+                      tvStatus.setText("⏳ Test stopped");
                       tvStatus.setTextColor(0xFFFF9800);
-                      tvSwipeStatus.setText("     Swipe to Accept →");
-                      Toast.makeText(this, "Reset! Swipe to accept", Toast.LENGTH_SHORT).show();
+                      Toast.makeText(this, "Test reset! Press Start Test to begin", Toast.LENGTH_SHORT).show();
                   });
               }
 
-              private void generateRandomOrder() {
-                  // Pickup distance: 0.1 to 2.0 km
+              private void generateAndShowOrder() {
+                  if (!isTestRunning) return;
+                  
+                  // Generate random distances
                   currentPickup = 0.1f + random.nextFloat() * 1.9f;
                   currentPickup = Math.round(currentPickup * 10) / 10.0f;
                   
-                  // Drop distance: 0.1 to 5.0 km
                   currentDrop = 0.1f + random.nextFloat() * 4.9f;
                   currentDrop = Math.round(currentDrop * 10) / 10.0f;
                   
-                  // Delivery fee: 8 to 25 SAR
-                  float fee = 8 + random.nextFloat() * 17;
-                  fee = Math.round(fee * 100) / 100.0f;
+                  float price = 7 + random.nextFloat() * 8;
+                  price = Math.round(price * 10) / 10.0f;
                   
-                  // Random addresses
-                  String pickupAddr = pickupAddresses[random.nextInt(pickupAddresses.length)];
-                  String dropAddr = dropAddresses[random.nextInt(dropAddresses.length)];
+                  int pickupIndex = random.nextInt(pickupAddresses.length);
+                  int dropIndex = random.nextInt(dropAddresses.length);
                   
-                  tvPickupAddress.setText(pickupAddr);
-                  tvPickupDistance.setText("🚗 " + currentPickup + " km from you");
-                  tvDropAddress.setText(dropAddr);
-                  tvDropDistance.setText("🚗 " + currentDrop + " km from pickup");
-                  tvDeliveryFee.setText("SAR " + String.format("%.2f", fee));
+                  // Update main screen
+                  tvPickup.setText(pickupAddresses[pickupIndex]);
+                  tvPickupDist.setText(currentPickup + " Km From You");
+                  tvDrop.setText(dropAddresses[dropIndex]);
+                  tvDropDist.setText(currentDrop + " Km From Pickup");
+                  tvPrice.setText("₪ " + price);
+                  
+                  isOrderActive = true;
+                  tvStatus.setText("🆕 ORDER ARRIVED! Check popup");
+                  tvStatus.setTextColor(0xFF4CAF50);
+                  
+                  // Show popup
+                  showOrderPopup(currentPickup, currentDrop);
               }
 
-              private void acceptOrder() {
-                  isOrderAccepted = true;
-                  tvStatus.setText("✅ ORDER ACCEPTED!\nPickup: " + currentPickup + " km | Drop: " + currentDrop + " km");
+              private void showOrderPopup(float pickup, float drop) {
+                  popupDialog = new Dialog(MainActivity.this);
+                  popupDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+                  popupDialog.setContentView(R.layout.popup_layout);
+                  popupDialog.setCancelable(false);
+                  
+                  Window window = popupDialog.getWindow();
+                  if (window != null) {
+                      window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
+                      window.setBackgroundDrawableResource(android.R.color.transparent);
+                  }
+                  
+                  TextView popupPickup = popupDialog.findViewById(R.id.popup_pickup);
+                  TextView popupDrop = popupDialog.findViewById(R.id.popup_drop);
+                  TextView popupTimer = popupDialog.findViewById(R.id.popup_timer);
+                  Button btnAccept = popupDialog.findViewById(R.id.popup_accept);
+                  Button btnReject = popupDialog.findViewById(R.id.popup_reject);
+                  
+                  popupPickup.setText("🚗 Pickup: " + pickup + " km from you");
+                  popupDrop.setText("📍 Drop: " + drop + " km from pickup");
+                  
+                  // Start 5 second countdown for NEXT ORDER (not auto accept)
+                  nextOrderTimer = new CountDownTimer(5000, 1000) {
+                      @Override
+                      public void onTick(long millisUntilFinished) {
+                          int secondsLeft = (int) (millisUntilFinished / 1000);
+                          popupTimer.setText("Next order in: " + secondsLeft);
+                          popupTimer.setTextColor(0xFFFF9800);
+                      }
+                      
+                      @Override
+                      public void onFinish() {
+                          popupTimer.setText("Getting next order...");
+                          popupTimer.setTextColor(0xFF4CAF50);
+                          // Dismiss current popup and generate next order
+                          if (popupDialog != null && popupDialog.isShowing()) {
+                              popupDialog.dismiss();
+                          }
+                          isOrderActive = false;
+                          // Generate next order automatically
+                          new Handler().postDelayed(() -> {
+                              if (isTestRunning && !isOrderActive) {
+                                  generateAndShowOrder();
+                              }
+                          }, 500);
+                      }
+                  }.start();
+                  
+                  // Accept button - this is what your auto swipe app will click
+                  btnAccept.setOnClickListener(v -> {
+                      if (nextOrderTimer != null) {
+                          nextOrderTimer.cancel();
+                      }
+                      if (popupDialog != null && popupDialog.isShowing()) {
+                          popupDialog.dismiss();
+                      }
+                      acceptOrder(pickup, drop);
+                  });
+                  
+                  // Skip button - next order aayega
+                  btnReject.setOnClickListener(v -> {
+                      if (nextOrderTimer != null) {
+                          nextOrderTimer.cancel();
+                      }
+                      if (popupDialog != null && popupDialog.isShowing()) {
+                          popupDialog.dismiss();
+                      }
+                      Toast.makeText(MainActivity.this, "Order skipped! Next order coming...", Toast.LENGTH_SHORT).show();
+                      isOrderActive = false;
+                      // Generate next order
+                      new Handler().postDelayed(() -> {
+                          if (isTestRunning && !isOrderActive) {
+                              generateAndShowOrder();
+                          }
+                      }, 500);
+                  });
+                  
+                  popupDialog.setOnDismissListener(dialog -> {
+                      if (nextOrderTimer != null) {
+                          nextOrderTimer.cancel();
+                      }
+                  });
+                  
+                  popupDialog.show();
+              }
+
+              private void acceptOrder(float pickup, float drop) {
+                  isOrderActive = false;
+                  isTestRunning = false; // Stop test after accept
+                  stopAllTimers();
+                  
+                  tvStatus.setText("✅ ORDER ACCEPTED!\nPickup: " + pickup + " km | Drop: " + drop + " km");
                   tvStatus.setTextColor(0xFF4CAF50);
-                  tvSwipeStatus.setText("     ✓ Accepted ✓");
-                  Toast.makeText(this, "🎉 Order Accepted! Press New Order for next", Toast.LENGTH_LONG).show();
+                  Toast.makeText(this, "🎉 Order Accepted! Test stopped. Press Start Test for new", Toast.LENGTH_LONG).show();
+              }
+              
+              private void stopAllTimers() {
+                  if (nextOrderTimer != null) {
+                      nextOrderTimer.cancel();
+                      nextOrderTimer = null;
+                  }
+              }
+              
+              @Override
+              protected void onDestroy() {
+                  super.onDestroy();
+                  stopAllTimers();
               }
           }
           EOF
@@ -539,5 +554,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Simulator
+          name: Jahez-Simulator-Final
           path: app/build/outputs/apk/debug/*.apk
