@@ -53,8 +53,8 @@ jobs:
                   applicationId 'com.saned.autoswipe'
                   minSdk 26
                   targetSdk 34
-                  versionCode 6
-                  versionName '6.0'
+                  versionCode 7
+                  versionName '7.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -72,7 +72,7 @@ jobs:
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <application
-                  android:label="Saned Auto"
+                  android:label="Jahez Auto Accept"
                   android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
@@ -107,13 +107,13 @@ jobs:
               android:canPerformGestures="true"
               android:canRetrieveWindowContent="true"
               android:notificationTimeout="100"
-              android:packageNames="com.saned.delivery"/>
+              android:packageNames="net.jahez.fleets"/>
           EOF
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">Saned Auto</string>
+              <string name="app_name">Jahez Auto Accept</string>
           </resources>
           EOF
 
@@ -133,7 +133,7 @@ jobs:
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="Saned Auto Swipe"
+                      android:text="Jahez Auto Accept"
                       android:textSize="24sp"
                       android:textColor="#FFFFFF"
                       android:textStyle="bold"
@@ -178,7 +178,7 @@ jobs:
                   <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="(0 se is tak ke orders accept honge)"
+                      android:text="0 se is tak ke orders accept honge"
                       android:textColor="#777777"
                       android:textSize="11sp"
                       android:gravity="center"
@@ -221,7 +221,7 @@ jobs:
                   <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="(0 se is tak ke orders accept honge)"
+                      android:text="0 se is tak ke orders accept honge"
                       android:textColor="#777777"
                       android:textSize="11sp"
                       android:gravity="center"
@@ -304,26 +304,24 @@ jobs:
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
 
-                  prefs            = getSharedPreferences("saned_prefs", MODE_PRIVATE);
-                  switchService    = findViewById(R.id.switch_service);
-                  etPickupMax      = findViewById(R.id.et_pickup_max);
-                  etDropMax        = findViewById(R.id.et_drop_max);
-                  tvStatus         = findViewById(R.id.tv_status);
-                  tvInfo           = findViewById(R.id.tv_info);
-                  btnSave          = findViewById(R.id.btn_save);
+                  prefs = getSharedPreferences("jahez_prefs", MODE_PRIVATE);
+                  switchService = findViewById(R.id.switch_service);
+                  etPickupMax = findViewById(R.id.et_pickup_max);
+                  etDropMax = findViewById(R.id.et_drop_max);
+                  tvStatus = findViewById(R.id.tv_status);
+                  tvInfo = findViewById(R.id.tv_info);
+                  btnSave = findViewById(R.id.btn_save);
                   btnAccessibility = findViewById(R.id.btn_accessibility);
 
                   etPickupMax.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
                   etDropMax.setText(String.valueOf(prefs.getFloat("drop_max", 10.0f)));
 
-                  switchService.setOnCheckedChangeListener((btn, isChecked) ->
-                      updateStatus(isChecked)
-                  );
+                  switchService.setOnCheckedChangeListener((btn, isChecked) -> updateStatus(isChecked));
 
                   btnSave.setOnClickListener(v -> {
                       float pMax, dMax;
                       try { pMax = Float.parseFloat(etPickupMax.getText().toString()); } catch (Exception e) { pMax = 5.0f; }
-                      try { dMax = Float.parseFloat(etDropMax.getText().toString());   } catch (Exception e) { dMax = 10.0f; }
+                      try { dMax = Float.parseFloat(etDropMax.getText().toString()); } catch (Exception e) { dMax = 10.0f; }
 
                       prefs.edit()
                           .putFloat("pickup_max", pMax)
@@ -408,7 +406,7 @@ jobs:
 
           public class AutoSwipeService extends AccessibilityService {
 
-              private static final String TAG = "SanedAuto";
+              private static final String TAG = "JahezAuto";
               private SharedPreferences prefs;
               private final Handler handler = new Handler(Looper.getMainLooper());
               private boolean isProcessing = false;
@@ -416,7 +414,8 @@ jobs:
               @Override
               public void onServiceConnected() {
                   super.onServiceConnected();
-                  prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  prefs = getSharedPreferences("jahez_prefs", MODE_PRIVATE);
+                  Log.d(TAG, "✅ Service Connected - Jahez Auto Accept");
               }
 
               @Override
@@ -424,42 +423,42 @@ jobs:
                   if (prefs == null || !prefs.getBoolean("enabled", false) || isProcessing) return;
                   
                   String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
-                  if (!pkg.contains("saned") && !pkg.contains("jahez")) return;
+                  if (!pkg.contains("jahez")) return;
                   
                   isProcessing = true;
                   handler.postDelayed(() -> {
-                      checkAndAccept();
+                      checkAndAcceptOrder();
                       isProcessing = false;
-                  }, 1000);
+                  }, 1500);
               }
 
-              private void checkAndAccept() {
+              private void checkAndAcceptOrder() {
                   AccessibilityNodeInfo root = getRootInActiveWindow();
                   if (root == null) return;
                   
                   try {
-                      // Check if new order screen
-                      List<AccessibilityNodeInfo> newOrder = root.findAccessibilityNodeInfosByText("New Order");
-                      if (newOrder == null || newOrder.isEmpty()) {
-                          newOrder = root.findAccessibilityNodeInfosByText("طلب جديد");
-                          if (newOrder == null || newOrder.isEmpty()) return;
-                      }
-                      if (newOrder != null) { for (AccessibilityNodeInfo n : newOrder) { if (n != null) n.recycle(); } }
+                      // Check if this is an order screen (look for JAHEZ or price)
+                      if (!isOrderScreen(root)) return;
                       
                       float pickupMax = prefs.getFloat("pickup_max", 5.0f);
                       float dropMax = prefs.getFloat("drop_max", 10.0f);
                       
-                      float pickupKm = getDistance(root, "From You");
-                      if (pickupKm < 0) pickupKm = getDistance(root, "منك");
-                      float dropKm = getDistance(root, "From Pickup");
-                      if (dropKm < 0) dropKm = getDistance(root, "من نقطة الاستلام");
+                      float pickupKm = getPickupDistance(root);
+                      float dropKm = getDropDistance(root);
                       
-                      if (pickupKm < 0 || dropKm < 0) return;
+                      Log.d(TAG, "📊 Pickup: " + pickupKm + " km, Drop: " + dropKm + " km");
+                      Log.d(TAG, "🎯 Limits - Pickup Max: " + pickupMax + ", Drop Max: " + dropMax);
                       
-                      Log.d(TAG, "Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
+                      if (pickupKm < 0 || dropKm < 0) {
+                          Log.d(TAG, "⚠️ Could not find distances");
+                          return;
+                      }
                       
                       if (pickupKm <= pickupMax && dropKm <= dropMax) {
-                          swipeAcceptButton(root, pickupKm, dropKm);
+                          Log.d(TAG, "✅ Distance OK! Accepting order...");
+                          swipeGreenButton(root, pickupKm, dropKm);
+                      } else {
+                          Log.d(TAG, "❌ Rejected - Distance out of range");
                       }
                   } catch (Exception e) {
                       Log.e(TAG, "Error: " + e.getMessage());
@@ -468,68 +467,191 @@ jobs:
                   }
               }
               
-              private float getDistance(AccessibilityNodeInfo root, String keyword) {
-                  List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(keyword);
-                  if (nodes != null && !nodes.isEmpty()) {
-                      String text = nodes.get(0).getText() != null ? nodes.get(0).getText().toString() : "";
-                      for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
-                      try {
-                          String[] parts = text.trim().split("\\s+");
-                          if (parts.length > 0) {
-                              return Float.parseFloat(parts[0].replace(",", "."));
+              private boolean isOrderScreen(AccessibilityNodeInfo root) {
+                  // Look for JAHEZ or price text
+                  List<AccessibilityNodeInfo> jahezNodes = root.findAccessibilityNodeInfosByText("JAHEZ");
+                  if (jahezNodes != null && !jahezNodes.isEmpty()) {
+                      for (AccessibilityNodeInfo n : jahezNodes) { if (n != null) n.recycle(); }
+                      Log.d(TAG, "✅ Order screen detected (JAHEZ found)");
+                      return true;
+                  }
+                  
+                  List<AccessibilityNodeInfo> priceNodes = root.findAccessibilityNodeInfosByText("₪");
+                  if (priceNodes != null && !priceNodes.isEmpty()) {
+                      for (AccessibilityNodeInfo n : priceNodes) { if (n != null) n.recycle(); }
+                      Log.d(TAG, "✅ Order screen detected (Price found)");
+                      return true;
+                  }
+                  
+                  return false;
+              }
+              
+              private float getPickupDistance(AccessibilityNodeInfo root) {
+                  String[] patterns = {"From You", "منك", "Km From You"};
+                  for (String pattern : patterns) {
+                      List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(pattern);
+                      if (nodes != null && !nodes.isEmpty()) {
+                          for (AccessibilityNodeInfo node : nodes) {
+                              String text = node.getText() != null ? node.getText().toString() : "";
+                              float dist = extractDistance(text);
+                              node.recycle();
+                              if (dist > 0) {
+                                  for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
+                                  return dist;
+                              }
                           }
-                      } catch (Exception e) {}
+                          for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
+                      }
                   }
                   return -1f;
               }
               
-              private void swipeAcceptButton(AccessibilityNodeInfo root, float pickupKm, float dropKm) {
-                  String[] texts = {"Accept", "ACCEPT", "قبول"};
-                  
-                  for (String text : texts) {
-                      List<AccessibilityNodeInfo> btns = root.findAccessibilityNodeInfosByText(text);
-                      if (btns != null && !btns.isEmpty()) {
-                          for (AccessibilityNodeInfo btn : btns) {
-                              if (btn != null) {
-                                  Rect bounds = new Rect();
-                                  btn.getBoundsInScreen(bounds);
-                                  btn.recycle();
-                                  
-                                  if (bounds.width() > 0) {
-                                      int startX = bounds.left + (bounds.width() / 6);
-                                      int endX = bounds.right - (bounds.width() / 6);
-                                      int y = bounds.centerY();
-                                      
-                                      performSwipe(startX, y, endX, y, () -> {
-                                          Log.d(TAG, "Order Accepted! Pickup: " + pickupKm + " Drop: " + dropKm);
-                                          showNotification(pickupKm, dropKm);
-                                      });
-                                      return;
-                                  }
+              private float getDropDistance(AccessibilityNodeInfo root) {
+                  String[] patterns = {"From Pickup", "من نقطة الاستلام"};
+                  for (String pattern : patterns) {
+                      List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(pattern);
+                      if (nodes != null && !nodes.isEmpty()) {
+                          for (AccessibilityNodeInfo node : nodes) {
+                              String text = node.getText() != null ? node.getText().toString() : "";
+                              float dist = extractDistance(text);
+                              node.recycle();
+                              if (dist > 0) {
+                                  for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
+                                  return dist;
                               }
                           }
-                          for (AccessibilityNodeInfo btn : btns) { if (btn != null) btn.recycle(); }
+                          for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
                       }
                   }
+                  return -1f;
               }
               
-              private void performSwipe(int x1, int y1, int x2, int y2, Runnable onDone) {
+              private float extractDistance(String text) {
+                  try {
+                      String[] parts = text.trim().split("\\s+");
+                      for (String part : parts) {
+                          String cleaned = part.replace(",", ".").replace("km", "").replace("Km", "").trim();
+                          try {
+                              float val = Float.parseFloat(cleaned);
+                              if (val > 0 && val < 100) return val;
+                          } catch (NumberFormatException e) {}
+                      }
+                  } catch (Exception e) {}
+                  return -1f;
+              }
+              
+              private void swipeGreenButton(AccessibilityNodeInfo root, float pickupKm, float dropKm) {
+                  // Find the green accept button (at bottom of screen)
+                  AccessibilityNodeInfo button = findAcceptButton(root);
+                  
+                  if (button != null) {
+                      Rect bounds = new Rect();
+                      button.getBoundsInScreen(bounds);
+                      button.recycle();
+                      
+                      if (bounds.width() > 0) {
+                          // Left to Right swipe on the button
+                          int startX = bounds.left + 20;
+                          int endX = bounds.right - 20;
+                          int y = bounds.centerY();
+                          
+                          Log.d(TAG, "👉 Swiping on button: " + startX + " → " + endX + " at Y=" + y);
+                          performLeftToRightSwipe(startX, y, endX, y, () -> {
+                              Log.d(TAG, "🎉 ORDER ACCEPTED! Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
+                              showNotification(pickupKm, dropKm);
+                          });
+                          return;
+                      }
+                  }
+                  
+                  // Fallback: Swipe at bottom of screen
+                  Log.d(TAG, "⚠️ Button not found, swiping at bottom");
+                  swipeAtBottom(pickupKm, dropKm);
+              }
+              
+              private AccessibilityNodeInfo findAcceptButton(AccessibilityNodeInfo root) {
+                  // Try to find by text first
+                  String[] texts = {"Accept", "ACCEPT", "قبول", "موافقة"};
+                  for (String text : texts) {
+                      List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(text);
+                      if (nodes != null && !nodes.isEmpty()) {
+                          Log.d(TAG, "🔘 Found button with text: " + text);
+                          return nodes.get(0);
+                      }
+                  }
+                  
+                  // If not found, find button at bottom by class
+                  return findBottomButton(root);
+              }
+              
+              private AccessibilityNodeInfo findBottomButton(AccessibilityNodeInfo node) {
+                  if (node == null) return null;
+                  
+                  Rect bounds = new Rect();
+                  node.getBoundsInScreen(bounds);
+                  int screenHeight = getResources().getDisplayMetrics().heightPixels;
+                  
+                  CharSequence className = node.getClassName();
+                  if (className != null) {
+                      String classNameStr = className.toString().toLowerCase();
+                      if (classNameStr.contains("button") && bounds.bottom > screenHeight * 0.7) {
+                          Log.d(TAG, "🔘 Found bottom button by class: " + classNameStr);
+                          return node;
+                      }
+                  }
+                  
+                  for (int i = 0; i < node.getChildCount(); i++) {
+                      AccessibilityNodeInfo child = node.getChild(i);
+                      if (child != null) {
+                          AccessibilityNodeInfo result = findBottomButton(child);
+                          if (result != null) return result;
+                          child.recycle();
+                      }
+                  }
+                  return null;
+              }
+              
+              private void swipeAtBottom(float pickupKm, float dropKm) {
+                  int screenWidth = getResources().getDisplayMetrics().widthPixels;
+                  int screenHeight = getResources().getDisplayMetrics().heightPixels;
+                  
+                  int startX = screenWidth / 5;
+                  int endX = (screenWidth * 4) / 5;
+                  int y = (int)(screenHeight * 0.85);
+                  
+                  Log.d(TAG, "👉 Bottom swipe: " + startX + " → " + endX + " at Y=" + y);
+                  performLeftToRightSwipe(startX, y, endX, y, () -> {
+                      Log.d(TAG, "🎉 Bottom swipe done!");
+                      showNotification(pickupKm, dropKm);
+                  });
+              }
+              
+              private void performLeftToRightSwipe(int x1, int y1, int x2, int y2, Runnable onComplete) {
                   Path path = new Path();
                   path.moveTo(x1, y1);
-                  path.lineTo(x2, y2);
+                  
+                  // Smooth swipe with multiple points
+                  int steps = 20;
+                  float stepX = (float)(x2 - x1) / steps;
+                  for (int i = 1; i <= steps; i++) {
+                      path.lineTo(x1 + (stepX * i), y1);
+                  }
                   
                   GestureDescription gesture = new GestureDescription.Builder()
-                      .addStroke(new GestureDescription.StrokeDescription(path, 0, 300))
+                      .addStroke(new GestureDescription.StrokeDescription(path, 0, 400))
                       .build();
                   
                   dispatchGesture(gesture, new GestureResultCallback() {
                       @Override
                       public void onCompleted(GestureDescription g) {
-                          handler.postDelayed(onDone, 500);
+                          Log.d(TAG, "✅ Swipe completed");
+                          if (onComplete != null) {
+                              handler.postDelayed(onComplete, 500);
+                          }
                       }
                       @Override
                       public void onCancelled(GestureDescription g) {
-                          Log.e(TAG, "Swipe cancelled");
+                          Log.e(TAG, "❌ Swipe cancelled");
                       }
                   }, null);
               }
@@ -541,19 +663,19 @@ jobs:
                       
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                           NotificationChannel channel = new NotificationChannel(
-                              "saned_channel", "Saned Auto", NotificationManager.IMPORTANCE_HIGH);
+                              "jahez_auto", "Jahez Auto Accept", NotificationManager.IMPORTANCE_HIGH);
                           nm.createNotificationChannel(channel);
                       }
                       
                       Notification.Builder builder;
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          builder = new Notification.Builder(this, "saned_channel");
+                          builder = new Notification.Builder(this, "jahez_auto");
                       } else {
                           builder = new Notification.Builder(this);
                       }
                       
                       builder.setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setContentTitle("Order Accepted!")
+                          .setContentTitle("✅ Order Accepted!")
                           .setContentText("Pickup: " + pickup + "km | Drop: " + drop + "km")
                           .setAutoCancel(true);
                       
@@ -574,5 +696,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Auto-Swipe-v6
+          name: Jahez-Auto-Accept-v7
           path: app/build/outputs/apk/debug/*.apk
