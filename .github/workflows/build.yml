@@ -107,7 +107,7 @@ jobs:
               android:canPerformGestures="true"
               android:canRetrieveWindowContent="true"
               android:notificationTimeout="100"
-              android:packageNames="com.plat.autosaned"/>
+              android:packageNames="net.jahez.fleets"/>
           EOF
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
@@ -560,8 +560,9 @@ jobs:
                   if (prefs == null) return;
                   if (!prefs.getBoolean("enabled", false)) return;
 
+                  // Package check - exact match for Saned Driver App
                   String pkg = String.valueOf(event.getPackageName());
-                  if (!pkg.contains("saned") && !pkg.contains("plat")) return;
+                  if (!pkg.equals("net.jahez.fleets")) return;
 
                   int screenDelay = prefs.getInt("screen_delay", 400);
                   handler.postDelayed(this::checkAndAccept, screenDelay);
