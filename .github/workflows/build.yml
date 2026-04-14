@@ -54,8 +54,8 @@ jobs:
                   applicationId 'com.saned.autoswipe'
                   minSdk 26
                   targetSdk 34
-                  versionCode 5
-                  versionName '5.0'
+                  versionCode 6
+                  versionName '6.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -64,21 +64,12 @@ jobs:
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'androidx.core:core:1.10.1'
           }
           EOF
 
           python3 - << 'PYEOF'
-          import base64
-          b64 = "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAA93klEQVR4nO3de5Al533e9+ft2zln7jN7wV5wJ0hcAi4ogXcCFiNREmlJVEm2K7JlOy5btqgkZTlx4sSWYpdvclVcSSl2iUWHtspViuIiTUlmkiraJkUyJEVTFCESIAEQ4GKBJYAFsAvszs7OzLl2d/44MzszOzM7Z2ZOd7/v299P1dTszs7s9vbpfn9P/973+xgBcNqpU2fyqv7tCxeeMFX92wAOh5MXsEyVBb1oBAbAHpyMQMl8LvCHRUAAysPJBhSAIj9+hANgvDihgEOi2FeHUAAcHCcPsA8Ue/sRCoDRcKIAu6DY+4NQAGzHSQGsoeDXB4EAIACgxij4WEcgQB1x0KM2KPgYFYEAdcBBDq9R9HFYhAH4igMb3qHooyiEAfiEgxnOo+CjKgQCuIyDF06i6MM2hAG4hgMWTqHww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3EAYB"
-          import os
-          data = base64.b64decode(b64 + "==")
-          os.makedirs('app/src/main/res/mipmap-xxxhdpi', exist_ok=True)
-          PYEOF
-
-          python3 - << 'PYEOF'
           import base64, os
-          b64 = "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAA93klEQVR4nO3de5Al533e9+ft2zln7jN7wV5wJ0hcAi4ogXcCFiNREmlJVEm2K7JlOy5btqgkZTlx4sSWYpdvclVcSSl2iUWHtspViuIiTUlmkiraJkUyJEVTFCESIAEQ4GKBJYAFsAvszs7OzLl2d/44MzszOzM7Z2ZOd7/v299P1dTszs7s9vbpfn9P/973+xgBcNqpU2fyqv7tCxeeMFX92wAOh5MXsEyVBb1oBAbAHpyMQMl8LvCHRUAAysPJBhSAIj9+hANgvDihgEOi2FeHUAAcHCcPsA8Ue/sRCoDRcKIAu6DY+4NQAGzHSQGsoeDXB4EAIACgxij4WEcgQB1x0KM2KPgYFYEAdcBBDq9R9HFYhAH4igMb3qHooyiEAfiEgxnOo+CjKgQCuIyDF06i6MM2hAG4hgMWTqHww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHABezUcM/gAAAABJRU5ErkJggg=="
+          b64 = "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAA93klEQVR4nO3de5Al533e9+ft2zln7jN7wV5wJ0hcAi4ogXcCFiNREmlJVEm2K7JlOy5btqgkZTlx4sSWYpdvclVcSSl2iUWHtspViuIiTUlmkiraJkUyJEVTFCESIAEQ4GKBJYAFsAvszs7OzLl2d/44MzszOzM7Z2ZOd7/v299P1dTszs7s9vbpfn9P/973+xgBcNqpU2fyqv7tCxeeMFX92wAOh5MXsEyVBb1oBAbAHpyMQMl8LvCHRUAAysPJBhSAIj9+hANgvDihgEOi2FeHUAAcHCcPsA8Ue/sRCoDRcKIAu6DY+4NQAGzHSQGsoeDXB4EAIACgxij4WEcgQB1x0KM2KPgYFYEAdcBBDq9R9HFYhAH4igMb3qHooyiEAfiEgxnOo+CjKgQCuIyDF06i6MM2hAG4hgMWTqHww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHABezUcM/gAAAABJRU5ErkJggg=="
           data = base64.b64decode(b64)
           with open('app/src/main/res/mipmap-xxxhdpi/ic_launcher.png', 'wb') as f:
               f.write(data)
@@ -134,8 +125,6 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">Saned Auto</string>
-              <string name="channel_id">saned_auto_channel</string>
-              <string name="channel_name">Saned Auto Notifications</string>
           </resources>
           EOF
 
@@ -170,7 +159,6 @@ jobs:
                       android:textColor="#FF5555"
                       android:layout_marginBottom="28dp"/>
 
-                  <!-- PICKUP MAX ONLY -->
                   <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
@@ -213,7 +201,6 @@ jobs:
                       android:background="#333333"
                       android:layout_marginVertical="8dp"/>
 
-                  <!-- DROP MAX ONLY -->
                   <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
@@ -355,12 +342,14 @@ jobs:
                           .putBoolean("enabled", switchService.isChecked())
                           .apply();
 
-                      // Keyboard aur cursor band karo
                       etPickupMax.clearFocus();
                       etDropMax.clearFocus();
                       InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                      if (imm != null && getCurrentFocus() != null)
-                          imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+                      if (imm != null) {
+                          android.view.View view = getCurrentFocus();
+                          if (view == null) view = new android.view.View(this);
+                          imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                      }
 
                       Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
                       tvStatus.setText("Settings Saved!");
@@ -462,24 +451,20 @@ jobs:
                   try {
                       NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
                       if (nm == null) return;
-
                       Notification.Builder builder;
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                           builder = new Notification.Builder(this, CHANNEL_ID);
                       } else {
                           builder = new Notification.Builder(this);
                       }
-
                       builder.setSmallIcon(android.R.drawable.ic_dialog_info)
                           .setContentTitle("Order Accept Ho Gaya!")
                           .setContentText("Pickup: " + pickupKm + " km | Drop: " + dropKm + " km")
                           .setAutoCancel(true)
                           .setPriority(Notification.PRIORITY_HIGH);
-
                       nm.notify(NOTIF_ID, builder.build());
-                      Log.d(TAG, "Notification sent!");
                   } catch (Exception e) {
-                      Log.e(TAG, "Notification error: " + e.getMessage());
+                      Log.e(TAG, "Notif error: " + e.getMessage());
                   }
               }
 
@@ -496,7 +481,6 @@ jobs:
                   AccessibilityNodeInfo root = getRootInActiveWindow();
                   if (root == null) return;
                   try {
-                      // "New Order" screen check
                       List<AccessibilityNodeInfo> newOrderList =
                           root.findAccessibilityNodeInfosByText("New Order");
                       if (newOrderList == null || newOrderList.isEmpty()) return;
@@ -508,23 +492,16 @@ jobs:
                       float dropKm   = findDistance(root, "From Pickup");
 
                       Log.d(TAG, "Pickup: " + pickupKm + " | Drop: " + dropKm);
-                      Log.d(TAG, "Max - Pickup: " + pickupMax + " | Drop: " + dropMax);
 
                       if (pickupKm < 0 || dropKm < 0) return;
 
-                      boolean pickupOk = pickupKm <= pickupMax;
-                      boolean dropOk   = dropKm   <= dropMax;
-
-                      if (pickupOk && dropOk) {
-                          // Accept button dhundo aur swipe karo
+                      if (pickupKm <= pickupMax && dropKm <= dropMax) {
                           List<AccessibilityNodeInfo> acceptNodes =
                               root.findAccessibilityNodeInfosByText("Accept");
-                          if (acceptNodes == null || acceptNodes.isEmpty()) {
+                          if (acceptNodes == null || acceptNodes.isEmpty())
                               acceptNodes = root.findAccessibilityNodeInfosByText("ACCEPT");
-                          }
-                          if (acceptNodes == null || acceptNodes.isEmpty()) {
+                          if (acceptNodes == null || acceptNodes.isEmpty())
                               acceptNodes = root.findAccessibilityNodeInfosByText("قبول");
-                          }
 
                           if (acceptNodes != null && !acceptNodes.isEmpty()) {
                               AccessibilityNodeInfo btn = acceptNodes.get(0);
@@ -532,7 +509,6 @@ jobs:
                                   Rect bounds = new Rect();
                                   btn.getBoundsInScreen(bounds);
 
-                                  // Button ke center se right tak swipe
                                   int startX = bounds.left + 80;
                                   int endX   = bounds.right - 20;
                                   int y      = bounds.centerY();
@@ -541,16 +517,15 @@ jobs:
                                   final float dKm = dropKm;
 
                                   swipeOnScreen(startX, y, endX, y, () -> {
-                                      Log.d(TAG, "ORDER ACCEPTED via SWIPE! Pickup:" + pKm + " Drop:" + dKm);
+                                      Log.d(TAG, "ACCEPTED! Pickup:" + pKm + " Drop:" + dKm);
                                       prefs.edit().putBoolean("enabled", false).apply();
                                       sendOrderNotification(pKm, dKm);
                                   });
-
                                   btn.recycle();
                               }
                           }
                       } else {
-                          Log.d(TAG, "IGNORED - pickup=" + pickupOk + " drop=" + dropOk);
+                          Log.d(TAG, "IGNORED - pickup=" + pickupKm + " drop=" + dropKm);
                       }
                   } finally {
                       root.recycle();
@@ -561,17 +536,16 @@ jobs:
                   Path path = new Path();
                   path.moveTo(x1, y1);
                   path.lineTo(x2, y2);
-
-                  GestureDescription.Builder builder = new GestureDescription.Builder();
-                  builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 300));
-
-                  dispatchGesture(builder.build(), new GestureResultCallback() {
+                  GestureDescription gesture = new GestureDescription.Builder()
+                      .addStroke(new GestureDescription.StrokeDescription(path, 0, 300))
+                      .build();
+                  dispatchGesture(gesture, new GestureResultCallback() {
                       @Override
-                      public void onCompleted(GestureDescription gestureDescription) {
+                      public void onCompleted(GestureDescription g) {
                           handler.post(onDone);
                       }
                       @Override
-                      public void onCancelled(GestureDescription gestureDescription) {
+                      public void onCancelled(GestureDescription g) {
                           Log.e(TAG, "Swipe cancelled");
                       }
                   }, null);
@@ -611,5 +585,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Auto-Swipe-v5
+          name: Saned-Auto-Swipe-v6
           path: app/build/outputs/apk/debug/*.apk
