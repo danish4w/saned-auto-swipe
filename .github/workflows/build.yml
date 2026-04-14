@@ -1,4 +1,3 @@
-
 name: Build Log Viewer for Saned
 on: workflow_dispatch
 
@@ -59,7 +58,6 @@ jobs:
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'com.google.android.material:material:1.11.0'
           }
           EOF
 
@@ -209,6 +207,7 @@ jobs:
                   android:layout_marginBottom="5dp"/>
 
               <ScrollView
+                  android:id="@+id/log_scroll"
                   android:layout_width="match_parent"
                   android:layout_height="0dp"
                   android:layout_weight="1"
@@ -219,7 +218,7 @@ jobs:
                       android:id="@+id/tv_logs"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Waiting for logs...\n\nMake sure:\n1. Saned Auto Swipe Accessibility is ON\n2. Saned Driver app is open\n3. Orders are coming"
+                      android:text="Waiting for logs...\n\nMake sure:\n1. Root access granted\n2. Saned Auto Swipe Accessibility is ON\n3. Saned Driver app is open\n4. Orders are coming"
                       android:textSize="11sp"
                       android:textColor="#AAAAAA"
                       android:fontFamily="monospace"
@@ -246,7 +245,6 @@ jobs:
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
-          import android.text.TextUtils;
           import android.widget.Button;
           import android.widget.ScrollView;
           import android.widget.TextView;
@@ -275,7 +273,7 @@ jobs:
 
                   tvLogs = findViewById(R.id.tv_logs);
                   tvStatus = findViewById(R.id.tv_status);
-                  scrollView = findViewById(R.id.scrollView);
+                  scrollView = findViewById(R.id.log_scroll);
                   btnStart = findViewById(R.id.btn_start);
                   btnStop = findViewById(R.id.btn_stop);
                   btnClear = findViewById(R.id.btn_clear);
@@ -291,16 +289,16 @@ jobs:
                   btnStop.setOnClickListener(v -> stopLogging());
                   btnClear.setOnClickListener(v -> clearLogs());
 
-                  btnAll.setOnClickListener(v -> { currentFilter = "all"; updateLogFilter(); });
-                  btnSanedAuto.setOnClickListener(v -> { currentFilter = "sanedauto"; updateLogFilter(); });
-                  btnSanedDriver.setOnClickListener(v -> { currentFilter = "sanedd river"; updateLogFilter(); });
-                  btnError.setOnClickListener(v -> { currentFilter = "error"; updateLogFilter(); });
+                  btnAll.setOnClickListener(v -> { currentFilter = "all"; addLog("--- Filter: ALL ---"); });
+                  btnSanedAuto.setOnClickListener(v -> { currentFilter = "sanedauto"; addLog("--- Filter: SANED AUTO ONLY ---"); });
+                  btnSanedDriver.setOnClickListener(v -> { currentFilter = "driver"; addLog("--- Filter: SANED DRIVER ONLY ---"); });
+                  btnError.setOnClickListener(v -> { currentFilter = "error"; addLog("--- Filter: ERRORS ONLY ---"); });
               }
 
               private void startLogging() {
                   if (isRunning) return;
                   isRunning = true;
-                  tvStatus.setText("Status: Running - fetching logs...");
+                  tvStatus.setText("Status: Running...");
                   Toast.makeText(this, "Logging started", Toast.LENGTH_SHORT).show();
                   executor.execute(this::readLogs);
               }
@@ -321,13 +319,9 @@ jobs:
                   });
               }
 
-              private void updateLogFilter() {
-                  addLog("--- Filter changed to: " + currentFilter + " ---");
-              }
-
               private void readLogs() {
                   try {
-                      ProcessBuilder pb = new ProcessBuilder("logcat", "-v", "time");
+                      ProcessBuilder pb = new ProcessBuilder("logcat", "-v", "brief");
                       pb.redirectErrorStream(true);
                       logProcess = pb.start();
 
@@ -354,7 +348,7 @@ jobs:
                   switch (currentFilter) {
                       case "sanedauto":
                           return lowerLine.contains("sanedauto") || lowerLine.contains("autoswipe");
-                      case "sanedd river":
+                      case "driver":
                           return lowerLine.contains("jahez") || lowerLine.contains("net.jahez") || lowerLine.contains("saned.delivery");
                       case "error":
                           return lowerLine.contains("error") || lowerLine.contains("exception") || lowerLine.contains("fail");
