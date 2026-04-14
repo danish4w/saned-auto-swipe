@@ -1,4 +1,4 @@
-name: Build Jahez Simulator Final
+name: Build Saned Exact Simulator
 on: workflow_dispatch
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
 
       - name: Build Project
         run: |
-          mkdir -p app/src/main/java/com/jahezsimulator
+          mkdir -p app/src/main/java/com/sanedsimulator
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p gradle/wrapper
@@ -46,10 +46,10 @@ jobs:
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.jahezsimulator'
+              namespace 'com.sanedsimulator'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.jahezsimulator'
+                  applicationId 'com.sanedsimulator'
                   minSdk 26
                   targetSdk 34
                   versionCode 1
@@ -65,7 +65,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
-                  android:label="Jahez Simulator"
+                  android:label="Saned Simulator"
                   android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
@@ -82,7 +82,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">Jahez Simulator</string>
+              <string name="app_name">Saned Simulator</string>
           </resources>
           EOF
 
@@ -92,46 +92,36 @@ jobs:
               android:layout_width="match_parent"
               android:layout_height="wrap_content"
               android:orientation="vertical"
-              android:background="#1E1E1E"
+              android:background="#FFFFFF"
               android:padding="20dp"
               android:elevation="10dp">
 
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="🆕 NEW ORDER"
+                  android:text="🆕 New Order"
                   android:textSize="18sp"
-                  android:textColor="#FF9800"
+                  android:textColor="#FF5722"
                   android:textStyle="bold"
                   android:layout_gravity="center"
                   android:layout_marginBottom="15dp"/>
 
               <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="JAHEZ"
-                  android:textSize="22sp"
-                  android:textColor="#4CAF50"
-                  android:textStyle="bold"
-                  android:layout_gravity="center"
-                  android:layout_marginBottom="10dp"/>
-
-              <TextView
                   android:id="@+id/popup_pickup"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="Pickup: -- km"
+                  android:text="Pick-up: 0.0 km from you"
                   android:textSize="14sp"
-                  android:textColor="#FFFFFF"
+                  android:textColor="#333333"
                   android:layout_marginBottom="8dp"/>
 
               <TextView
                   android:id="@+id/popup_drop"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="Drop: -- km"
+                  android:text="Drop: 0.0 km from pickup"
                   android:textSize="14sp"
-                  android:textColor="#FFFFFF"
+                  android:textColor="#333333"
                   android:layout_marginBottom="15dp"/>
 
               <TextView
@@ -140,7 +130,7 @@ jobs:
                   android:layout_height="wrap_content"
                   android:text="Next order in: 5"
                   android:textSize="16sp"
-                  android:textColor="#FF9800"
+                  android:textColor="#FF5722"
                   android:textStyle="bold"
                   android:layout_gravity="center"
                   android:layout_marginBottom="15dp"/>
@@ -155,8 +145,9 @@ jobs:
                       android:layout_width="0dp"
                       android:layout_height="45dp"
                       android:layout_weight="1"
-                      android:text="Accept Order"
+                      android:text="Accept"
                       android:textSize="14sp"
+                      android:backgroundTint="#4CAF50"
                       android:layout_marginEnd="8dp"/>
 
                   <Button
@@ -164,8 +155,9 @@ jobs:
                       android:layout_width="0dp"
                       android:layout_height="45dp"
                       android:layout_weight="1"
-                      android:text="Skip"
-                      android:textSize="14sp"/>
+                      android:text="Reject"
+                      android:textSize="14sp"
+                      android:backgroundTint="#F44336"/>
 
               </LinearLayout>
 
@@ -178,15 +170,15 @@ jobs:
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:orientation="vertical"
-              android:background="#121212"
-              android:padding="20dp">
+              android:background="#F5F5F5"
+              android:padding="16dp">
 
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="📦 Jahez Order Simulator"
+                  android:text="Saned Auto Swipe"
                   android:textSize="22sp"
-                  android:textColor="#FFFFFF"
+                  android:textColor="#FF5722"
                   android:textStyle="bold"
                   android:layout_gravity="center"
                   android:layout_marginTop="20dp"
@@ -195,46 +187,47 @@ jobs:
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="Testing Mode"
+                  android:text="Training Mode"
                   android:textSize="14sp"
-                  android:textColor="#AAAAAA"
+                  android:textColor="#666666"
                   android:layout_gravity="center"
                   android:layout_marginBottom="30dp"/>
 
-              <!-- Main Order Card -->
               <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:orientation="vertical"
-                  android:background="#1E1E1E"
-                  android:padding="20dp"
+                  android:background="#FFFFFF"
+                  android:elevation="4dp"
+                  android:padding="16dp"
                   android:layout_marginBottom="20dp">
 
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="🆕 CURRENT ORDER"
+                      android:text="🆕 New Order"
                       android:textSize="16sp"
-                      android:textColor="#FF9800"
+                      android:textColor="#FF5722"
                       android:textStyle="bold"
                       android:layout_marginBottom="15dp"/>
 
                   <TextView
+                      android:id="@+id/tv_saned"
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="JAHEZ"
+                      android:text="Saned"
                       android:textSize="18sp"
                       android:textColor="#4CAF50"
                       android:textStyle="bold"
-                      android:layout_marginBottom="10dp"/>
+                      android:layout_marginBottom="5dp"/>
 
                   <TextView
                       android:id="@+id/tv_price"
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="₪ 10.0"
+                      android:text="SAR 10.0"
                       android:textSize="16sp"
-                      android:textColor="#FFFFFF"
+                      android:textColor="#333333"
                       android:layout_marginBottom="15dp"/>
 
                   <TextView
@@ -242,16 +235,16 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:text="Pick-up from Al Thumamah Rd."
-                      android:textSize="13sp"
-                      android:textColor="#DDDDDD"
+                      android:textSize="14sp"
+                      android:textColor="#333333"
                       android:layout_marginBottom="5dp"/>
 
                   <TextView
                       android:id="@+id/tv_pickup_dist"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="1.6 Km From You"
-                      android:textSize="13sp"
+                      android:text="0.0 Km From You"
+                      android:textSize="14sp"
                       android:textColor="#FF9800"
                       android:layout_marginBottom="15dp"/>
 
@@ -260,22 +253,21 @@ jobs:
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:text="Drop off at Al Aqiq"
-                      android:textSize="13sp"
-                      android:textColor="#DDDDDD"
+                      android:textSize="14sp"
+                      android:textColor="#333333"
                       android:layout_marginBottom="5dp"/>
 
                   <TextView
                       android:id="@+id/tv_drop_dist"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="2.9 Km From Pickup"
-                      android:textSize="13sp"
+                      android:text="0.0 Km From Pickup"
+                      android:textSize="14sp"
                       android:textColor="#FF9800"
                       android:layout_marginBottom="20dp"/>
 
               </LinearLayout>
 
-              <!-- Status -->
               <TextView
                   android:id="@+id/tv_status"
                   android:layout_width="match_parent"
@@ -286,7 +278,6 @@ jobs:
                   android:gravity="center"
                   android:layout_marginBottom="20dp"/>
 
-              <!-- Buttons -->
               <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
@@ -315,23 +306,22 @@ jobs:
               <TextView
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="💡 Rules:\n• Order aate hi popup khulega\n• 5 second countdown chalega\n• 5 second mein accept nahi kiya to NEXT ORDER aayega\n• Accept karne se order confirm hoga aur ruk jayega\n• Tumhara auto swipe app accept karega to bhi kaam karega"
+                  android:text="💡 How to Test:\n1. Click Start Test\n2. Popup show hoga with order details\n3. 5 seconds countdown chalega\n4. Agar accept nahi kiya to next order aayega\n5. Accept click karo ya apne auto swipe app se accept karo"
                   android:textSize="11sp"
-                  android:textColor="#666666"
+                  android:textColor="#999999"
                   android:lineSpacingExtra="3dp"/>
 
           </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/jahezsimulator/MainActivity.java << 'EOF'
-          package com.jahezsimulator;
+          cat > app/src/main/java/com/sanedsimulator/MainActivity.java << 'EOF'
+          package com.sanedsimulator;
 
           import android.app.Dialog;
           import android.os.Bundle;
           import android.os.CountDownTimer;
           import android.os.Handler;
-          import android.view.View;
-          import android.view.Window;
+          android.view.Window;
           import android.view.WindowManager;
           import android.widget.Button;
           import android.widget.TextView;
@@ -347,26 +337,23 @@ jobs:
               private CountDownTimer nextOrderTimer;
               private boolean isOrderActive = false;
               private boolean isTestRunning = false;
-              private float currentPickup = 0;
-              private float currentDrop = 0;
+              private float currentPickup = 0, currentDrop = 0;
               private Random random = new Random();
 
               private String[] pickupAddresses = {
                   "Pick-up from Al Thumamah Rd., Ar Rabi District",
                   "Pick-up from QJJP+64P, Ibrahim bin neghaimish",
-                  "Pick-up from RRAA7381, RRAA7381, 7381 Al",
-                  "Pick-up from 6655 Al Bahr Al Moutaousset, Al",
-                  "Pick-up from RRAC6717, 6717, 3800 Al Bahr Al",
-                  "Pick-up from King Fahd Rd., Al Malaz"
+                  "Pick-up from RRAA7381, 7381 Al",
+                  "Pick-up from 6655 Al Bahr Al Moutaousset",
+                  "Pick-up from RRAC6717, 6717 Al Bahr"
               };
 
               private String[] dropAddresses = {
                   "Drop off at QJ7R+Q88, Al Aqiq, Riyadh 13519",
-                  "Drop off at RRMA6837, 4034, 459 رقم",
-                  "Drop off at RASB7966, 7966 Al Nafl, 3960",
-                  "Drop off at 7131 Al Ulaya, 2763, Al Ghadir",
-                  "Drop off at RALA7654, 7654 Al Hasna, 3627",
-                  "Drop off at King Abdullah Rd., Al Malaz"
+                  "Drop off at RRMA6837, 4034",
+                  "Drop off at RASB7966, 7966 Al Nafl",
+                  "Drop off at 7131 Al Ulaya, 2763",
+                  "Drop off at RALA7654, 7654 Al Hasna"
               };
 
               @Override
@@ -386,59 +373,44 @@ jobs:
                   btnStartTest.setOnClickListener(v -> {
                       if (!isTestRunning) {
                           isTestRunning = true;
-                          generateAndShowOrder();
-                          Toast.makeText(this, "Test started! Orders will come automatically", Toast.LENGTH_SHORT).show();
-                      } else {
-                          Toast.makeText(this, "Test already running!", Toast.LENGTH_SHORT).show();
+                          generateOrder();
+                          Toast.makeText(this, "Test Started!", Toast.LENGTH_SHORT).show();
                       }
                   });
 
                   btnReset.setOnClickListener(v -> {
-                      stopAllTimers();
-                      if (popupDialog != null && popupDialog.isShowing()) {
-                          popupDialog.dismiss();
-                      }
+                      if (nextOrderTimer != null) nextOrderTimer.cancel();
+                      if (popupDialog != null && popupDialog.isShowing()) popupDialog.dismiss();
                       isOrderActive = false;
                       isTestRunning = false;
-                      tvStatus.setText("⏳ Test stopped");
-                      tvStatus.setTextColor(0xFFFF9800);
-                      Toast.makeText(this, "Test reset! Press Start Test to begin", Toast.LENGTH_SHORT).show();
+                      tvStatus.setText("⏳ Test Stopped");
+                      Toast.makeText(this, "Reset Done!", Toast.LENGTH_SHORT).show();
                   });
               }
 
-              private void generateAndShowOrder() {
+              private void generateOrder() {
                   if (!isTestRunning) return;
                   
-                  // Generate random distances
-                  currentPickup = 0.1f + random.nextFloat() * 1.9f;
-                  currentPickup = Math.round(currentPickup * 10) / 10.0f;
+                  currentPickup = Math.round((0.1f + random.nextFloat() * 1.9f) * 10) / 10.0f;
+                  currentDrop = Math.round((0.1f + random.nextFloat() * 4.9f) * 10) / 10.0f;
+                  float price = Math.round((8 + random.nextFloat() * 12) * 10) / 10.0f;
                   
-                  currentDrop = 0.1f + random.nextFloat() * 4.9f;
-                  currentDrop = Math.round(currentDrop * 10) / 10.0f;
+                  int pIndex = random.nextInt(pickupAddresses.length);
+                  int dIndex = random.nextInt(dropAddresses.length);
                   
-                  float price = 7 + random.nextFloat() * 8;
-                  price = Math.round(price * 10) / 10.0f;
-                  
-                  int pickupIndex = random.nextInt(pickupAddresses.length);
-                  int dropIndex = random.nextInt(dropAddresses.length);
-                  
-                  // Update main screen
-                  tvPickup.setText(pickupAddresses[pickupIndex]);
+                  tvPickup.setText(pickupAddresses[pIndex]);
                   tvPickupDist.setText(currentPickup + " Km From You");
-                  tvDrop.setText(dropAddresses[dropIndex]);
+                  tvDrop.setText(dropAddresses[dIndex]);
                   tvDropDist.setText(currentDrop + " Km From Pickup");
-                  tvPrice.setText("₪ " + price);
+                  tvPrice.setText("SAR " + price);
                   
                   isOrderActive = true;
-                  tvStatus.setText("🆕 ORDER ARRIVED! Check popup");
-                  tvStatus.setTextColor(0xFF4CAF50);
-                  
-                  // Show popup
-                  showOrderPopup(currentPickup, currentDrop);
+                  tvStatus.setText("🆕 ORDER ARRIVED!");
+                  showPopup();
               }
 
-              private void showOrderPopup(float pickup, float drop) {
-                  popupDialog = new Dialog(MainActivity.this);
+              private void showPopup() {
+                  popupDialog = new Dialog(this);
                   popupDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
                   popupDialog.setContentView(R.layout.popup_layout);
                   popupDialog.setCancelable(false);
@@ -455,95 +427,36 @@ jobs:
                   Button btnAccept = popupDialog.findViewById(R.id.popup_accept);
                   Button btnReject = popupDialog.findViewById(R.id.popup_reject);
                   
-                  popupPickup.setText("🚗 Pickup: " + pickup + " km from you");
-                  popupDrop.setText("📍 Drop: " + drop + " km from pickup");
+                  popupPickup.setText("🚗 Pickup: " + currentPickup + " km from you");
+                  popupDrop.setText("📍 Drop: " + currentDrop + " km from pickup");
                   
-                  // Start 5 second countdown for NEXT ORDER (not auto accept)
                   nextOrderTimer = new CountDownTimer(5000, 1000) {
-                      @Override
-                      public void onTick(long millisUntilFinished) {
-                          int secondsLeft = (int) (millisUntilFinished / 1000);
-                          popupTimer.setText("Next order in: " + secondsLeft);
-                          popupTimer.setTextColor(0xFFFF9800);
-                      }
-                      
-                      @Override
+                      public void onTick(long millis) { popupTimer.setText("Next order in: " + (millis/1000)); }
                       public void onFinish() {
-                          popupTimer.setText("Getting next order...");
-                          popupTimer.setTextColor(0xFF4CAF50);
-                          // Dismiss current popup and generate next order
-                          if (popupDialog != null && popupDialog.isShowing()) {
-                              popupDialog.dismiss();
-                          }
+                          if (popupDialog != null && popupDialog.isShowing()) popupDialog.dismiss();
                           isOrderActive = false;
-                          // Generate next order automatically
-                          new Handler().postDelayed(() -> {
-                              if (isTestRunning && !isOrderActive) {
-                                  generateAndShowOrder();
-                              }
-                          }, 500);
+                          new Handler().postDelayed(() -> { if (isTestRunning && !isOrderActive) generateOrder(); }, 300);
                       }
                   }.start();
                   
-                  // Accept button - this is what your auto swipe app will click
                   btnAccept.setOnClickListener(v -> {
-                      if (nextOrderTimer != null) {
-                          nextOrderTimer.cancel();
-                      }
-                      if (popupDialog != null && popupDialog.isShowing()) {
-                          popupDialog.dismiss();
-                      }
-                      acceptOrder(pickup, drop);
-                  });
-                  
-                  // Skip button - next order aayega
-                  btnReject.setOnClickListener(v -> {
-                      if (nextOrderTimer != null) {
-                          nextOrderTimer.cancel();
-                      }
-                      if (popupDialog != null && popupDialog.isShowing()) {
-                          popupDialog.dismiss();
-                      }
-                      Toast.makeText(MainActivity.this, "Order skipped! Next order coming...", Toast.LENGTH_SHORT).show();
+                      if (nextOrderTimer != null) nextOrderTimer.cancel();
+                      popupDialog.dismiss();
                       isOrderActive = false;
-                      // Generate next order
-                      new Handler().postDelayed(() -> {
-                          if (isTestRunning && !isOrderActive) {
-                              generateAndShowOrder();
-                          }
-                      }, 500);
+                      isTestRunning = false;
+                      tvStatus.setText("✅ ACCEPTED! Pickup: " + currentPickup + "km, Drop: " + currentDrop + "km");
+                      Toast.makeText(MainActivity.this, "Order Accepted!", Toast.LENGTH_LONG).show();
                   });
                   
-                  popupDialog.setOnDismissListener(dialog -> {
-                      if (nextOrderTimer != null) {
-                          nextOrderTimer.cancel();
-                      }
+                  btnReject.setOnClickListener(v -> {
+                      if (nextOrderTimer != null) nextOrderTimer.cancel();
+                      popupDialog.dismiss();
+                      isOrderActive = false;
+                      Toast.makeText(MainActivity.this, "Skipped! Next order in 5 sec", Toast.LENGTH_SHORT).show();
+                      new Handler().postDelayed(() -> { if (isTestRunning && !isOrderActive) generateOrder(); }, 300);
                   });
                   
                   popupDialog.show();
-              }
-
-              private void acceptOrder(float pickup, float drop) {
-                  isOrderActive = false;
-                  isTestRunning = false; // Stop test after accept
-                  stopAllTimers();
-                  
-                  tvStatus.setText("✅ ORDER ACCEPTED!\nPickup: " + pickup + " km | Drop: " + drop + " km");
-                  tvStatus.setTextColor(0xFF4CAF50);
-                  Toast.makeText(this, "🎉 Order Accepted! Test stopped. Press Start Test for new", Toast.LENGTH_LONG).show();
-              }
-              
-              private void stopAllTimers() {
-                  if (nextOrderTimer != null) {
-                      nextOrderTimer.cancel();
-                      nextOrderTimer = null;
-                  }
-              }
-              
-              @Override
-              protected void onDestroy() {
-                  super.onDestroy();
-                  stopAllTimers();
               }
           }
           EOF
@@ -554,5 +467,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Jahez-Simulator-Final
+          name: Saned-Simulator-Final
           path: app/build/outputs/apk/debug/*.apk
