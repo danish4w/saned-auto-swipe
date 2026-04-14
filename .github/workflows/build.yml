@@ -1,4 +1,4 @@
-name: Build Saned Auto Swipe
+name: Build Jahez Order Simulator
 on: workflow_dispatch
 
 jobs:
@@ -15,9 +15,9 @@ jobs:
 
       - name: Build Project
         run: |
-          mkdir -p app/src/main/java/com/saned/autoswipe
+          mkdir -p app/src/main/java/com/ordersimulator
           mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/values
           mkdir -p gradle/wrapper
 
@@ -47,32 +47,27 @@ jobs:
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.saned.autoswipe'
+              namespace 'com.ordersimulator'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.saned.autoswipe'
+                  applicationId 'com.ordersimulator'
                   minSdk 26
                   targetSdk 34
-                  versionCode 7
-                  versionName '7.0'
-              }
-              packagingOptions {
-                  exclude 'META-INF/LICENSE.md'
-                  exclude 'META-INF/LICENSE-notice.md'
+                  versionCode 1
+                  versionName '1.0'
               }
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.11.0'
           }
           EOF
 
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <application
-                  android:label="Jahez Auto Accept"
+                  android:label="Order Simulator"
                   android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
@@ -82,610 +77,359 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
-                  <service
-                      android:name=".AutoSwipeService"
-                      android:exported="true"
-                      android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-                      <intent-filter>
-                          <action android:name="android.accessibilityservice.AccessibilityService"/>
-                      </intent-filter>
-                      <meta-data
-                          android:name="android.accessibilityservice"
-                          android:resource="@xml/acc_config"/>
-                  </service>
               </application>
           </manifest>
           EOF
 
-          cat > app/src/main/res/xml/acc_config.xml << 'EOF'
+          cat > app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <accessibility-service
-              xmlns:android="http://schemas.android.com/apk/res/android"
-              android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
-              android:accessibilityFeedbackType="feedbackGeneric"
-              android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows"
-              android:canPerformGestures="true"
-              android:canRetrieveWindowContent="true"
-              android:notificationTimeout="100"
-              android:packageNames="net.jahez.fleets"/>
+          <resources>
+              <color name="purple_200">#FFBB86FC</color>
+              <color name="purple_500">#FF6200EE</color>
+              <color name="purple_700">#FF3700B3</color>
+              <color name="teal_200">#FF03DAC5</color>
+              <color name="teal_700">#FF018786</color>
+              <color name="black">#FF000000</color>
+              <color name="white">#FFFFFFFF</color>
+          </resources>
           EOF
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">Jahez Auto Accept</string>
+              <string name="app_name">Order Simulator</string>
           </resources>
+          EOF
+
+          cat > app/src/main/res/drawable/green_button.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android">
+              <solid android:color="#4CAF50"/>
+              <corners android:radius="30dp"/>
+              <stroke android:width="2dp" android:color="#388E3C"/>
+          </shape>
           EOF
 
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
-              android:background="#121212">
+              android:orientation="vertical"
+              android:background="#121212"
+              android:padding="20dp">
+
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="📦 Jahez Order Simulator"
+                  android:textSize="22sp"
+                  android:textColor="#FFFFFF"
+                  android:textStyle="bold"
+                  android:layout_gravity="center"
+                  android:layout_marginTop="20dp"
+                  android:layout_marginBottom="10dp"/>
+
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Training Mode"
+                  android:textSize="14sp"
+                  android:textColor="#AAAAAA"
+                  android:layout_gravity="center"
+                  android:layout_marginBottom="30dp"/>
+
+              <!-- Order Card -->
               <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:orientation="vertical"
-                  android:gravity="center_horizontal"
-                  android:padding="24dp">
+                  android:background="#1E1E1E"
+                  android:padding="20dp"
+                  android:layout_marginBottom="20dp">
 
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="Jahez Auto Accept"
-                      android:textSize="24sp"
-                      android:textColor="#FFFFFF"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="6dp"/>
-
-                  <TextView
-                      android:id="@+id/tv_status"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="Service OFF"
-                      android:textSize="15sp"
-                      android:textColor="#FF5555"
-                      android:layout_marginBottom="28dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Pickup Distance (From You)"
-                      android:textColor="#1DB954"
-                      android:textSize="15sp"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="8dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Max (Km)"
-                      android:textColor="#AAAAAA"
-                      android:textSize="13sp"
-                      android:gravity="center"/>
-                  <EditText
-                      android:id="@+id/et_pickup_max"
-                      android:layout_width="200dp"
-                      android:layout_height="wrap_content"
-                      android:inputType="numberDecimal"
-                      android:text="5.0"
-                      android:textColor="#FFFFFF"
-                      android:backgroundTint="#333333"
-                      android:gravity="center"
-                      android:padding="10dp"
-                      android:layout_marginBottom="4dp"/>
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="0 se is tak ke orders accept honge"
-                      android:textColor="#777777"
-                      android:textSize="11sp"
-                      android:gravity="center"
-                      android:layout_marginBottom="16dp"/>
-
-                  <View
-                      android:layout_width="match_parent"
-                      android:layout_height="1dp"
-                      android:background="#333333"
-                      android:layout_marginVertical="8dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Drop Distance (From Pickup)"
-                      android:textColor="#FF9500"
-                      android:textSize="15sp"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="8dp"
-                      android:layout_marginTop="8dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Max (Km)"
-                      android:textColor="#AAAAAA"
-                      android:textSize="13sp"
-                      android:gravity="center"/>
-                  <EditText
-                      android:id="@+id/et_drop_max"
-                      android:layout_width="200dp"
-                      android:layout_height="wrap_content"
-                      android:inputType="numberDecimal"
-                      android:text="10.0"
-                      android:textColor="#FFFFFF"
-                      android:backgroundTint="#333333"
-                      android:gravity="center"
-                      android:padding="10dp"
-                      android:layout_marginBottom="4dp"/>
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="0 se is tak ke orders accept honge"
-                      android:textColor="#777777"
-                      android:textSize="11sp"
-                      android:gravity="center"
-                      android:layout_marginBottom="16dp"/>
-
-                  <View
-                      android:layout_width="match_parent"
-                      android:layout_height="1dp"
-                      android:background="#333333"
-                      android:layout_marginVertical="8dp"/>
-
-                  <Switch
-                      android:id="@+id/switch_service"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="Auto Accept"
-                      android:textColor="#FFFFFF"
-                      android:textSize="18sp"
-                      android:layout_marginTop="12dp"
-                      android:layout_marginBottom="16dp"/>
-
-                  <Button
-                      android:id="@+id/btn_save"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="OK - Save Settings"
+                      android:text="🆕 NEW ORDER"
                       android:textSize="16sp"
+                      android:textColor="#FF9800"
                       android:textStyle="bold"
-                      android:backgroundTint="#1DB954"
-                      android:layout_marginBottom="16dp"/>
+                      android:layout_marginBottom="15dp"/>
 
                   <TextView
-                      android:id="@+id/tv_info"
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="Pehle Accessibility Service enable karein"
-                      android:textColor="#FFAA00"
-                      android:textSize="13sp"
-                      android:gravity="center"
-                      android:layout_marginBottom="12dp"/>
+                      android:text="JAHEZ"
+                      android:textSize="18sp"
+                      android:textColor="#4CAF50"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="10dp"/>
 
-                  <Button
-                      android:id="@+id/btn_accessibility"
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="₪ 10.0"
+                      android:textSize="16sp"
+                      android:textColor="#FFFFFF"
+                      android:layout_marginBottom="15dp"/>
+
+                  <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Open Accessibility Settings"
-                      android:backgroundTint="#444444"/>
+                      android:text="Pick-up from Al Thumamah Rd."
+                      android:textSize="14sp"
+                      android:textColor="#DDDDDD"
+                      android:layout_marginBottom="5dp"/>
+
+                  <TextView
+                      android:id="@+id/tv_pickup_distance"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="1.6 Km From You"
+                      android:textSize="14sp"
+                      android:textColor="#FF9800"
+                      android:layout_marginBottom="10dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Drop off at Al Aqiq, Riyadh"
+                      android:textSize="14sp"
+                      android:textColor="#DDDDDD"
+                      android:layout_marginBottom="5dp"/>
+
+                  <TextView
+                      android:id="@+id/tv_drop_distance"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="2.9 Km From Pickup"
+                      android:textSize="14sp"
+                      android:textColor="#FF9800"
+                      android:layout_marginBottom="20dp"/>
+
+                  <!-- Swipe Button -->
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="60dp"
+                      android:background="@drawable/green_button"
+                      android:orientation="horizontal"
+                      android:gravity="center_vertical">
+
+                      <TextView
+                          android:id="@+id/tv_swipe_status"
+                          android:layout_width="0dp"
+                          android:layout_height="match_parent"
+                          android:layout_weight="1"
+                          android:text="     Swipe to Accept →"
+                          android:textSize="16sp"
+                          android:textColor="#FFFFFF"
+                          android:textStyle="bold"
+                          android:gravity="center_vertical"/>
+
+                      <TextView
+                          android:id="@+id/tv_swipe_arrow"
+                          android:layout_width="50dp"
+                          android:layout_height="match_parent"
+                          android:text="→→"
+                          android:textSize="20sp"
+                          android:textColor="#FFFFFF"
+                          android:gravity="center"
+                          android:background="#388E3C"/>
+
+                  </LinearLayout>
 
               </LinearLayout>
-          </ScrollView>
+
+              <!-- Status -->
+              <TextView
+                  android:id="@+id/tv_order_status"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="⏳ Waiting for swipe..."
+                  android:textSize="16sp"
+                  android:textColor="#FF9800"
+                  android:gravity="center"
+                  android:layout_marginBottom="20dp"/>
+
+              <!-- Buttons -->
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="horizontal">
+
+                  <Button
+                      android:id="@+id/btn_new_order"
+                      android:layout_width="0dp"
+                      android:layout_height="50dp"
+                      android:layout_weight="1"
+                      android:text="🔄 New Order"
+                      android:textSize="14sp"
+                      android:backgroundTint="#2196F3"
+                      android:layout_marginEnd="10dp"/>
+
+                  <Button
+                      android:id="@+id/btn_reset"
+                      android:layout_width="0dp"
+                      android:layout_height="50dp"
+                      android:layout_weight="1"
+                      android:text="🔁 Reset"
+                      android:textSize="14sp"
+                      android:backgroundTint="#F44336"/>
+
+              </LinearLayout>
+
+              <TextView
+                  android:id="@+id/tv_instruction"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="💡 Instruction:\n1. Order accept karne ke liye green button ko LEFT se RIGHT swipe karein\n2. Accept ho jayega\n3. New Order ke liye 'New Order' button dabayein"
+                  android:textSize="12sp"
+                  android:textColor="#666666"
+                  android:layout_marginTop="20dp"
+                  android:lineSpacingExtra="4dp"/>
+
+          </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
-          package com.saned.autoswipe;
+          cat > app/src/main/java/com/ordersimulator/MainActivity.java << 'EOF'
+          package com.ordersimulator;
 
-          import android.content.Intent;
-          import android.content.SharedPreferences;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
-          import android.provider.Settings;
-          import android.view.inputmethod.InputMethodManager;
+          import android.view.MotionEvent;
+          import android.view.View;
           import android.widget.Button;
-          import android.widget.EditText;
-          import android.widget.Switch;
+          import android.widget.LinearLayout;
           import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
+          import java.util.Random;
 
           public class MainActivity extends AppCompatActivity {
 
-              Switch switchService;
-              EditText etPickupMax, etDropMax;
-              TextView tvStatus, tvInfo;
-              Button btnSave, btnAccessibility;
-              SharedPreferences prefs;
+              private TextView tvPickupDistance, tvDropDistance, tvOrderStatus, tvSwipeStatus;
+              private LinearLayout swipeButton;
+              private Button btnNewOrder, btnReset;
+              private Handler handler = new Handler(Looper.getMainLooper());
+              private boolean isOrderAccepted = false;
+              private float startX = 0;
+              private Random random = new Random();
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
 
-                  prefs = getSharedPreferences("jahez_prefs", MODE_PRIVATE);
-                  switchService = findViewById(R.id.switch_service);
-                  etPickupMax = findViewById(R.id.et_pickup_max);
-                  etDropMax = findViewById(R.id.et_drop_max);
-                  tvStatus = findViewById(R.id.tv_status);
-                  tvInfo = findViewById(R.id.tv_info);
-                  btnSave = findViewById(R.id.btn_save);
-                  btnAccessibility = findViewById(R.id.btn_accessibility);
+                  tvPickupDistance = findViewById(R.id.tv_pickup_distance);
+                  tvDropDistance = findViewById(R.id.tv_drop_distance);
+                  tvOrderStatus = findViewById(R.id.tv_order_status);
+                  tvSwipeStatus = findViewById(R.id.tv_swipe_status);
+                  swipeButton = findViewById(R.id.tv_swipe_arrow);
+                  btnNewOrder = findViewById(R.id.btn_new_order);
+                  btnReset = findViewById(R.id.btn_reset);
 
-                  etPickupMax.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
-                  etDropMax.setText(String.valueOf(prefs.getFloat("drop_max", 10.0f)));
+                  generateRandomOrder();
 
-                  switchService.setOnCheckedChangeListener((btn, isChecked) -> updateStatus(isChecked));
+                  // Swipe detection on green button area
+                  findViewById(R.id.tv_swipe_arrow).setOnTouchListener(new View.OnTouchListener() {
+                      private float startX = 0;
+                      private boolean isSwiping = false;
 
-                  btnSave.setOnClickListener(v -> {
-                      float pMax, dMax;
-                      try { pMax = Float.parseFloat(etPickupMax.getText().toString()); } catch (Exception e) { pMax = 5.0f; }
-                      try { dMax = Float.parseFloat(etDropMax.getText().toString()); } catch (Exception e) { dMax = 10.0f; }
+                      @Override
+                      public boolean onTouch(View v, MotionEvent event) {
+                          if (isOrderAccepted) {
+                              Toast.makeText(MainActivity.this, "Order already accepted! Press New Order", Toast.LENGTH_SHORT).show();
+                              return true;
+                          }
 
-                      prefs.edit()
-                          .putFloat("pickup_max", pMax)
-                          .putFloat("drop_max", dMax)
-                          .putBoolean("enabled", switchService.isChecked())
-                          .apply();
+                          switch (event.getAction()) {
+                              case MotionEvent.ACTION_DOWN:
+                                  startX = event.getRawX();
+                                  isSwiping = true;
+                                  tvSwipeStatus.setText("     →→→ Swipe →→→");
+                                  return true;
 
-                      etPickupMax.clearFocus();
-                      etDropMax.clearFocus();
-                      InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                      if (imm != null) {
-                          android.view.View view = getCurrentFocus();
-                          if (view == null) view = new android.view.View(this);
-                          imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                              case MotionEvent.ACTION_MOVE:
+                                  if (isSwiping) {
+                                      float deltaX = event.getRawX() - startX;
+                                      if (deltaX > 100) {
+                                          acceptOrder();
+                                          isSwiping = false;
+                                      }
+                                  }
+                                  return true;
+
+                              case MotionEvent.ACTION_UP:
+                                  isSwiping = false;
+                                  tvSwipeStatus.setText("     Swipe to Accept →");
+                                  return true;
+                          }
+                          return false;
                       }
-
-                      Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
-                      tvStatus.setText("Settings Saved!");
-                      tvStatus.setTextColor(0xFF1DB954);
-                      new Handler(Looper.getMainLooper()).postDelayed(() ->
-                          updateStatus(switchService.isChecked()), 1500);
                   });
 
-                  btnAccessibility.setOnClickListener(v ->
-                      startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                  );
-              }
-
-              private void updateStatus(boolean enabled) {
-                  if (enabled) {
-                      tvStatus.setText("Service ON - Waiting for order...");
-                      tvStatus.setTextColor(0xFF1DB954);
-                  } else {
-                      tvStatus.setText("Service OFF");
-                      tvStatus.setTextColor(0xFFFF5555);
-                  }
-              }
-
-              @Override
-              protected void onResume() {
-                  super.onResume();
-                  boolean enabled = prefs.getBoolean("enabled", false);
-                  switchService.setChecked(enabled);
-                  updateStatus(enabled);
-                  if (isAccessibilityEnabled()) {
-                      tvInfo.setText("Accessibility Service: Active");
-                      tvInfo.setTextColor(0xFF1DB954);
-                  } else {
-                      tvInfo.setText("Pehle Accessibility Service enable karein!");
-                      tvInfo.setTextColor(0xFFFFAA00);
-                  }
-              }
-
-              private boolean isAccessibilityEnabled() {
-                  try {
-                      String s = Settings.Secure.getString(getContentResolver(),
-                          Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-                      return s != null && s.contains(getPackageName());
-                  } catch (Exception e) { return false; }
-              }
-          }
-          EOF
-
-          cat > app/src/main/java/com/saned/autoswipe/AutoSwipeService.java << 'EOF'
-          package com.saned.autoswipe;
-
-          import android.accessibilityservice.AccessibilityService;
-          import android.accessibilityservice.GestureDescription;
-          import android.app.Notification;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.content.SharedPreferences;
-          import android.graphics.Path;
-          import android.graphics.Rect;
-          import android.os.Build;
-          import android.os.Handler;
-          import android.os.Looper;
-          import android.util.Log;
-          import android.view.accessibility.AccessibilityEvent;
-          import android.view.accessibility.AccessibilityNodeInfo;
-          import java.util.List;
-
-          public class AutoSwipeService extends AccessibilityService {
-
-              private static final String TAG = "JahezAuto";
-              private SharedPreferences prefs;
-              private final Handler handler = new Handler(Looper.getMainLooper());
-              private boolean isProcessing = false;
-
-              @Override
-              public void onServiceConnected() {
-                  super.onServiceConnected();
-                  prefs = getSharedPreferences("jahez_prefs", MODE_PRIVATE);
-                  Log.d(TAG, "✅ Service Connected - Jahez Auto Accept");
-              }
-
-              @Override
-              public void onAccessibilityEvent(AccessibilityEvent event) {
-                  if (prefs == null || !prefs.getBoolean("enabled", false) || isProcessing) return;
-                  
-                  String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
-                  if (!pkg.contains("jahez")) return;
-                  
-                  isProcessing = true;
-                  handler.postDelayed(() -> {
-                      checkAndAcceptOrder();
-                      isProcessing = false;
-                  }, 1500);
-              }
-
-              private void checkAndAcceptOrder() {
-                  AccessibilityNodeInfo root = getRootInActiveWindow();
-                  if (root == null) return;
-                  
-                  try {
-                      // Check if this is an order screen (look for JAHEZ or price)
-                      if (!isOrderScreen(root)) return;
-                      
-                      float pickupMax = prefs.getFloat("pickup_max", 5.0f);
-                      float dropMax = prefs.getFloat("drop_max", 10.0f);
-                      
-                      float pickupKm = getPickupDistance(root);
-                      float dropKm = getDropDistance(root);
-                      
-                      Log.d(TAG, "📊 Pickup: " + pickupKm + " km, Drop: " + dropKm + " km");
-                      Log.d(TAG, "🎯 Limits - Pickup Max: " + pickupMax + ", Drop Max: " + dropMax);
-                      
-                      if (pickupKm < 0 || dropKm < 0) {
-                          Log.d(TAG, "⚠️ Could not find distances");
-                          return;
-                      }
-                      
-                      if (pickupKm <= pickupMax && dropKm <= dropMax) {
-                          Log.d(TAG, "✅ Distance OK! Accepting order...");
-                          swipeGreenButton(root, pickupKm, dropKm);
+                  btnNewOrder.setOnClickListener(v -> {
+                      if (isOrderAccepted) {
+                          generateRandomOrder();
+                          isOrderAccepted = false;
+                          tvOrderStatus.setText("⏳ Waiting for swipe...");
+                          tvOrderStatus.setTextColor(0xFFFF9800);
+                          tvSwipeStatus.setText("     Swipe to Accept →");
+                          Toast.makeText(this, "New order generated!", Toast.LENGTH_SHORT).show();
                       } else {
-                          Log.d(TAG, "❌ Rejected - Distance out of range");
+                          generateRandomOrder();
+                          Toast.makeText(this, "New random order generated!", Toast.LENGTH_SHORT).show();
                       }
-                  } catch (Exception e) {
-                      Log.e(TAG, "Error: " + e.getMessage());
-                  } finally {
-                      if (root != null) root.recycle();
-                  }
-              }
-              
-              private boolean isOrderScreen(AccessibilityNodeInfo root) {
-                  // Look for JAHEZ or price text
-                  List<AccessibilityNodeInfo> jahezNodes = root.findAccessibilityNodeInfosByText("JAHEZ");
-                  if (jahezNodes != null && !jahezNodes.isEmpty()) {
-                      for (AccessibilityNodeInfo n : jahezNodes) { if (n != null) n.recycle(); }
-                      Log.d(TAG, "✅ Order screen detected (JAHEZ found)");
-                      return true;
-                  }
-                  
-                  List<AccessibilityNodeInfo> priceNodes = root.findAccessibilityNodeInfosByText("₪");
-                  if (priceNodes != null && !priceNodes.isEmpty()) {
-                      for (AccessibilityNodeInfo n : priceNodes) { if (n != null) n.recycle(); }
-                      Log.d(TAG, "✅ Order screen detected (Price found)");
-                      return true;
-                  }
-                  
-                  return false;
-              }
-              
-              private float getPickupDistance(AccessibilityNodeInfo root) {
-                  String[] patterns = {"From You", "منك", "Km From You"};
-                  for (String pattern : patterns) {
-                      List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(pattern);
-                      if (nodes != null && !nodes.isEmpty()) {
-                          for (AccessibilityNodeInfo node : nodes) {
-                              String text = node.getText() != null ? node.getText().toString() : "";
-                              float dist = extractDistance(text);
-                              node.recycle();
-                              if (dist > 0) {
-                                  for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
-                                  return dist;
-                              }
-                          }
-                          for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
-                      }
-                  }
-                  return -1f;
-              }
-              
-              private float getDropDistance(AccessibilityNodeInfo root) {
-                  String[] patterns = {"From Pickup", "من نقطة الاستلام"};
-                  for (String pattern : patterns) {
-                      List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(pattern);
-                      if (nodes != null && !nodes.isEmpty()) {
-                          for (AccessibilityNodeInfo node : nodes) {
-                              String text = node.getText() != null ? node.getText().toString() : "";
-                              float dist = extractDistance(text);
-                              node.recycle();
-                              if (dist > 0) {
-                                  for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
-                                  return dist;
-                              }
-                          }
-                          for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
-                      }
-                  }
-                  return -1f;
-              }
-              
-              private float extractDistance(String text) {
-                  try {
-                      String[] parts = text.trim().split("\\s+");
-                      for (String part : parts) {
-                          String cleaned = part.replace(",", ".").replace("km", "").replace("Km", "").trim();
-                          try {
-                              float val = Float.parseFloat(cleaned);
-                              if (val > 0 && val < 100) return val;
-                          } catch (NumberFormatException e) {}
-                      }
-                  } catch (Exception e) {}
-                  return -1f;
-              }
-              
-              private void swipeGreenButton(AccessibilityNodeInfo root, float pickupKm, float dropKm) {
-                  // Find the green accept button (at bottom of screen)
-                  AccessibilityNodeInfo button = findAcceptButton(root);
-                  
-                  if (button != null) {
-                      Rect bounds = new Rect();
-                      button.getBoundsInScreen(bounds);
-                      button.recycle();
-                      
-                      if (bounds.width() > 0) {
-                          // Left to Right swipe on the button
-                          int startX = bounds.left + 20;
-                          int endX = bounds.right - 20;
-                          int y = bounds.centerY();
-                          
-                          Log.d(TAG, "👉 Swiping on button: " + startX + " → " + endX + " at Y=" + y);
-                          performLeftToRightSwipe(startX, y, endX, y, () -> {
-                              Log.d(TAG, "🎉 ORDER ACCEPTED! Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
-                              showNotification(pickupKm, dropKm);
-                          });
-                          return;
-                      }
-                  }
-                  
-                  // Fallback: Swipe at bottom of screen
-                  Log.d(TAG, "⚠️ Button not found, swiping at bottom");
-                  swipeAtBottom(pickupKm, dropKm);
-              }
-              
-              private AccessibilityNodeInfo findAcceptButton(AccessibilityNodeInfo root) {
-                  // Try to find by text first
-                  String[] texts = {"Accept", "ACCEPT", "قبول", "موافقة"};
-                  for (String text : texts) {
-                      List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(text);
-                      if (nodes != null && !nodes.isEmpty()) {
-                          Log.d(TAG, "🔘 Found button with text: " + text);
-                          return nodes.get(0);
-                      }
-                  }
-                  
-                  // If not found, find button at bottom by class
-                  return findBottomButton(root);
-              }
-              
-              private AccessibilityNodeInfo findBottomButton(AccessibilityNodeInfo node) {
-                  if (node == null) return null;
-                  
-                  Rect bounds = new Rect();
-                  node.getBoundsInScreen(bounds);
-                  int screenHeight = getResources().getDisplayMetrics().heightPixels;
-                  
-                  CharSequence className = node.getClassName();
-                  if (className != null) {
-                      String classNameStr = className.toString().toLowerCase();
-                      if (classNameStr.contains("button") && bounds.bottom > screenHeight * 0.7) {
-                          Log.d(TAG, "🔘 Found bottom button by class: " + classNameStr);
-                          return node;
-                      }
-                  }
-                  
-                  for (int i = 0; i < node.getChildCount(); i++) {
-                      AccessibilityNodeInfo child = node.getChild(i);
-                      if (child != null) {
-                          AccessibilityNodeInfo result = findBottomButton(child);
-                          if (result != null) return result;
-                          child.recycle();
-                      }
-                  }
-                  return null;
-              }
-              
-              private void swipeAtBottom(float pickupKm, float dropKm) {
-                  int screenWidth = getResources().getDisplayMetrics().widthPixels;
-                  int screenHeight = getResources().getDisplayMetrics().heightPixels;
-                  
-                  int startX = screenWidth / 5;
-                  int endX = (screenWidth * 4) / 5;
-                  int y = (int)(screenHeight * 0.85);
-                  
-                  Log.d(TAG, "👉 Bottom swipe: " + startX + " → " + endX + " at Y=" + y);
-                  performLeftToRightSwipe(startX, y, endX, y, () -> {
-                      Log.d(TAG, "🎉 Bottom swipe done!");
-                      showNotification(pickupKm, dropKm);
+                  });
+
+                  btnReset.setOnClickListener(v -> {
+                      isOrderAccepted = false;
+                      tvOrderStatus.setText("⏳ Waiting for swipe...");
+                      tvOrderStatus.setTextColor(0xFFFF9800);
+                      tvSwipeStatus.setText("     Swipe to Accept →");
+                      Toast.makeText(this, "Reset! Swipe to accept", Toast.LENGTH_SHORT).show();
                   });
               }
-              
-              private void performLeftToRightSwipe(int x1, int y1, int x2, int y2, Runnable onComplete) {
-                  Path path = new Path();
-                  path.moveTo(x1, y1);
+
+              private void generateRandomOrder() {
+                  // Pickup distance: 0.1 to 2.0 km
+                  float pickupKm = 0.1f + random.nextFloat() * 1.9f;
+                  pickupKm = Math.round(pickupKm * 10) / 10.0f;
                   
-                  // Smooth swipe with multiple points
-                  int steps = 20;
-                  float stepX = (float)(x2 - x1) / steps;
-                  for (int i = 1; i <= steps; i++) {
-                      path.lineTo(x1 + (stepX * i), y1);
-                  }
+                  // Drop distance: 0.1 to 5.0 km
+                  float dropKm = 0.1f + random.nextFloat() * 4.9f;
+                  dropKm = Math.round(dropKm * 10) / 10.0f;
                   
-                  GestureDescription gesture = new GestureDescription.Builder()
-                      .addStroke(new GestureDescription.StrokeDescription(path, 0, 400))
-                      .build();
+                  String[] pickupLocations = {"Al Thumamah Rd.", "King Fahd Rd.", "Olaya St.", "Tahlia St.", "Al Aqiq"};
+                  String[] dropLocations = {"Al Aqiq", "Al Malaz", "Al Rawabi", "Al Nakheel", "Al Yasmin"};
                   
-                  dispatchGesture(gesture, new GestureResultCallback() {
-                      @Override
-                      public void onCompleted(GestureDescription g) {
-                          Log.d(TAG, "✅ Swipe completed");
-                          if (onComplete != null) {
-                              handler.postDelayed(onComplete, 500);
-                          }
-                      }
-                      @Override
-                      public void onCancelled(GestureDescription g) {
-                          Log.e(TAG, "❌ Swipe cancelled");
-                      }
-                  }, null);
+                  String pickupLocation = pickupLocations[random.nextInt(pickupLocations.length)];
+                  String dropLocation = dropLocations[random.nextInt(dropLocations.length)];
+                  
+                  tvPickupDistance.setText(pickupKm + " Km From You");
+                  tvDropDistance.setText(dropKm + " Km From Pickup");
+                  
+                  // Update the address text in the layout
+                  TextView pickupAddr = findViewById(android.R.id.text1);
+                  TextView dropAddr = findViewById(android.R.id.text2);
+                  
+                  // Store distances for acceptance check
+                  getIntent().putExtra("pickup", pickupKm);
+                  getIntent().putExtra("drop", dropKm);
               }
-              
-              private void showNotification(float pickup, float drop) {
-                  try {
-                      NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                      if (nm == null) return;
-                      
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          NotificationChannel channel = new NotificationChannel(
-                              "jahez_auto", "Jahez Auto Accept", NotificationManager.IMPORTANCE_HIGH);
-                          nm.createNotificationChannel(channel);
-                      }
-                      
-                      Notification.Builder builder;
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          builder = new Notification.Builder(this, "jahez_auto");
-                      } else {
-                          builder = new Notification.Builder(this);
-                      }
-                      
-                      builder.setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setContentTitle("✅ Order Accepted!")
-                          .setContentText("Pickup: " + pickup + "km | Drop: " + drop + "km")
-                          .setAutoCancel(true);
-                      
-                      nm.notify(1001, builder.build());
-                  } catch (Exception e) {}
-              }
-              
-              @Override
-              public void onInterrupt() {
-                  isProcessing = false;
+
+              private void acceptOrder() {
+                  isOrderAccepted = true;
+                  float pickup = getIntent().getFloatExtra("pickup", 0);
+                  float drop = getIntent().getFloatExtra("drop", 0);
+                  
+                  tvOrderStatus.setText("✅ ORDER ACCEPTED! ✅\nPickup: " + pickup + " km | Drop: " + drop + " km");
+                  tvOrderStatus.setTextColor(0xFF4CAF50);
+                  tvSwipeStatus.setText("     ✓ Accepted ✓");
+                  
+                  Toast.makeText(this, "🎉 Order Accepted! Press New Order for next", Toast.LENGTH_LONG).show();
               }
           }
           EOF
@@ -696,5 +440,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Jahez-Auto-Accept-v7
+          name: Order-Simulator
           path: app/build/outputs/apk/debug/*.apk
