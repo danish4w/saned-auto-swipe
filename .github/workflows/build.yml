@@ -1,4 +1,4 @@
-name: Build Log Viewer for Saned
+name: Build LogCat Master
 on: workflow_dispatch
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
 
       - name: Build Project
         run: |
-          mkdir -p app/src/main/java/com/saned/logviewer
+          mkdir -p app/src/main/java/com/logcat/master
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p gradle/wrapper
@@ -46,14 +46,14 @@ jobs:
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.saned.logviewer'
+              namespace 'com.logcat.master'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.saned.logviewer'
+                  applicationId 'com.logcat.master'
                   minSdk 26
                   targetSdk 34
-                  versionCode 1
-                  versionName '1.0'
+                  versionCode 2
+                  versionName '2.0'
               }
           }
           dependencies {
@@ -66,7 +66,7 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.READ_LOGS"/>
               <application
-                  android:label="Saned Log Viewer"
+                  android:label="LogCat Master"
                   android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
@@ -83,7 +83,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">Saned Log Viewer</string>
+              <string name="app_name">LogCat Master</string>
           </resources>
           EOF
 
@@ -99,23 +99,52 @@ jobs:
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="📋 Saned Log Viewer"
+                  android:text="📋 LogCat Master"
                   android:textSize="20sp"
                   android:textColor="#FFFFFF"
                   android:textStyle="bold"
                   android:layout_gravity="center"
-                  android:layout_marginBottom="10dp"/>
+                  android:layout_marginBottom="5dp"/>
 
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="Real-time logs from both apps"
+                  android:text="Custom Log Viewer"
                   android:textSize="12sp"
                   android:textColor="#AAAAAA"
                   android:layout_gravity="center"
                   android:layout_marginBottom="20dp"/>
 
-              <!-- Filter Buttons -->
+              <!-- Custom Filter Input -->
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="horizontal"
+                  android:layout_marginBottom="10dp">
+
+                  <EditText
+                      android:id="@+id/et_custom_filter"
+                      android:layout_width="0dp"
+                      android:layout_height="45dp"
+                      android:layout_weight="1"
+                      android:hint="Enter app name (e.g., jahez, saned)"
+                      android:textColor="#FFFFFF"
+                      android:textColorHint="#888888"
+                      android:background="#333333"
+                      android:padding="10dp"
+                      android:layout_marginEnd="5dp"/>
+
+                  <Button
+                      android:id="@+id/btn_custom"
+                      android:layout_width="wrap_content"
+                      android:layout_height="45dp"
+                      android:text="Filter"
+                      android:textSize="12sp"
+                      android:backgroundTint="#2196F3"/>
+
+              </LinearLayout>
+
+              <!-- Quick Filter Buttons -->
               <LinearLayout
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
@@ -137,7 +166,7 @@ jobs:
                       android:layout_height="40dp"
                       android:layout_weight="1"
                       android:text="Saned Auto"
-                      android:textSize="11sp"
+                      android:textSize="10sp"
                       android:layout_marginEnd="5dp"/>
 
                   <Button
@@ -146,7 +175,7 @@ jobs:
                       android:layout_height="40dp"
                       android:layout_weight="1"
                       android:text="Saned Driver"
-                      android:textSize="11sp"
+                      android:textSize="10sp"
                       android:layout_marginEnd="5dp"/>
 
                   <Button
@@ -218,7 +247,7 @@ jobs:
                       android:id="@+id/tv_logs"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Waiting for logs...\n\nMake sure:\n1. Root access granted\n2. Saned Auto Swipe Accessibility is ON\n3. Saned Driver app is open\n4. Orders are coming"
+                      android:text="Waiting for logs...\n\nMake sure:\n1. Root access granted\n2. Start button pressed\n3. Custom filter: type app name"
                       android:textSize="11sp"
                       android:textColor="#AAAAAA"
                       android:fontFamily="monospace"
@@ -236,16 +265,26 @@ jobs:
                   android:gravity="center"
                   android:layout_marginTop="8dp"/>
 
+              <TextView
+                  android:id="@+id/tv_current_filter"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Filter: all"
+                  android:textSize="10sp"
+                  android:textColor="#666666"
+                  android:gravity="center"/>
+
           </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/saned/logviewer/MainActivity.java << 'EOF'
-          package com.saned.logviewer;
+          cat > app/src/main/java/com/logcat/master/MainActivity.java << 'EOF'
+          package com.logcat.master;
 
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
           import android.widget.Button;
+          import android.widget.EditText;
           import android.widget.ScrollView;
           import android.widget.TextView;
           import android.widget.Toast;
@@ -257,14 +296,16 @@ jobs:
 
           public class MainActivity extends AppCompatActivity {
 
-              private TextView tvLogs, tvStatus;
+              private TextView tvLogs, tvStatus, tvCurrentFilter;
               private ScrollView scrollView;
-              private Button btnStart, btnStop, btnClear, btnAll, btnSanedAuto, btnSanedDriver, btnError;
+              private EditText etCustomFilter;
+              private Button btnStart, btnStop, btnClear, btnAll, btnSanedAuto, btnSanedDriver, btnError, btnCustom;
               private ExecutorService executor;
               private Handler uiHandler;
               private boolean isRunning = false;
               private Process logProcess;
               private String currentFilter = "all";
+              private String customFilterText = "";
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
@@ -273,7 +314,9 @@ jobs:
 
                   tvLogs = findViewById(R.id.tv_logs);
                   tvStatus = findViewById(R.id.tv_status);
+                  tvCurrentFilter = findViewById(R.id.tv_current_filter);
                   scrollView = findViewById(R.id.log_scroll);
+                  etCustomFilter = findViewById(R.id.et_custom_filter);
                   btnStart = findViewById(R.id.btn_start);
                   btnStop = findViewById(R.id.btn_stop);
                   btnClear = findViewById(R.id.btn_clear);
@@ -281,6 +324,7 @@ jobs:
                   btnSanedAuto = findViewById(R.id.btn_saned_auto);
                   btnSanedDriver = findViewById(R.id.btn_saned_driver);
                   btnError = findViewById(R.id.btn_error);
+                  btnCustom = findViewById(R.id.btn_custom);
 
                   executor = Executors.newSingleThreadExecutor();
                   uiHandler = new Handler(Looper.getMainLooper());
@@ -289,10 +333,45 @@ jobs:
                   btnStop.setOnClickListener(v -> stopLogging());
                   btnClear.setOnClickListener(v -> clearLogs());
 
-                  btnAll.setOnClickListener(v -> { currentFilter = "all"; addLog("--- Filter: ALL ---"); });
-                  btnSanedAuto.setOnClickListener(v -> { currentFilter = "sanedauto"; addLog("--- Filter: SANED AUTO ONLY ---"); });
-                  btnSanedDriver.setOnClickListener(v -> { currentFilter = "driver"; addLog("--- Filter: SANED DRIVER ONLY ---"); });
-                  btnError.setOnClickListener(v -> { currentFilter = "error"; addLog("--- Filter: ERRORS ONLY ---"); });
+                  btnAll.setOnClickListener(v -> { 
+                      currentFilter = "all"; 
+                      customFilterText = "";
+                      tvCurrentFilter.setText("Filter: all");
+                      addLog("--- Filter: ALL ---");
+                  });
+                  
+                  btnSanedAuto.setOnClickListener(v -> { 
+                      currentFilter = "custom"; 
+                      customFilterText = "sanedauto|autoswipe";
+                      tvCurrentFilter.setText("Filter: Saned Auto (sanedauto|autoswipe)");
+                      addLog("--- Filter: SANED AUTO ONLY ---");
+                  });
+                  
+                  btnSanedDriver.setOnClickListener(v -> { 
+                      currentFilter = "custom"; 
+                      customFilterText = "jahez|net.jahez|saned";
+                      tvCurrentFilter.setText("Filter: Saned Driver (jahez|net.jahez|saned)");
+                      addLog("--- Filter: SANED DRIVER ONLY ---");
+                  });
+                  
+                  btnError.setOnClickListener(v -> { 
+                      currentFilter = "error"; 
+                      customFilterText = "";
+                      tvCurrentFilter.setText("Filter: errors only");
+                      addLog("--- Filter: ERRORS ONLY ---");
+                  });
+                  
+                  btnCustom.setOnClickListener(v -> {
+                      String input = etCustomFilter.getText().toString().trim();
+                      if (!input.isEmpty()) {
+                          currentFilter = "custom";
+                          customFilterText = input.toLowerCase();
+                          tvCurrentFilter.setText("Filter: " + customFilterText);
+                          addLog("--- Custom Filter: " + customFilterText + " ---");
+                      } else {
+                          Toast.makeText(this, "Enter filter text", Toast.LENGTH_SHORT).show();
+                      }
+                  });
               }
 
               private void startLogging() {
@@ -345,15 +424,23 @@ jobs:
               private boolean shouldShowLine(String line) {
                   String lowerLine = line.toLowerCase();
                   
+                  // Skip own app logs
+                  if (lowerLine.contains("logcat.master") || lowerLine.contains("logcatmaster")) {
+                      return false;
+                  }
+                  
                   switch (currentFilter) {
-                      case "sanedauto":
-                          return lowerLine.contains("sanedauto") || lowerLine.contains("autoswipe");
-                      case "driver":
-                          return lowerLine.contains("jahez") || lowerLine.contains("net.jahez") || lowerLine.contains("saned.delivery");
                       case "error":
                           return lowerLine.contains("error") || lowerLine.contains("exception") || lowerLine.contains("fail");
+                      case "custom":
+                          if (customFilterText.isEmpty()) return true;
+                          String[] keywords = customFilterText.split("\\|");
+                          for (String kw : keywords) {
+                              if (lowerLine.contains(kw)) return true;
+                          }
+                          return false;
                       default:
-                          return lowerLine.contains("saned") || lowerLine.contains("jahez") || lowerLine.contains("autoswipe");
+                          return true;
                   }
               }
 
@@ -387,5 +474,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Log-Viewer
+          name: LogCat-Master
           path: app/build/outputs/apk/debug/*.apk
