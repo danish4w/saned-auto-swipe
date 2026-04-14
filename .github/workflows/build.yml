@@ -53,8 +53,8 @@ jobs:
                   applicationId 'com.saned.autoswipe'
                   minSdk 26
                   targetSdk 34
-                  versionCode 6
-                  versionName '6.0'
+                  versionCode 7
+                  versionName '7.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -233,6 +233,66 @@ jobs:
                       android:background="#333333"
                       android:layout_marginVertical="8dp"/>
 
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Timing Settings"
+                      android:textColor="#FF9500"
+                      android:textSize="15sp"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="8dp"
+                      android:layout_marginTop="8dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Screen Detection Delay (ms)"
+                      android:textColor="#AAAAAA"
+                      android:textSize="13sp"/>
+                  <SeekBar
+                      android:id="@+id/seek_screen_delay"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:max="2900"
+                      android:progress="300"
+                      android:layout_marginBottom="4dp"/>
+                  <TextView
+                      android:id="@+id/tv_screen_delay"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="400 ms"
+                      android:textColor="#1DB954"
+                      android:textSize="12sp"
+                      android:layout_marginBottom="8dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Swipe Duration (ms)"
+                      android:textColor="#AAAAAA"
+                      android:textSize="13sp"/>
+                  <SeekBar
+                      android:id="@+id/seek_swipe_duration"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:max="2900"
+                      android:progress="200"
+                      android:layout_marginBottom="4dp"/>
+                  <TextView
+                      android:id="@+id/tv_swipe_duration"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="300 ms"
+                      android:textColor="#1DB954"
+                      android:textSize="12sp"
+                      android:layout_marginBottom="16dp"/>
+
+                  <View
+                      android:layout_width="match_parent"
+                      android:layout_height="1dp"
+                      android:background="#333333"
+                      android:layout_marginVertical="8dp"/>
+
                   <Switch
                       android:id="@+id/switch_service"
                       android:layout_width="wrap_content"
@@ -286,6 +346,7 @@ jobs:
           import android.view.inputmethod.InputMethodManager;
           import android.widget.Button;
           import android.widget.EditText;
+          import android.widget.SeekBar;
           import android.widget.Switch;
           import android.widget.TextView;
           import android.widget.Toast;
@@ -295,7 +356,8 @@ jobs:
 
               Switch switchService;
               EditText etPickupMax, etDropMax;
-              TextView tvStatus, tvInfo;
+              TextView tvStatus, tvInfo, tvScreenDelay, tvSwipeDuration;
+              SeekBar seekScreenDelay, seekSwipeDuration;
               Button btnSave, btnAccessibility;
               SharedPreferences prefs;
 
@@ -304,17 +366,53 @@ jobs:
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
 
-                  prefs            = getSharedPreferences("saned_prefs", MODE_PRIVATE);
-                  switchService    = findViewById(R.id.switch_service);
-                  etPickupMax      = findViewById(R.id.et_pickup_max);
-                  etDropMax        = findViewById(R.id.et_drop_max);
-                  tvStatus         = findViewById(R.id.tv_status);
-                  tvInfo           = findViewById(R.id.tv_info);
-                  btnSave          = findViewById(R.id.btn_save);
+                  prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  switchService = findViewById(R.id.switch_service);
+                  etPickupMax = findViewById(R.id.et_pickup_max);
+                  etDropMax = findViewById(R.id.et_drop_max);
+                  tvStatus = findViewById(R.id.tv_status);
+                  tvInfo = findViewById(R.id.tv_info);
+                  tvScreenDelay = findViewById(R.id.tv_screen_delay);
+                  tvSwipeDuration = findViewById(R.id.tv_swipe_duration);
+                  seekScreenDelay = findViewById(R.id.seek_screen_delay);
+                  seekSwipeDuration = findViewById(R.id.seek_swipe_duration);
+                  btnSave = findViewById(R.id.btn_save);
                   btnAccessibility = findViewById(R.id.btn_accessibility);
 
+                  // Load saved values
                   etPickupMax.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
                   etDropMax.setText(String.valueOf(prefs.getFloat("drop_max", 10.0f)));
+                  
+                  int savedScreenDelay = prefs.getInt("screen_delay", 400);
+                  int savedSwipeDuration = prefs.getInt("swipe_duration", 300);
+                  
+                  seekScreenDelay.setProgress(savedScreenDelay - 100);
+                  seekSwipeDuration.setProgress(savedSwipeDuration - 100);
+                  tvScreenDelay.setText(savedScreenDelay + " ms");
+                  tvSwipeDuration.setText(savedSwipeDuration + " ms");
+
+                  // SeekBar listeners
+                  seekScreenDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                          int value = progress + 100;
+                          tvScreenDelay.setText(value + " ms");
+                          if (fromUser) prefs.edit().putInt("screen_delay", value).apply();
+                      }
+                      @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                      @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+                  });
+                  
+                  seekSwipeDuration.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                          int value = progress + 100;
+                          tvSwipeDuration.setText(value + " ms");
+                          if (fromUser) prefs.edit().putInt("swipe_duration", value).apply();
+                      }
+                      @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                      @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+                  });
 
                   switchService.setOnCheckedChangeListener((btn, isChecked) ->
                       updateStatus(isChecked)
@@ -323,7 +421,7 @@ jobs:
                   btnSave.setOnClickListener(v -> {
                       float pMax, dMax;
                       try { pMax = Float.parseFloat(etPickupMax.getText().toString()); } catch (Exception e) { pMax = 5.0f; }
-                      try { dMax = Float.parseFloat(etDropMax.getText().toString());   } catch (Exception e) { dMax = 10.0f; }
+                      try { dMax = Float.parseFloat(etDropMax.getText().toString()); } catch (Exception e) { dMax = 10.0f; }
 
                       prefs.edit()
                           .putFloat("pickup_max", pMax)
@@ -397,7 +495,6 @@ jobs:
           import android.app.NotificationManager;
           import android.content.SharedPreferences;
           import android.graphics.Path;
-          import android.graphics.Rect;
           import android.os.Build;
           import android.os.Handler;
           import android.os.Looper;
@@ -463,13 +560,11 @@ jobs:
                   if (prefs == null) return;
                   if (!prefs.getBoolean("enabled", false)) return;
 
-                  // Package check - sahi package name
                   String pkg = String.valueOf(event.getPackageName());
                   if (!pkg.contains("saned") && !pkg.contains("plat")) return;
 
-                  // className se live order screen check
-                  String className = String.valueOf(event.getClassName());
-                  handler.postDelayed(this::checkAndAccept, 400);
+                  int screenDelay = prefs.getInt("screen_delay", 400);
+                  handler.postDelayed(this::checkAndAccept, screenDelay);
               }
 
               private void checkAndAccept() {
@@ -499,41 +594,38 @@ jobs:
                               acceptNodes = root.findAccessibilityNodeInfosByText("قبول");
 
                           if (acceptNodes != null && !acceptNodes.isEmpty()) {
-                              AccessibilityNodeInfo btn = acceptNodes.get(0);
-                              if (btn != null) {
-                                  // Screen width se swipe - button bounds se nahi
-                                  DisplayMetrics dm = getResources().getDisplayMetrics();
-                                  int screenWidth = dm.widthPixels;
-                                  int screenHeight = dm.heightPixels;
-                                  int startX = (int)(screenWidth * 0.15f);  // 15% se
-                                  int endX   = (int)(screenWidth * 0.85f);  // 85% tak
-                                  int y      = (int)(screenHeight * 0.80f); // Screen ka 80% neeche
+                              DisplayMetrics dm = getResources().getDisplayMetrics();
+                              int screenWidth = dm.widthPixels;
+                              int screenHeight = dm.heightPixels;
+                              int startX = (int)(screenWidth * 0.15f);
+                              int endX   = (int)(screenWidth * 0.85f);
+                              int y      = (int)(screenHeight * 0.80f);
 
-                                  final float pKm = pickupKm;
-                                  final float dKm = dropKm;
+                              int swipeDuration = prefs.getInt("swipe_duration", 300);
 
-                                  swipeOnScreen(startX, y, endX, y, () -> {
-                                      Log.d(TAG, "ACCEPTED! Pickup:" + pKm + " Drop:" + dKm);
-                                      prefs.edit().putBoolean("enabled", false).apply();
-                                      sendOrderNotification(pKm, dKm);
-                                  });
-                                  btn.recycle();
-                              }
+                              final float pKm = pickupKm;
+                              final float dKm = dropKm;
+
+                              swipeOnScreen(startX, y, endX, y, swipeDuration, () -> {
+                                  Log.d(TAG, "ACCEPTED! Pickup:" + pKm + " Drop:" + dKm);
+                                  prefs.edit().putBoolean("enabled", false).apply();
+                                  sendOrderNotification(pKm, dKm);
+                              });
                           }
                       } else {
                           Log.d(TAG, "IGNORED - pickup=" + pickupKm + " drop=" + dropKm);
                       }
                   } finally {
-                      root.recycle();
+                      if (root != null) root.recycle();
                   }
               }
 
-              private void swipeOnScreen(int x1, int y1, int x2, int y2, Runnable onDone) {
+              private void swipeOnScreen(int x1, int y1, int x2, int y2, int duration, Runnable onDone) {
                   Path path = new Path();
                   path.moveTo(x1, y1);
                   path.lineTo(x2, y2);
                   GestureDescription gesture = new GestureDescription.Builder()
-                      .addStroke(new GestureDescription.StrokeDescription(path, 0, 300))
+                      .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))
                       .build();
                   dispatchGesture(gesture, new GestureResultCallback() {
                       @Override
@@ -582,5 +674,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Auto-Swipe-v6
+          name: Saned-Auto-Swipe-v7
           path: app/build/outputs/apk/debug/*.apk
