@@ -54,8 +54,8 @@ jobs:
                   applicationId 'com.saned.autoswipe'
                   minSdk 26
                   targetSdk 34
-                  versionCode 4
-                  versionName '4.0'
+                  versionCode 5
+                  versionName '5.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -64,23 +64,32 @@ jobs:
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.core:core:1.10.1'
           }
           EOF
 
-          # Icon PNG base64 se generate karo
+          python3 - << 'PYEOF'
+          import base64
+          b64 = "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAA93klEQVR4nO3de5Al533e9+ft2zln7jN7wV5wJ0hcAi4ogXcCFiNREmlJVEm2K7JlOy5btqgkZTlx4sSWYpdvclVcSSl2iUWHtspViuIiTUlmkiraJkUyJEVTFCESIAEQ4GKBJYAFsAvszs7OzLl2d/44MzszOzM7Z2ZOd7/v299P1dTszs7s9vbpfn9P/973+xgBcNqpU2fyqv7tCxeeMFX92wAOh5MXsEyVBb1oBAbAHpyMQMl8LvCHRUAAysPJBhSAIj9+hANgvDihgEOi2FeHUAAcHCcPsA8Ue/sRCoDRcKIAu6DY+4NQAGzHSQGsoeDXB4EAIACgxij4WEcgQB1x0KM2KPgYFYEAdcBBDq9R9HFYhAH4igMb3qHooyiEAfiEgxnOo+CjKgQCuIyDF06i6MM2hAG4hgMWTqHww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3EAYB"
+          import os
+          data = base64.b64decode(b64 + "==")
+          os.makedirs('app/src/main/res/mipmap-xxxhdpi', exist_ok=True)
+          PYEOF
+
           python3 - << 'PYEOF'
           import base64, os
-          b64 = "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAA93klEQVR4nO3de5Al533e9+ft2zln7jN7wV5wJ0hcAi4ogXcCFiNREmlJVEm2K7JlOy5btqgkZTlx4sSWYpdvclVcSSl2iUWHtspViuIiTUlmkiraJkUyJEVTFCESIAEQ4GKBJYAFsAvszs7OzLl2d/44MzszOzM7Z2ZOd7/v299P1dTszs7s9vbpfn9P/973+xgBcNqpU2fyqv7tCxeeMFX92wAOh5MXsEyVBb1oBAbAHpyMQMl8LvCHRUAAysPJBhSAIj9+hANgvDihgEOi2FeHUAAcHCcPsA8Ue/sRCoDRcKIAu6DY+4NQAGzHSQGsoeDXB4EAIACgxij4WEcgQB1x0KM2KPgYFYEAdcBBDq9R9HFYhAH4igMb3qHooyiEAfiEgxnOo+CjKgQCuIyDF06i6MM2hAG4hgMWTqHww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSTqHww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHABezUcM/gAAAABJRU5ErkJggg=="
+          b64 = "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAA93klEQVR4nO3de5Al533e9+ft2zln7jN7wV5wJ0hcAi4ogXcCFiNREmlJVEm2K7JlOy5btqgkZTlx4sSWYpdvclVcSSl2iUWHtspViuIiTUlmkiraJkUyJEVTFCESIAEQ4GKBJYAFsAvszs7OzLl2d/44MzszOzM7Z2ZOd7/v299P1dTszs7s9vbpfn9P/973+xgBcNqpU2fyqv7tCxeeMFX92wAOh5MXsEyVBb1oBAbAHpyMQMl8LvCHRUAAysPJBhSAIj9+hANgvDihgEOi2FeHUAAcHCcPsA8Ue/sRCoDRcKIAu6DY+4NQAGzHSQGsoeDXB4EAIACgxij4WEcgQB1x0KM2KPgYFYEAdcBBDq9R9HFYhAH4igMb3qHooyiEAfiEgxnOo+CjKgQCuIyDF06i6MM2hAG4hgMWTqHww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHYhgMSzqDww3YEAbiCAxXWo+jDVYQB2IyDE1ai6MM3hAHABezUcM/gAAAABJRU5ErkJggg=="
           data = base64.b64decode(b64)
           with open('app/src/main/res/mipmap-xxxhdpi/ic_launcher.png', 'wb') as f:
               f.write(data)
-          print("Icon created!")
+          print("Icon OK")
           PYEOF
 
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <application
                   android:label="Saned Auto"
                   android:icon="@mipmap/ic_launcher"
@@ -125,6 +134,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">Saned Auto</string>
+              <string name="channel_id">saned_auto_channel</string>
+              <string name="channel_name">Saned Auto Notifications</string>
           </resources>
           EOF
 
@@ -159,6 +170,7 @@ jobs:
                       android:textColor="#FF5555"
                       android:layout_marginBottom="28dp"/>
 
+                  <!-- PICKUP MAX ONLY -->
                   <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
@@ -166,69 +178,42 @@ jobs:
                       android:textColor="#1DB954"
                       android:textSize="15sp"
                       android:textStyle="bold"
-                      android:layout_marginBottom="10dp"/>
+                      android:layout_marginBottom="8dp"/>
 
-                  <LinearLayout
+                  <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:orientation="horizontal"
-                      android:layout_marginBottom="6dp">
-                      <LinearLayout
-                          android:layout_width="0dp"
-                          android:layout_height="wrap_content"
-                          android:layout_weight="1"
-                          android:orientation="vertical"
-                          android:gravity="center"
-                          android:layout_marginEnd="8dp">
-                          <TextView
-                              android:layout_width="wrap_content"
-                              android:layout_height="wrap_content"
-                              android:text="Min (Km)"
-                              android:textColor="#AAAAAA"
-                              android:textSize="13sp"/>
-                          <EditText
-                              android:id="@+id/et_pickup_min"
-                              android:layout_width="match_parent"
-                              android:layout_height="wrap_content"
-                              android:inputType="numberDecimal"
-                              android:text="0.1"
-                              android:textColor="#FFFFFF"
-                              android:backgroundTint="#333333"
-                              android:gravity="center"
-                              android:padding="8dp"/>
-                      </LinearLayout>
-                      <LinearLayout
-                          android:layout_width="0dp"
-                          android:layout_height="wrap_content"
-                          android:layout_weight="1"
-                          android:orientation="vertical"
-                          android:gravity="center"
-                          android:layout_marginStart="8dp">
-                          <TextView
-                              android:layout_width="wrap_content"
-                              android:layout_height="wrap_content"
-                              android:text="Max (Km)"
-                              android:textColor="#AAAAAA"
-                              android:textSize="13sp"/>
-                          <EditText
-                              android:id="@+id/et_pickup_max"
-                              android:layout_width="match_parent"
-                              android:layout_height="wrap_content"
-                              android:inputType="numberDecimal"
-                              android:text="5.0"
-                              android:textColor="#FFFFFF"
-                              android:backgroundTint="#333333"
-                              android:gravity="center"
-                              android:padding="8dp"/>
-                      </LinearLayout>
-                  </LinearLayout>
+                      android:text="Max (Km)"
+                      android:textColor="#AAAAAA"
+                      android:textSize="13sp"
+                      android:gravity="center"/>
+                  <EditText
+                      android:id="@+id/et_pickup_max"
+                      android:layout_width="200dp"
+                      android:layout_height="wrap_content"
+                      android:inputType="numberDecimal"
+                      android:text="5.0"
+                      android:textColor="#FFFFFF"
+                      android:backgroundTint="#333333"
+                      android:gravity="center"
+                      android:padding="10dp"
+                      android:layout_marginBottom="4dp"/>
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="(0 se is tak ke orders accept honge)"
+                      android:textColor="#777777"
+                      android:textSize="11sp"
+                      android:gravity="center"
+                      android:layout_marginBottom="16dp"/>
 
                   <View
                       android:layout_width="match_parent"
                       android:layout_height="1dp"
                       android:background="#333333"
-                      android:layout_marginVertical="16dp"/>
+                      android:layout_marginVertical="8dp"/>
 
+                  <!-- DROP MAX ONLY -->
                   <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
@@ -236,68 +221,41 @@ jobs:
                       android:textColor="#FF9500"
                       android:textSize="15sp"
                       android:textStyle="bold"
-                      android:layout_marginBottom="10dp"/>
+                      android:layout_marginBottom="8dp"
+                      android:layout_marginTop="8dp"/>
 
-                  <LinearLayout
+                  <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:orientation="horizontal"
-                      android:layout_marginBottom="6dp">
-                      <LinearLayout
-                          android:layout_width="0dp"
-                          android:layout_height="wrap_content"
-                          android:layout_weight="1"
-                          android:orientation="vertical"
-                          android:gravity="center"
-                          android:layout_marginEnd="8dp">
-                          <TextView
-                              android:layout_width="wrap_content"
-                              android:layout_height="wrap_content"
-                              android:text="Min (Km)"
-                              android:textColor="#AAAAAA"
-                              android:textSize="13sp"/>
-                          <EditText
-                              android:id="@+id/et_drop_min"
-                              android:layout_width="match_parent"
-                              android:layout_height="wrap_content"
-                              android:inputType="numberDecimal"
-                              android:text="0.1"
-                              android:textColor="#FFFFFF"
-                              android:backgroundTint="#333333"
-                              android:gravity="center"
-                              android:padding="8dp"/>
-                      </LinearLayout>
-                      <LinearLayout
-                          android:layout_width="0dp"
-                          android:layout_height="wrap_content"
-                          android:layout_weight="1"
-                          android:orientation="vertical"
-                          android:gravity="center"
-                          android:layout_marginStart="8dp">
-                          <TextView
-                              android:layout_width="wrap_content"
-                              android:layout_height="wrap_content"
-                              android:text="Max (Km)"
-                              android:textColor="#AAAAAA"
-                              android:textSize="13sp"/>
-                          <EditText
-                              android:id="@+id/et_drop_max"
-                              android:layout_width="match_parent"
-                              android:layout_height="wrap_content"
-                              android:inputType="numberDecimal"
-                              android:text="10.0"
-                              android:textColor="#FFFFFF"
-                              android:backgroundTint="#333333"
-                              android:gravity="center"
-                              android:padding="8dp"/>
-                      </LinearLayout>
-                  </LinearLayout>
+                      android:text="Max (Km)"
+                      android:textColor="#AAAAAA"
+                      android:textSize="13sp"
+                      android:gravity="center"/>
+                  <EditText
+                      android:id="@+id/et_drop_max"
+                      android:layout_width="200dp"
+                      android:layout_height="wrap_content"
+                      android:inputType="numberDecimal"
+                      android:text="10.0"
+                      android:textColor="#FFFFFF"
+                      android:backgroundTint="#333333"
+                      android:gravity="center"
+                      android:padding="10dp"
+                      android:layout_marginBottom="4dp"/>
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="(0 se is tak ke orders accept honge)"
+                      android:textColor="#777777"
+                      android:textSize="11sp"
+                      android:gravity="center"
+                      android:layout_marginBottom="16dp"/>
 
                   <View
                       android:layout_width="match_parent"
                       android:layout_height="1dp"
                       android:background="#333333"
-                      android:layout_marginVertical="16dp"/>
+                      android:layout_marginVertical="8dp"/>
 
                   <Switch
                       android:id="@+id/switch_service"
@@ -306,6 +264,7 @@ jobs:
                       android:text="Auto Accept"
                       android:textColor="#FFFFFF"
                       android:textSize="18sp"
+                      android:layout_marginTop="12dp"
                       android:layout_marginBottom="16dp"/>
 
                   <Button
@@ -316,7 +275,7 @@ jobs:
                       android:textSize="16sp"
                       android:textStyle="bold"
                       android:backgroundTint="#1DB954"
-                      android:layout_marginBottom="12dp"/>
+                      android:layout_marginBottom="16dp"/>
 
                   <TextView
                       android:id="@+id/tv_info"
@@ -359,7 +318,7 @@ jobs:
           public class MainActivity extends AppCompatActivity {
 
               Switch switchService;
-              EditText etPickupMin, etPickupMax, etDropMin, etDropMax;
+              EditText etPickupMax, etDropMax;
               TextView tvStatus, tvInfo;
               Button btnSave, btnAccessibility;
               SharedPreferences prefs;
@@ -371,18 +330,14 @@ jobs:
 
                   prefs            = getSharedPreferences("saned_prefs", MODE_PRIVATE);
                   switchService    = findViewById(R.id.switch_service);
-                  etPickupMin      = findViewById(R.id.et_pickup_min);
                   etPickupMax      = findViewById(R.id.et_pickup_max);
-                  etDropMin        = findViewById(R.id.et_drop_min);
                   etDropMax        = findViewById(R.id.et_drop_max);
                   tvStatus         = findViewById(R.id.tv_status);
                   tvInfo           = findViewById(R.id.tv_info);
                   btnSave          = findViewById(R.id.btn_save);
                   btnAccessibility = findViewById(R.id.btn_accessibility);
 
-                  etPickupMin.setText(String.valueOf(prefs.getFloat("pickup_min", 0.1f)));
                   etPickupMax.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
-                  etDropMin.setText(String.valueOf(prefs.getFloat("drop_min", 0.1f)));
                   etDropMax.setText(String.valueOf(prefs.getFloat("drop_max", 10.0f)));
 
                   switchService.setOnCheckedChangeListener((btn, isChecked) ->
@@ -390,20 +345,19 @@ jobs:
                   );
 
                   btnSave.setOnClickListener(v -> {
-                      float pMin, pMax, dMin, dMax;
-                      try { pMin = Float.parseFloat(etPickupMin.getText().toString()); } catch (Exception e) { pMin = 0.1f; }
+                      float pMax, dMax;
                       try { pMax = Float.parseFloat(etPickupMax.getText().toString()); } catch (Exception e) { pMax = 5.0f; }
-                      try { dMin = Float.parseFloat(etDropMin.getText().toString());   } catch (Exception e) { dMin = 0.1f; }
                       try { dMax = Float.parseFloat(etDropMax.getText().toString());   } catch (Exception e) { dMax = 10.0f; }
 
                       prefs.edit()
-                          .putFloat("pickup_min", pMin)
                           .putFloat("pickup_max", pMax)
-                          .putFloat("drop_min", dMin)
                           .putFloat("drop_max", dMax)
                           .putBoolean("enabled", switchService.isChecked())
                           .apply();
 
+                      // Keyboard aur cursor band karo
+                      etPickupMax.clearFocus();
+                      etDropMax.clearFocus();
                       InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
                       if (imm != null && getCurrentFocus() != null)
                           imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
@@ -459,7 +413,14 @@ jobs:
           package com.saned.autoswipe;
 
           import android.accessibilityservice.AccessibilityService;
+          import android.accessibilityservice.GestureDescription;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
           import android.content.SharedPreferences;
+          import android.graphics.Path;
+          import android.graphics.Rect;
+          import android.os.Build;
           import android.os.Handler;
           import android.os.Looper;
           import android.util.Log;
@@ -470,6 +431,8 @@ jobs:
           public class AutoSwipeService extends AccessibilityService {
 
               private static final String TAG = "SanedAuto";
+              private static final String CHANNEL_ID = "saned_auto_channel";
+              private static final int NOTIF_ID = 1001;
               private SharedPreferences prefs;
               private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -477,7 +440,47 @@ jobs:
               public void onServiceConnected() {
                   super.onServiceConnected();
                   prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  createNotificationChannel();
                   Log.d(TAG, "Service Connected");
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID,
+                          "Saned Auto Notifications",
+                          NotificationManager.IMPORTANCE_HIGH
+                      );
+                      channel.setDescription("Order accept notifications");
+                      channel.enableVibration(true);
+                      NotificationManager nm = getSystemService(NotificationManager.class);
+                      if (nm != null) nm.createNotificationChannel(channel);
+                  }
+              }
+
+              private void sendOrderNotification(float pickupKm, float dropKm) {
+                  try {
+                      NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                      if (nm == null) return;
+
+                      Notification.Builder builder;
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          builder = new Notification.Builder(this, CHANNEL_ID);
+                      } else {
+                          builder = new Notification.Builder(this);
+                      }
+
+                      builder.setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle("Order Accept Ho Gaya!")
+                          .setContentText("Pickup: " + pickupKm + " km | Drop: " + dropKm + " km")
+                          .setAutoCancel(true)
+                          .setPriority(Notification.PRIORITY_HIGH);
+
+                      nm.notify(NOTIF_ID, builder.build());
+                      Log.d(TAG, "Notification sent!");
+                  } catch (Exception e) {
+                      Log.e(TAG, "Notification error: " + e.getMessage());
+                  }
               }
 
               @Override
@@ -493,29 +496,58 @@ jobs:
                   AccessibilityNodeInfo root = getRootInActiveWindow();
                   if (root == null) return;
                   try {
+                      // "New Order" screen check
                       List<AccessibilityNodeInfo> newOrderList =
                           root.findAccessibilityNodeInfosByText("New Order");
                       if (newOrderList == null || newOrderList.isEmpty()) return;
 
-                      float pickupMin = prefs.getFloat("pickup_min", 0.1f);
                       float pickupMax = prefs.getFloat("pickup_max", 5.0f);
-                      float dropMin   = prefs.getFloat("drop_min",   0.1f);
-                      float dropMax   = prefs.getFloat("drop_max",  10.0f);
+                      float dropMax   = prefs.getFloat("drop_max", 10.0f);
 
                       float pickupKm = findDistance(root, "From You");
                       float dropKm   = findDistance(root, "From Pickup");
 
                       Log.d(TAG, "Pickup: " + pickupKm + " | Drop: " + dropKm);
+                      Log.d(TAG, "Max - Pickup: " + pickupMax + " | Drop: " + dropMax);
 
                       if (pickupKm < 0 || dropKm < 0) return;
 
-                      boolean pickupOk = pickupKm >= pickupMin && pickupKm <= pickupMax;
-                      boolean dropOk   = dropKm   >= dropMin   && dropKm   <= dropMax;
+                      boolean pickupOk = pickupKm <= pickupMax;
+                      boolean dropOk   = dropKm   <= dropMax;
 
                       if (pickupOk && dropOk) {
-                          if (clickAccept(root)) {
-                              Log.d(TAG, "ORDER ACCEPTED!");
-                              prefs.edit().putBoolean("enabled", false).apply();
+                          // Accept button dhundo aur swipe karo
+                          List<AccessibilityNodeInfo> acceptNodes =
+                              root.findAccessibilityNodeInfosByText("Accept");
+                          if (acceptNodes == null || acceptNodes.isEmpty()) {
+                              acceptNodes = root.findAccessibilityNodeInfosByText("ACCEPT");
+                          }
+                          if (acceptNodes == null || acceptNodes.isEmpty()) {
+                              acceptNodes = root.findAccessibilityNodeInfosByText("قبول");
+                          }
+
+                          if (acceptNodes != null && !acceptNodes.isEmpty()) {
+                              AccessibilityNodeInfo btn = acceptNodes.get(0);
+                              if (btn != null) {
+                                  Rect bounds = new Rect();
+                                  btn.getBoundsInScreen(bounds);
+
+                                  // Button ke center se right tak swipe
+                                  int startX = bounds.left + 80;
+                                  int endX   = bounds.right - 20;
+                                  int y      = bounds.centerY();
+
+                                  final float pKm = pickupKm;
+                                  final float dKm = dropKm;
+
+                                  swipeOnScreen(startX, y, endX, y, () -> {
+                                      Log.d(TAG, "ORDER ACCEPTED via SWIPE! Pickup:" + pKm + " Drop:" + dKm);
+                                      prefs.edit().putBoolean("enabled", false).apply();
+                                      sendOrderNotification(pKm, dKm);
+                                  });
+
+                                  btn.recycle();
+                              }
                           }
                       } else {
                           Log.d(TAG, "IGNORED - pickup=" + pickupOk + " drop=" + dropOk);
@@ -523,6 +555,26 @@ jobs:
                   } finally {
                       root.recycle();
                   }
+              }
+
+              private void swipeOnScreen(int x1, int y1, int x2, int y2, Runnable onDone) {
+                  Path path = new Path();
+                  path.moveTo(x1, y1);
+                  path.lineTo(x2, y2);
+
+                  GestureDescription.Builder builder = new GestureDescription.Builder();
+                  builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 300));
+
+                  dispatchGesture(builder.build(), new GestureResultCallback() {
+                      @Override
+                      public void onCompleted(GestureDescription gestureDescription) {
+                          handler.post(onDone);
+                      }
+                      @Override
+                      public void onCancelled(GestureDescription gestureDescription) {
+                          Log.e(TAG, "Swipe cancelled");
+                      }
+                  }, null);
               }
 
               private float findDistance(AccessibilityNodeInfo root, String keyword) {
@@ -549,32 +601,6 @@ jobs:
                   return -1f;
               }
 
-              private boolean clickAccept(AccessibilityNodeInfo root) {
-                  String[] labels = {"Accept", "ACCEPT", "قبول"};
-                  for (String label : labels) {
-                      List<AccessibilityNodeInfo> nodes =
-                          root.findAccessibilityNodeInfosByText(label);
-                      if (nodes != null && !nodes.isEmpty()) {
-                          AccessibilityNodeInfo btn = nodes.get(0);
-                          if (btn != null) {
-                              boolean clicked = btn.performAction(
-                                  AccessibilityNodeInfo.ACTION_CLICK);
-                              if (!clicked) {
-                                  AccessibilityNodeInfo parent = btn.getParent();
-                                  if (parent != null) {
-                                      clicked = parent.performAction(
-                                          AccessibilityNodeInfo.ACTION_CLICK);
-                                      parent.recycle();
-                                  }
-                              }
-                              btn.recycle();
-                              if (clicked) return true;
-                          }
-                      }
-                  }
-                  return false;
-              }
-
               @Override
               public void onInterrupt() {}
           }
@@ -585,5 +611,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Auto-Swipe-v4
+          name: Saned-Auto-Swipe-v5
           path: app/build/outputs/apk/debug/*.apk
