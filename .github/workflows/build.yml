@@ -53,8 +53,8 @@ jobs:
                   applicationId 'com.saned.autoswipe'
                   minSdk 26
                   targetSdk 34
-                  versionCode 7
-                  versionName '7.0'
+                  versionCode 8
+                  versionName '8.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -246,14 +246,14 @@ jobs:
                   <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Screen Detection Delay (ms)"
+                      android:text="Screen Detection Delay (0.1-1 sec)"
                       android:textColor="#AAAAAA"
                       android:textSize="13sp"/>
                   <SeekBar
                       android:id="@+id/seek_screen_delay"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:max="2900"
+                      android:max="900"
                       android:progress="300"
                       android:layout_marginBottom="4dp"/>
                   <TextView
@@ -268,14 +268,14 @@ jobs:
                   <TextView
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Swipe Duration (ms)"
+                      android:text="Swipe Duration (0.1-1 sec)"
                       android:textColor="#AAAAAA"
                       android:textSize="13sp"/>
                   <SeekBar
                       android:id="@+id/seek_swipe_duration"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:max="2900"
+                      android:max="900"
                       android:progress="200"
                       android:layout_marginBottom="4dp"/>
                   <TextView
@@ -386,12 +386,18 @@ jobs:
                   int savedScreenDelay = prefs.getInt("screen_delay", 400);
                   int savedSwipeDuration = prefs.getInt("swipe_duration", 300);
                   
+                  // Ensure values are within 100-1000 range
+                  if (savedScreenDelay < 100) savedScreenDelay = 400;
+                  if (savedScreenDelay > 1000) savedScreenDelay = 400;
+                  if (savedSwipeDuration < 100) savedSwipeDuration = 300;
+                  if (savedSwipeDuration > 1000) savedSwipeDuration = 300;
+                  
                   seekScreenDelay.setProgress(savedScreenDelay - 100);
                   seekSwipeDuration.setProgress(savedSwipeDuration - 100);
                   tvScreenDelay.setText(savedScreenDelay + " ms");
                   tvSwipeDuration.setText(savedSwipeDuration + " ms");
 
-                  // SeekBar listeners
+                  // SeekBar listeners (range: 100ms to 1000ms)
                   seekScreenDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                       @Override
                       public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -675,5 +681,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Auto-Swipe-v7
+          name: Saned-Auto-Swipe-v8
           path: app/build/outputs/apk/debug/*.apk
