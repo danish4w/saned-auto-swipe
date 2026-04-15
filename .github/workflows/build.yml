@@ -53,8 +53,8 @@ jobs:
                   applicationId 'com.danish.auto'
                   minSdk 26
                   targetSdk 34
-                  versionCode 3
-                  versionName '3.0'
+                  versionCode 4
+                  versionName '4.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -705,8 +705,8 @@ jobs:
               private static final String CHANNEL_ID = "danish_auto_channel";
               private static final int NOTIF_ID = 1001;
               private SharedPreferences prefs;
-              private final Handler handler = new Handler(Looper.getMainLooper());
-              private int retryCount = 0;
+              private final Handler backgroundHandler = new Handler(Looper.getMainLooper());
+              private boolean isProcessing = false;
 
               private void addDebugLog(String message) {
                   Log.d(TAG, message);
@@ -718,7 +718,7 @@ jobs:
                   super.onServiceConnected();
                   prefs = getSharedPreferences("danish_prefs", MODE_PRIVATE);
                   createNotificationChannel();
-                  addDebugLog("✅ Service Connected - DanishAuto");
+                  addDebugLog("✅ Service Connected - DanishAuto (Bottom-area optimized)");
               }
 
               private void createNotificationChannel() {
@@ -760,151 +760,213 @@ jobs:
               public void onAccessibilityEvent(AccessibilityEvent event) {
                   if (prefs == null) return;
                   if (!prefs.getBoolean("enabled", false)) return;
+                  if (isProcessing) return;
 
-                  String pkg = String.valueOf(event.getPackageName());
-                  addDebugLog("📱 Event from: " + pkg);
-                  
+                  String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
                   if (!pkg.equals("net.jahez.fleets")) return;
-                  
-                  addDebugLog("✅ Package matched! Processing order...");
 
-                  int screenDelay = prefs.getInt("screen_delay", 400);
-                  addDebugLog("⏱ Screen delay: " + screenDelay + "ms");
-                  handler.postDelayed(this::checkAndAccept, screenDelay);
+                  addDebugLog("📱 Order event detected");
+
+                  isProcessing = true;
+                  int delay = prefs.getInt("screen_delay", 500);
+                  backgroundHandler.postDelayed(() -> {
+                      try {
+                          checkAndAccept();
+                      } catch (Exception e) {
+                          addDebugLog("❌ Error in checkAndAccept: " + e.getMessage());
+                      } finally {
+                          isProcessing = false;
+                      }
+                  }, delay);
               }
 
               private void checkAndAccept() {
-                  addDebugLog("🔍 Checking for order screen...");
                   AccessibilityNodeInfo root = getRootInActiveWindow();
-                  
                   if (root == null) {
-                      retryCount++;
-                      addDebugLog("❌ Root is null, retry " + retryCount + "/5");
-                      if (retryCount <= 5) {
-                          handler.postDelayed(this::checkAndAccept, 500);
-                      } else {
-                          retryCount = 0;
-                          addDebugLog("❌ Failed after 5 retries");
-                      }
+                      addDebugLog("❌ Root null, will retry later");
                       return;
                   }
-                  retryCount = 0;
-                  
+
                   try {
-                      List<AccessibilityNodeInfo> newOrderList = root.findAccessibilityNodeInfosByText("New Order");
-                      if (newOrderList == null || newOrderList.isEmpty()) {
-                          addDebugLog("❌ 'New Order' text not found");
+                      // Look for "New Order" text (anywhere)
+                      boolean hasNewOrder = false;
+                      List<AccessibilityNodeInfo> newOrderNodes = root.findAccessibilityNodeInfosByText("New Order");
+                      if (newOrderNodes != null && !newOrderNodes.isEmpty()) {
+                          hasNewOrder = true;
+                          for (AccessibilityNodeInfo n : newOrderNodes) n.recycle();
+                      }
+                      if (!hasNewOrder) {
+                          addDebugLog("❌ Not an order screen (no 'New Order')");
                           return;
                       }
-                      addDebugLog("✅ 'New Order' found!");
-                      for (AccessibilityNodeInfo n : newOrderList) { if (n != null) n.recycle(); }
+                      addDebugLog("✅ Order screen confirmed");
 
                       float pickupMax = prefs.getFloat("pickup_max", 5.0f);
                       float dropMax = prefs.getFloat("drop_max", 10.0f);
                       addDebugLog("📏 Limits - Pickup Max: " + pickupMax + "km, Drop Max: " + dropMax + "km");
 
-                      // Get distances by finding "Km" pattern
-                      float[] distances = extractAllDistances(root);
+                      // Extract distances only from bottom 40% of screen
+                      float[] distances = extractDistancesFromBottom(root);
                       float pickupKm = distances[0];
                       float dropKm = distances[1];
 
                       addDebugLog("📊 Distances - Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
 
                       if (pickupKm < 0 || dropKm < 0) {
-                          addDebugLog("⚠️ Could not parse distances, retrying...");
-                          handler.postDelayed(this::checkAndAccept, 800);
+                          addDebugLog("⚠️ Could not parse distances, aborting");
                           return;
                       }
 
                       if (pickupKm <= pickupMax && dropKm <= dropMax) {
-                          addDebugLog("✅ Distances within limits! Looking for Accept button...");
-                          
-                          String[] acceptTexts = {"Accept", "ACCEPT", "قبول", "موافقة"};
-                          AccessibilityNodeInfo acceptBtn = null;
-                          
-                          for (String text : acceptTexts) {
-                              List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(text);
-                              if (nodes != null && !nodes.isEmpty()) {
-                                  acceptBtn = nodes.get(0);
-                                  addDebugLog("🔘 Found accept button with text: " + text);
-                                  break;
-                              }
-                          }
-                          
-                          if (acceptBtn != null) {
-                              // Get button position and swipe
-                              Rect bounds = new Rect();
-                              acceptBtn.getBoundsInScreen(bounds);
-                              int startX = bounds.left + 20;
-                              int endX = bounds.right - 20;
-                              int y = bounds.centerY();
-                              
-                              int swipeDuration = prefs.getInt("swipe_duration", 300);
-                              addDebugLog("👉 Swiping from " + startX + " to " + endX + " at Y=" + y);
-
-                              final float pKm = pickupKm;
-                              final float dKm = dropKm;
-
-                              performSwipe(startX, y, endX, y, swipeDuration, () -> {
-                                  addDebugLog("🎉 ACCEPTED! Pickup: " + pKm + "km, Drop: " + dKm + "km");
-                                  prefs.edit().putBoolean("enabled", false).apply();
-                                  sendOrderNotification(pKm, dKm);
-                              });
-                              acceptBtn.recycle();
-                          } else {
-                              addDebugLog("❌ Accept button not found!");
-                          }
+                          addDebugLog("✅ Within limits, accepting order");
+                          performAccept(root);
                       } else {
-                          addDebugLog("❌ IGNORED - Distance out of range");
+                          addDebugLog("❌ Rejected: distance out of range");
                       }
                   } catch (Exception e) {
-                      addDebugLog("❌ Error: " + e.getMessage());
+                      addDebugLog("❌ Exception: " + e.getMessage());
                   } finally {
                       if (root != null) root.recycle();
                   }
               }
 
-              private float[] extractAllDistances(AccessibilityNodeInfo root) {
-                  float[] distances = {-1f, -1f};
-                  List<Float> foundDistances = new ArrayList<>();
-                  
-                  // Find all nodes containing "Km"
+              private float[] extractDistancesFromBottom(AccessibilityNodeInfo root) {
+                  float[] result = {-1f, -1f};
+                  List<Float> distances = new ArrayList<>();
+
+                  int screenHeight = getResources().getDisplayMetrics().heightPixels;
+                  int bottomStartY = (int)(screenHeight * 0.6); // Only consider area below 60% of screen
+
+                  // Collect text only from nodes that are in bottom 40% area
+                  collectTextFromBottom(root, distances, bottomStartY);
+
+                  // Also directly search for "Km" nodes in bottom area
                   List<AccessibilityNodeInfo> kmNodes = root.findAccessibilityNodeInfosByText("Km");
                   if (kmNodes == null || kmNodes.isEmpty()) {
                       kmNodes = root.findAccessibilityNodeInfosByText("km");
                   }
-                  
-                  if (kmNodes != null && !kmNodes.isEmpty()) {
+                  if (kmNodes != null) {
                       for (AccessibilityNodeInfo node : kmNodes) {
-                          String text = node.getText() != null ? node.getText().toString() : "";
-                          float km = extractNumberFromText(text);
-                          if (km > 0 && km < 100) {
-                              foundDistances.add(km);
-                              addDebugLog("📏 Found distance: " + km + " km in text: " + text);
+                          Rect bounds = new Rect();
+                          node.getBoundsInScreen(bounds);
+                          if (bounds.bottom > bottomStartY) {
+                              String text = node.getText() != null ? node.getText().toString() : "";
+                              float km = extractNumberFromText(text);
+                              if (km > 0 && km < 100 && !distances.contains(km)) {
+                                  distances.add(km);
+                                  addDebugLog("📏 Found distance via 'Km': " + km + " from '" + text + "'");
+                              }
                           }
                           node.recycle();
                       }
                   }
-                  
-                  if (foundDistances.size() >= 1) distances[0] = foundDistances.get(0);
-                  if (foundDistances.size() >= 2) distances[1] = foundDistances.get(1);
-                  
-                  return distances;
+
+                  // Take first two valid distances
+                  if (distances.size() >= 1) result[0] = distances.get(0);
+                  if (distances.size() >= 2) result[1] = distances.get(1);
+                  return result;
+              }
+
+              private void collectTextFromBottom(AccessibilityNodeInfo node, List<Float> distances, int minY) {
+                  if (node == null) return;
+                  Rect bounds = new Rect();
+                  node.getBoundsInScreen(bounds);
+                  if (bounds.bottom > minY) {
+                      if (node.getText() != null && node.getText().length() > 0) {
+                          String text = node.getText().toString();
+                          float km = extractNumberFromText(text);
+                          if (km > 0 && km < 100 && !distances.contains(km)) {
+                              distances.add(km);
+                              addDebugLog("🔍 Found number: " + km + " in text: " + text);
+                          }
+                      }
+                  }
+                  for (int i = 0; i < node.getChildCount(); i++) {
+                      AccessibilityNodeInfo child = node.getChild(i);
+                      if (child != null) {
+                          collectTextFromBottom(child, distances, minY);
+                          child.recycle();
+                      }
+                  }
               }
 
               private float extractNumberFromText(String text) {
                   if (text == null || text.isEmpty()) return -1f;
-                  try {
-                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)");
-                      Matcher m = p.matcher(text);
-                      if (m.find()) {
+                  Pattern p = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*[Kk][Mm]");
+                  Matcher m = p.matcher(text);
+                  if (m.find()) {
+                      try {
                           return Float.parseFloat(m.group(1).replace(",", "."));
+                      } catch (NumberFormatException e) {
+                          return -1f;
                       }
-                  } catch (Exception e) {}
+                  }
                   return -1f;
               }
 
-              private void performSwipe(int x1, int y1, int x2, int y2, int duration, Runnable onDone) {
+              private void performAccept(AccessibilityNodeInfo root) {
+                  // Try to find Accept button by text
+                  String[] acceptTexts = {"Accept", "ACCEPT", "قبول", "موافقة", "تأكيد"};
+                  AccessibilityNodeInfo acceptBtn = null;
+                  for (String txt : acceptTexts) {
+                      List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(txt);
+                      if (nodes != null && !nodes.isEmpty()) {
+                          acceptBtn = nodes.get(0);
+                          addDebugLog("🔘 Found accept button with text: " + txt);
+                          break;
+                      }
+                  }
+
+                  if (acceptBtn == null) {
+                      addDebugLog("⚠️ Accept button not found by text, trying by position");
+                      acceptBtn = findBottomButton(root);
+                  }
+
+                  if (acceptBtn != null) {
+                      Rect bounds = new Rect();
+                      acceptBtn.getBoundsInScreen(bounds);
+                      acceptBtn.recycle();
+
+                      int startX = bounds.left + 20;
+                      int endX = bounds.right - 20;
+                      int y = bounds.centerY();
+                      int duration = prefs.getInt("swipe_duration", 300);
+                      addDebugLog("👉 Swiping from (" + startX + "," + y + ") to (" + endX + "," + y + ")");
+
+                      performSwipe(startX, y, endX, y, duration);
+                  } else {
+                      addDebugLog("❌ Could not find Accept button");
+                  }
+              }
+
+              private AccessibilityNodeInfo findBottomButton(AccessibilityNodeInfo root) {
+                  int screenHeight = getResources().getDisplayMetrics().heightPixels;
+                  return findBottomButtonRecursive(root, screenHeight);
+              }
+
+              private AccessibilityNodeInfo findBottomButtonRecursive(AccessibilityNodeInfo node, int screenHeight) {
+                  if (node == null) return null;
+                  Rect bounds = new Rect();
+                  node.getBoundsInScreen(bounds);
+                  if (bounds.bottom > screenHeight * 0.7) {
+                      CharSequence className = node.getClassName();
+                      if (className != null && className.toString().toLowerCase().contains("button")) {
+                          addDebugLog("🔘 Found bottom button at Y: " + bounds.bottom);
+                          return node;
+                      }
+                  }
+                  for (int i = 0; i < node.getChildCount(); i++) {
+                      AccessibilityNodeInfo child = node.getChild(i);
+                      if (child != null) {
+                          AccessibilityNodeInfo result = findBottomButtonRecursive(child, screenHeight);
+                          if (result != null) return result;
+                          child.recycle();
+                      }
+                  }
+                  return null;
+              }
+
+              private void performSwipe(int x1, int y1, int x2, int y2, int duration) {
                   Path path = new Path();
                   path.moveTo(x1, y1);
                   path.lineTo(x2, y2);
@@ -915,7 +977,6 @@ jobs:
                       @Override
                       public void onCompleted(GestureDescription g) {
                           addDebugLog("✅ Swipe completed");
-                          handler.post(onDone);
                       }
                       @Override
                       public void onCancelled(GestureDescription g) {
@@ -927,6 +988,7 @@ jobs:
               @Override
               public void onInterrupt() {
                   addDebugLog("⚠️ Service interrupted");
+                  isProcessing = false;
               }
           }
           EOF
