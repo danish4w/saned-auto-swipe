@@ -275,7 +275,6 @@ jobs:
                   try {
                       View decorView = getDecorView();
                       if (decorView == null) return;
-                      // Extract distances: first number+Km = pickup, second = drop
                       List<Float> distances = new ArrayList<>();
                       scanForKm(distances, decorView);
                       if (distances.size() < 2) return;
@@ -299,7 +298,6 @@ jobs:
                       Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
                       Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
                       Object activities = activityThreadClass.getDeclaredField("mActivities").get(activityThread);
-                      // android.util.ArrayMap is used internally; we access via reflection safely
                       if (activities instanceof android.util.ArrayMap) {
                           android.util.ArrayMap<?,?> map = (android.util.ArrayMap<?,?>) activities;
                           for (Object record : map.values()) {
