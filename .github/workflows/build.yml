@@ -23,7 +23,6 @@ jobs:
       - name: Create Build Files
         run: |
           echo "include ':app'" > settings.gradle
-
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
@@ -31,19 +30,13 @@ jobs:
 
           cat > build.gradle << 'EOF'
           buildscript {
-              repositories { 
-                  google()
-                  mavenCentral()
-              }
+              repositories { google(); mavenCentral() }
               dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
           allprojects {
               repositories { 
-                  google()
-                  mavenCentral()
-                  // Xposed API ke liye naya repo link
+                  google(); mavenCentral()
                   maven { url 'https://api.xposed.info/' }
-                  maven { url 'https://www.jitpack.io' }
               }
           }
           EOF
@@ -62,65 +55,31 @@ jobs:
               }
           }
           dependencies {
-              // LSPosed/Xposed API Fix
               compileOnly 'de.robv.android.xposed:api:82'
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'com.google.android.material:material:1.9.0'
           }
           EOF
 
-      - name: Create Java Source Files
+      - name: Create MainHook with Swipe Logic
         run: |
-          # Settings Activity
-          cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
-          package com.danish.lsposed;
-          import android.content.Context;
-          import android.content.SharedPreferences;
-          import android.os.Bundle;
-          import android.widget.Button;
-          import android.widget.EditText;
-          import android.widget.Switch;
-          import android.widget.Toast;
-          import androidx.appcompat.app.AppCompatActivity;
-          import java.io.File;
-
-          public class SettingsActivity extends AppCompatActivity {
-              private SharedPreferences prefs;
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_settings);
-                  prefs = getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                  
-                  EditText etP = findViewById(R.id.et_pickup_max);
-                  EditText etD = findViewById(R.id.et_drop_max);
-                  Switch sw = findViewById(R.id.switch_enabled);
-                  Button btn = findViewById(R.id.btn_save);
-
-                  etP.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
-                  etD.setText(String.valueOf(prefs.getFloat("drop_max", 10.0f)));
-                  sw.setChecked(prefs.getBoolean("enabled", false));
-
-                  btn.setOnClickListener(v -> {
-                      prefs.edit()
-                          .putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
-                          .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
-                          .putBoolean("enabled", sw.isChecked())
-                          .apply();
-                      
-                      File prefFile = new File(getFilesDir().getParent(), "shared_prefs/danish_prefs.xml");
-                      if (prefFile.exists()) prefFile.setReadable(true, false);
-                      Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
-                  });
-              }
-          }
-          EOF
-
-          # Main Hook
           cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
           package com.danish.lsposed;
 
+          import android.app.Activity;
           import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.os.SystemClock;
+          import android.view.MotionEvent;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.TextView;
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.regex.Matcher;
+          import java.util.regex.Pattern;
+
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XSharedPreferences;
@@ -129,6 +88,7 @@ jobs:
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
           public class MainHook implements IXposedHookLoadPackage {
+              private static final String TAG = "DanishAuto: ";
               private static XSharedPreferences xPrefs;
 
               @Override
@@ -136,54 +96,131 @@ jobs:
                   if (!lpparam.packageName.equals("net.jahez.fleets")) return;
 
                   xPrefs = new XSharedPreferences("com.danish.lsposed", "danish_prefs");
-                  
+
                   XposedHelpers.findAndHookMethod("com.jahez.fleets.ui.order.OrderActivity", lpparam.classLoader, 
                       "onCreate", Bundle.class, new XC_MethodHook() {
                       @Override
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                           xPrefs.reload();
                           if (!xPrefs.getBoolean("enabled", false)) return;
-                          XposedBridge.log("DanishAuto: Module Active");
+
+                          final Activity activity = (Activity) param.thisObject;
+                          final View decorView = activity.getWindow().getDecorView();
+                          
+                          new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                              processOrder(decorView);
+                          }, 1500);
                       }
+                  });
+              }
+
+              private void processOrder(View root) {
+                  List<Float> distances = new ArrayList<>();
+                  scanForKm(root, distances);
+                  
+                  if (distances.size() >= 2) {
+                      float p = distances.get(0);
+                      float d = distances.get(1);
+                      
+                      if (p <= xPrefs.getFloat("pickup_max", 5.0f) && d <= xPrefs.getFloat("drop_max", 10.0f)) {
+                          XposedBridge.log(TAG + "Match! Swiping to accept...");
+                          performSwipe(root);
+                      }
+                  }
+              }
+
+              private void scanForKm(View view, List<Float> found) {
+                  if (view instanceof ViewGroup) {
+                      for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) scanForKm(((ViewGroup) view).getChildAt(i), found);
+                  } else if (view instanceof TextView) {
+                      String t = ((TextView) view).getText().toString().toLowerCase();
+                      if (t.contains("km")) {
+                          Matcher m = Pattern.compile("(\\d+\\.?\\d*)").matcher(t);
+                          if (m.find()) found.add(Float.parseFloat(m.group(1)));
+                      }
+                  }
+              }
+
+              private void performSwipe(View view) {
+                  int width = view.getWidth();
+                  int height = view.getHeight();
+
+                  // Swipe coordinates (Screen ke bottom se thoda upar)
+                  float startX = width * 0.2f;
+                  float endX = width * 0.8f;
+                  float y = height * 0.85f; 
+
+                  long downTime = SystemClock.uptimeMillis();
+                  long eventTime = SystemClock.uptimeMillis();
+
+                  // ACTION_DOWN
+                  view.dispatchTouchEvent(MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_DOWN, startX, y, 0));
+                  
+                  // ACTION_MOVE (Swipe movement)
+                  for (int i = 1; i <= 10; i++) {
+                      eventTime += 20;
+                      float currentX = startX + (endX - startX) * i / 10f;
+                      view.dispatchTouchEvent(MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_MOVE, currentX, y, 0));
+                  }
+
+                  // ACTION_UP
+                  eventTime += 20;
+                  view.dispatchTouchEvent(MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_UP, endX, y, 0));
+                  XposedBridge.log(TAG + "Swipe Action Dispatched");
+              }
+          }
+          EOF
+
+      - name: Create Resources & UI
+        run: |
+          # (Isme wahi settings UI aur Manifest file rahengi jo pehle thin)
+          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="20dp">
+              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Pickup Km" android:inputType="numberDecimal" />
+              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Drop Km" android:inputType="numberDecimal" />
+              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Enable Swipe" />
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="SAVE" />
+          </LinearLayout>
+          EOF
+
+          cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
+          package com.danish.lsposed;
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.os.Bundle;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.Switch;
+          import androidx.appcompat.app.AppCompatActivity;
+          public class SettingsActivity extends AppCompatActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_settings);
+                  SharedPreferences p = getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                  EditText etP = findViewById(R.id.et_pickup_max);
+                  EditText etD = findViewById(R.id.et_drop_max);
+                  Switch s = findViewById(R.id.switch_enabled);
+                  findViewById(R.id.btn_save).setOnClickListener(v -> {
+                      p.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString())).putFloat("drop_max", Float.parseFloat(etD.getText().toString())).putBoolean("enabled", s.isChecked()).apply();
                   });
               }
           }
           EOF
 
-      - name: Create Resources & Manifest
-        run: |
-          cat > app/src/main/res/values/strings.xml << 'EOF'
-          <resources><string name="app_name">DanishAuto</string></resources>
-          EOF
-
-          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:padding="20dp">
-              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Pickup Km" />
-              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Drop Km" />
-              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Enable" />
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Save" />
-          </LinearLayout>
-          EOF
-
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="DanishAuto" android:theme="@style/Theme.AppCompat">
+              <application android:label="DanishSwipe" android:theme="@style/Theme.AppCompat.Light">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Jahez Auto Accept" />
+                  <meta-data android:name="xposeddescription" android:value="Jahez Auto Swipe" />
                   <meta-data android:name="xposedminversion" android:value="82" />
                   <activity android:name=".SettingsActivity" android:exported="true">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
+                      <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
                   </activity>
               </application>
           </manifest>
           EOF
-          
+
           cat > app/src/main/assets/xposed_init << 'EOF'
           com.danish.lsposed.MainHook
           EOF
@@ -193,11 +230,11 @@ jobs:
         with:
           gradle-version: '8.4'
 
-      - name: Build with Gradle
+      - name: Build APK
         run: gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DanishAuto-LSPosed-Final-v2
+          name: Gufran-Swipe-Module
           path: app/build/outputs/apk/debug/*.apk
