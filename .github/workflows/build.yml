@@ -24,6 +24,12 @@ jobs:
         run: |
           echo "include ':app'" > settings.gradle
 
+          # Fix for AndroidX error (Screenshot #58)
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
+
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
@@ -106,8 +112,6 @@ jobs:
           package com.danish.lsposed;
 
           import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.Looper;
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XSharedPreferences;
@@ -130,7 +134,7 @@ jobs:
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                           xPrefs.reload();
                           if (!xPrefs.getBoolean("enabled", false)) return;
-                          XposedBridge.log("DanishAuto: Hooked Jahez Order Screen");
+                          XposedBridge.log("DanishAuto: Module is Active for Jahez");
                       }
                   });
               }
@@ -151,7 +155,7 @@ jobs:
               <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Pickup Km" />
               <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Drop Km" />
               <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Enable" />
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Save" />
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Save Settings" />
           </LinearLayout>
           EOF
 
@@ -175,7 +179,7 @@ jobs:
           com.danish.lsposed.MainHook
           EOF
 
-      - name: Setup Gradle 8.4
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.4'
@@ -186,5 +190,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DanishAuto-LSPosed
+          name: DanishAuto-LSPosed-Final
           path: app/build/outputs/apk/debug/*.apk
