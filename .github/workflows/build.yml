@@ -35,11 +35,21 @@ jobs:
 
           cat > build.gradle << 'EOF'
           buildscript {
-              repositories { google(); mavenCentral() }
-              dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://maven.xposed.info/repository' }
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.3.2'
+              }
           }
           allprojects {
-              repositories { google(); mavenCentral() }
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://maven.xposed.info/repository' }
+              }
           }
           EOF
 
@@ -101,63 +111,58 @@ jobs:
           import android.app.Notification;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
-          import android.app.PendingIntent;
           import android.content.Context;
-          import android.content.Intent;
           import android.content.SharedPreferences;
-          import android.graphics.Path;
-          import android.graphics.Rect;
           import android.os.Build;
+          import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
+          import android.os.SystemClock;
+          import android.view.MotionEvent;
           import android.view.View;
           import android.view.ViewGroup;
           import android.widget.Button;
           import android.widget.TextView;
-          
+
+          import java.lang.reflect.Field;
+          import java.lang.reflect.Method;
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.regex.Matcher;
+          import java.util.regex.Pattern;
+
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XposedBridge;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
-          
-          import java.lang.reflect.Method;
-          import java.text.SimpleDateFormat;
-          import java.util.Date;
-          import java.util.List;
-          import java.util.Locale;
-          import java.util.regex.Matcher;
-          import java.util.regex.Pattern;
-          
+
           public class MainHook implements de.robv.android.xposed.IXposedHookLoadPackage {
-              
+
               private static final String TAG = "DanishAuto-LSP";
               private static final String PACKAGE_NAME = "net.jahez.fleets";
               private static SharedPreferences prefs;
               private static Handler uiHandler = new Handler(Looper.getMainLooper());
               private static boolean isProcessing = false;
-              
+
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
                   if (!lpparam.packageName.equals(PACKAGE_NAME)) return;
-                  
+
                   XposedBridge.log(TAG + " - Hooked into Jahez Driver app");
-                  
-                  // Hook OrderActivity's onCreate to get context and preferences
+
                   Class<?> orderActivity = XposedHelpers.findClass("com.jahez.fleets.ui.order.OrderActivity", lpparam.classLoader);
-                  
+
                   XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
                       @Override
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                           Context context = (Context) param.thisObject;
                           prefs = context.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                          
-                          // Check if enabled
+
                           if (!prefs.getBoolean("enabled", false)) return;
-                          
-                          // Delay for UI to load (respect user setting)
+
                           int delay = prefs.getInt("screen_delay", 500);
                           XposedBridge.log(TAG + " - Order screen detected, waiting " + delay + "ms");
-                          
+
                           uiHandler.postDelayed(() -> {
                               try {
                                   checkAndAcceptOrder(context);
@@ -168,65 +173,37 @@ jobs:
                       }
                   });
               }
-              
+
               private void checkAndAcceptOrder(Context context) {
                   if (isProcessing) return;
                   isProcessing = true;
-                  
+
                   try {
-                      // Get current activity's decor view
-                      View decorView = null;
-                      try {
-                          // Try to get the current activity
-                          Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-                          Method currentActivityThread = activityThreadClass.getMethod("currentActivityThread");
-                          Object activityThread = currentActivityThread.invoke(null);
-                          Field activitiesField = activityThreadClass.getDeclaredField("mActivities");
-                          activitiesField.setAccessible(true);
-                          ArrayMap activities = (ArrayMap) activitiesField.get(activityThread);
-                          for (Object activityRecord : activities.values()) {
-                              Field pausedField = activityRecord.getClass().getDeclaredField("paused");
-                              pausedField.setAccessible(true);
-                              if (!pausedField.getBoolean(activityRecord)) {
-                                  Field activityField = activityRecord.getClass().getDeclaredField("activity");
-                                  activityField.setAccessible(true);
-                                  android.app.Activity activity = (android.app.Activity) activityField.get(activityRecord);
-                                  decorView = activity.getWindow().getDecorView();
-                                  break;
-                              }
-                          }
-                      } catch (Exception e) {
-                          XposedBridge.log(TAG + " Could not get decorView: " + e.getMessage());
-                      }
-                      
+                      View decorView = getCurrentActivityDecorView();
                       if (decorView == null) {
                           XposedBridge.log(TAG + " DecorView is null, abort");
                           return;
                       }
-                      
-                      // Extract distances from UI
+
                       float[] distances = extractDistancesFromView(decorView);
                       float pickupKm = distances[0];
                       float dropKm = distances[1];
-                      
+
                       float pickupMax = prefs.getFloat("pickup_max", 5.0f);
                       float dropMax = prefs.getFloat("drop_max", 10.0f);
-                      
+
                       XposedBridge.log(TAG + " Limits - Pickup: " + pickupMax + "km, Drop: " + dropMax + "km");
                       XposedBridge.log(TAG + " Distances - Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
-                      
+
                       if (pickupKm < 0 || dropKm < 0) {
                           XposedBridge.log(TAG + " Could not parse distances");
                           return;
                       }
-                      
+
                       if (pickupKm <= pickupMax && dropKm <= dropMax) {
                           XposedBridge.log(TAG + " Order accepted automatically");
                           acceptOrder(decorView);
                           sendNotification(context, pickupKm, dropKm);
-                          
-                          // Optionally disable after accept (user can change in settings)
-                          // prefs.edit().putBoolean("enabled", false).apply();
                       } else {
                           XposedBridge.log(TAG + " Order rejected - distance out of range");
                       }
@@ -234,25 +211,45 @@ jobs:
                       isProcessing = false;
                   }
               }
-              
+
+              private View getCurrentActivityDecorView() {
+                  try {
+                      Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+                      Method currentActivityThread = activityThreadClass.getMethod("currentActivityThread");
+                      Object activityThread = currentActivityThread.invoke(null);
+                      Field activitiesField = activityThreadClass.getDeclaredField("mActivities");
+                      activitiesField.setAccessible(true);
+                      Object activities = activitiesField.get(activityThread);
+                      if (activities instanceof android.util.ArrayMap) {
+                          android.util.ArrayMap<?, ?> map = (android.util.ArrayMap<?, ?>) activities;
+                          for (Object activityRecord : map.values()) {
+                              Field pausedField = activityRecord.getClass().getDeclaredField("paused");
+                              pausedField.setAccessible(true);
+                              if (!pausedField.getBoolean(activityRecord)) {
+                                  Field activityField = activityRecord.getClass().getDeclaredField("activity");
+                                  activityField.setAccessible(true);
+                                  android.app.Activity activity = (android.app.Activity) activityField.get(activityRecord);
+                                  return activity.getWindow().getDecorView();
+                              }
+                          }
+                      }
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + " getDecorView error: " + e.getMessage());
+                  }
+                  return null;
+              }
+
               private float[] extractDistancesFromView(View root) {
                   float[] result = {-1f, -1f};
                   List<Float> distances = new ArrayList<>();
-                  
-                  // Traverse view hierarchy and find text with pattern "X.X Km"
                   traverseViews(root, distances);
-                  
-                  // Take first two distances (pickup, drop)
                   if (distances.size() >= 1) result[0] = distances.get(0);
                   if (distances.size() >= 2) result[1] = distances.get(1);
-                  
                   return result;
               }
-              
+
               private void traverseViews(View view, List<Float> distances) {
                   if (view == null) return;
-                  
-                  // Check if this view has text
                   if (view instanceof TextView) {
                       String text = ((TextView) view).getText().toString();
                       float km = extractNumberFromText(text);
@@ -261,8 +258,6 @@ jobs:
                           XposedBridge.log(TAG + " Found distance: " + km + " in text: " + text);
                       }
                   }
-                  
-                  // Traverse children
                   if (view instanceof ViewGroup) {
                       ViewGroup group = (ViewGroup) view;
                       for (int i = 0; i < group.getChildCount(); i++) {
@@ -270,7 +265,7 @@ jobs:
                       }
                   }
               }
-              
+
               private float extractNumberFromText(String text) {
                   if (text == null || text.isEmpty()) return -1f;
                   Pattern p = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*[Kk][Mm]");
@@ -284,32 +279,26 @@ jobs:
                   }
                   return -1f;
               }
-              
+
               private void acceptOrder(View decorView) {
-                  // Find Accept button (text or at bottom of screen)
                   Button acceptBtn = findAcceptButton(decorView);
                   if (acceptBtn != null) {
                       XposedBridge.log(TAG + " Accept button found, performing click");
                       acceptBtn.performClick();
                   } else {
-                      XposedBridge.log(TAG + " Accept button not found, trying to simulate swipe on bottom area");
-                      // Simulate swipe on bottom area (fallback)
+                      XposedBridge.log(TAG + " Accept button not found, trying swipe");
                       simulateSwipeOnBottom(decorView);
                   }
               }
-              
+
               private Button findAcceptButton(View view) {
                   if (view == null) return null;
-                  
-                  // Direct check
                   if (view instanceof Button) {
                       String text = ((Button) view).getText().toString();
                       if (text.equals("Accept") || text.equals("ACCEPT") || text.equals("قبول") || text.equals("موافقة")) {
                           return (Button) view;
                       }
                   }
-                  
-                  // Check children
                   if (view instanceof ViewGroup) {
                       ViewGroup group = (ViewGroup) view;
                       for (int i = 0; i < group.getChildCount(); i++) {
@@ -319,49 +308,42 @@ jobs:
                   }
                   return null;
               }
-              
+
               private void simulateSwipeOnBottom(View decorView) {
-                  // Get screen dimensions
                   int screenWidth = decorView.getResources().getDisplayMetrics().widthPixels;
                   int screenHeight = decorView.getResources().getDisplayMetrics().heightPixels;
-                  
                   int startX = (int)(screenWidth * 0.2);
                   int endX = (int)(screenWidth * 0.8);
                   int y = (int)(screenHeight * 0.85);
-                  
                   XposedBridge.log(TAG + " Simulating swipe from (" + startX + "," + y + ") to (" + endX + "," + y + ")");
-                  
-                  // Use MotionEvent injection (requires root, but Xposed can do it)
-                  // Since we are in Xposed, we can inject touch events
-                  injectTouchEvent(startX, y, endX, y, 300);
-              }
-              
-              private void injectTouchEvent(int x1, int y1, int x2, int y2, int duration) {
-                  // Use InputManager to inject events (requires system permissions, but Xposed can bypass)
+
                   try {
                       Class<?> inputManagerClass = Class.forName("android.hardware.input.InputManager");
                       Method getInstance = inputManagerClass.getMethod("getInstance");
                       Object inputManager = getInstance.invoke(null);
-                      Method injectInputEvent = inputManagerClass.getMethod("injectInputEvent", android.view.InputEvent.class, int.class);
-                      
+                      Method injectInputEvent = inputManagerClass.getMethod("injectInputEvent", MotionEvent.class, int.class);
+
                       long downTime = SystemClock.uptimeMillis();
-                      android.view.MotionEvent downEvent = android.view.MotionEvent.obtain(downTime, downTime, android.view.MotionEvent.ACTION_DOWN, x1, y1, 0);
+                      MotionEvent downEvent = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, startX, y, 0);
                       injectInputEvent.invoke(inputManager, downEvent, 0);
-                      
-                      long moveTime = downTime + duration / 2;
-                      android.view.MotionEvent moveEvent = android.view.MotionEvent.obtain(downTime, moveTime, android.view.MotionEvent.ACTION_MOVE, x2, y2, 0);
+                      downEvent.recycle();
+
+                      long moveTime = downTime + 150;
+                      MotionEvent moveEvent = MotionEvent.obtain(downTime, moveTime, MotionEvent.ACTION_MOVE, endX, y, 0);
                       injectInputEvent.invoke(inputManager, moveEvent, 0);
-                      
-                      long upTime = downTime + duration;
-                      android.view.MotionEvent upEvent = android.view.MotionEvent.obtain(downTime, upTime, android.view.MotionEvent.ACTION_UP, x2, y2, 0);
+                      moveEvent.recycle();
+
+                      long upTime = downTime + 300;
+                      MotionEvent upEvent = MotionEvent.obtain(downTime, upTime, MotionEvent.ACTION_UP, endX, y, 0);
                       injectInputEvent.invoke(inputManager, upEvent, 0);
-                      
+                      upEvent.recycle();
+
                       XposedBridge.log(TAG + " Touch events injected");
                   } catch (Exception e) {
                       XposedBridge.log(TAG + " Failed to inject touch: " + e.getMessage());
                   }
               }
-              
+
               private void sendNotification(Context context, float pickup, float drop) {
                   try {
                       NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -370,10 +352,11 @@ jobs:
                               "danish_channel", "DanishAuto", NotificationManager.IMPORTANCE_HIGH);
                           nm.createNotificationChannel(channel);
                       }
-                      
-                      Notification.Builder builder = new Notification.Builder(context);
+                      Notification.Builder builder;
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                           builder = new Notification.Builder(context, "danish_channel");
+                      } else {
+                          builder = new Notification.Builder(context);
                       }
                       builder.setSmallIcon(android.R.drawable.ic_dialog_info)
                           .setContentTitle("✅ Order Accepted")
