@@ -1,4 +1,4 @@
-name: Build LogCat Master
+name: Build Saned Auto Swipe with Debug
 on: workflow_dispatch
 
 jobs:
@@ -15,8 +15,9 @@ jobs:
 
       - name: Build Project
         run: |
-          mkdir -p app/src/main/java/com/logcat/master
+          mkdir -p app/src/main/java/com/saned/autoswipe
           mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
           mkdir -p gradle/wrapper
 
@@ -46,14 +47,18 @@ jobs:
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.logcat.master'
+              namespace 'com.saned.autoswipe'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.logcat.master'
+                  applicationId 'com.saned.autoswipe'
                   minSdk 26
                   targetSdk 34
-                  versionCode 2
-                  versionName '2.0'
+                  versionCode 9
+                  versionName '9.0'
+              }
+              packagingOptions {
+                  exclude 'META-INF/LICENSE.md'
+                  exclude 'META-INF/LICENSE-notice.md'
               }
           }
           dependencies {
@@ -64,9 +69,10 @@ jobs:
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.READ_LOGS"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <application
-                  android:label="LogCat Master"
+                  android:label="Saned Auto"
                   android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
@@ -76,18 +82,272 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
+                  <activity
+                      android:name=".DebugActivity"
+                      android:exported="false"
+                      android:label="Debug Logs"/>
+                  <service
+                      android:name=".AutoSwipeService"
+                      android:exported="true"
+                      android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+                      <intent-filter>
+                          <action android:name="android.accessibilityservice.AccessibilityService"/>
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.accessibilityservice"
+                          android:resource="@xml/acc_config"/>
+                  </service>
               </application>
           </manifest>
+          EOF
+
+          cat > app/src/main/res/xml/acc_config.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <accessibility-service
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+              android:accessibilityFeedbackType="feedbackGeneric"
+              android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows"
+              android:canPerformGestures="true"
+              android:canRetrieveWindowContent="true"
+              android:notificationTimeout="100"
+              android:packageNames="net.jahez.fleets"/>
           EOF
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">LogCat Master</string>
+              <string name="app_name">Saned Auto</string>
           </resources>
           EOF
 
           cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="#121212">
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical"
+                  android:gravity="center_horizontal"
+                  android:padding="24dp">
+
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Saned Auto Swipe"
+                      android:textSize="24sp"
+                      android:textColor="#FFFFFF"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="6dp"/>
+
+                  <TextView
+                      android:id="@+id/tv_status"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Service OFF"
+                      android:textSize="15sp"
+                      android:textColor="#FF5555"
+                      android:layout_marginBottom="28dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Pickup Distance (From You)"
+                      android:textColor="#1DB954"
+                      android:textSize="15sp"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="8dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Max (Km)"
+                      android:textColor="#AAAAAA"
+                      android:textSize="13sp"
+                      android:gravity="center"/>
+                  <EditText
+                      android:id="@+id/et_pickup_max"
+                      android:layout_width="200dp"
+                      android:layout_height="wrap_content"
+                      android:inputType="numberDecimal"
+                      android:text="5.0"
+                      android:textColor="#FFFFFF"
+                      android:backgroundTint="#333333"
+                      android:gravity="center"
+                      android:padding="10dp"
+                      android:layout_marginBottom="4dp"/>
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="(0 se is tak ke orders accept honge)"
+                      android:textColor="#777777"
+                      android:textSize="11sp"
+                      android:gravity="center"
+                      android:layout_marginBottom="16dp"/>
+
+                  <View
+                      android:layout_width="match_parent"
+                      android:layout_height="1dp"
+                      android:background="#333333"
+                      android:layout_marginVertical="8dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Drop Distance (From Pickup)"
+                      android:textColor="#FF9500"
+                      android:textSize="15sp"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="8dp"
+                      android:layout_marginTop="8dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Max (Km)"
+                      android:textColor="#AAAAAA"
+                      android:textSize="13sp"
+                      android:gravity="center"/>
+                  <EditText
+                      android:id="@+id/et_drop_max"
+                      android:layout_width="200dp"
+                      android:layout_height="wrap_content"
+                      android:inputType="numberDecimal"
+                      android:text="10.0"
+                      android:textColor="#FFFFFF"
+                      android:backgroundTint="#333333"
+                      android:gravity="center"
+                      android:padding="10dp"
+                      android:layout_marginBottom="4dp"/>
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="(0 se is tak ke orders accept honge)"
+                      android:textColor="#777777"
+                      android:textSize="11sp"
+                      android:gravity="center"
+                      android:layout_marginBottom="16dp"/>
+
+                  <View
+                      android:layout_width="match_parent"
+                      android:layout_height="1dp"
+                      android:background="#333333"
+                      android:layout_marginVertical="8dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Timing Settings"
+                      android:textColor="#FF9500"
+                      android:textSize="15sp"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="8dp"
+                      android:layout_marginTop="8dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Screen Detection Delay (0.1-1 sec)"
+                      android:textColor="#AAAAAA"
+                      android:textSize="13sp"/>
+                  <SeekBar
+                      android:id="@+id/seek_screen_delay"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:max="900"
+                      android:progress="300"
+                      android:layout_marginBottom="4dp"/>
+                  <TextView
+                      android:id="@+id/tv_screen_delay"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="400 ms"
+                      android:textColor="#1DB954"
+                      android:textSize="12sp"
+                      android:layout_marginBottom="8dp"/>
+
+                  <TextView
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Swipe Duration (0.1-1 sec)"
+                      android:textColor="#AAAAAA"
+                      android:textSize="13sp"/>
+                  <SeekBar
+                      android:id="@+id/seek_swipe_duration"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:max="900"
+                      android:progress="200"
+                      android:layout_marginBottom="4dp"/>
+                  <TextView
+                      android:id="@+id/tv_swipe_duration"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="300 ms"
+                      android:textColor="#1DB954"
+                      android:textSize="12sp"
+                      android:layout_marginBottom="16dp"/>
+
+                  <View
+                      android:layout_width="match_parent"
+                      android:layout_height="1dp"
+                      android:background="#333333"
+                      android:layout_marginVertical="8dp"/>
+
+                  <Switch
+                      android:id="@+id/switch_service"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Auto Accept"
+                      android:textColor="#FFFFFF"
+                      android:textSize="18sp"
+                      android:layout_marginTop="12dp"
+                      android:layout_marginBottom="16dp"/>
+
+                  <Button
+                      android:id="@+id/btn_save"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="OK - Save Settings"
+                      android:textSize="16sp"
+                      android:textStyle="bold"
+                      android:backgroundTint="#1DB954"
+                      android:layout_marginBottom="16dp"/>
+
+                  <Button
+                      android:id="@+id/btn_debug"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="🐛 Debug Logs"
+                      android:textSize="14sp"
+                      android:backgroundTint="#FF9800"
+                      android:layout_marginBottom="16dp"/>
+
+                  <TextView
+                      android:id="@+id/tv_info"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="Pehle Accessibility Service enable karein"
+                      android:textColor="#FFAA00"
+                      android:textSize="13sp"
+                      android:gravity="center"
+                      android:layout_marginBottom="12dp"/>
+
+                  <Button
+                      android:id="@+id/btn_accessibility"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="Open Accessibility Settings"
+                      android:backgroundTint="#444444"/>
+
+              </LinearLayout>
+          </ScrollView>
+          EOF
+
+          cat > app/src/main/res/layout/activity_debug.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
@@ -99,144 +359,32 @@ jobs:
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="📋 LogCat Master"
+                  android:text="🐛 Debug Logs"
                   android:textSize="20sp"
                   android:textColor="#FFFFFF"
                   android:textStyle="bold"
                   android:layout_gravity="center"
-                  android:layout_marginBottom="5dp"/>
+                  android:layout_marginBottom="10dp"/>
 
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="Custom Log Viewer"
+                  android:text="Real-time status from AutoSwipe Service"
                   android:textSize="12sp"
                   android:textColor="#AAAAAA"
                   android:layout_gravity="center"
                   android:layout_marginBottom="20dp"/>
 
-              <!-- Custom Filter Input -->
-              <LinearLayout
+              <Button
+                  android:id="@+id/btn_clear_logs"
                   android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:orientation="horizontal"
-                  android:layout_marginBottom="10dp">
-
-                  <EditText
-                      android:id="@+id/et_custom_filter"
-                      android:layout_width="0dp"
-                      android:layout_height="45dp"
-                      android:layout_weight="1"
-                      android:hint="Enter app name (e.g., jahez, saned)"
-                      android:textColor="#FFFFFF"
-                      android:textColorHint="#888888"
-                      android:background="#333333"
-                      android:padding="10dp"
-                      android:layout_marginEnd="5dp"/>
-
-                  <Button
-                      android:id="@+id/btn_custom"
-                      android:layout_width="wrap_content"
-                      android:layout_height="45dp"
-                      android:text="Filter"
-                      android:textSize="12sp"
-                      android:backgroundTint="#2196F3"/>
-
-              </LinearLayout>
-
-              <!-- Quick Filter Buttons -->
-              <LinearLayout
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:orientation="horizontal"
-                  android:layout_marginBottom="10dp">
-
-                  <Button
-                      android:id="@+id/btn_all"
-                      android:layout_width="0dp"
-                      android:layout_height="40dp"
-                      android:layout_weight="1"
-                      android:text="All"
-                      android:textSize="12sp"
-                      android:layout_marginEnd="5dp"/>
-
-                  <Button
-                      android:id="@+id/btn_saned_auto"
-                      android:layout_width="0dp"
-                      android:layout_height="40dp"
-                      android:layout_weight="1"
-                      android:text="Saned Auto"
-                      android:textSize="10sp"
-                      android:layout_marginEnd="5dp"/>
-
-                  <Button
-                      android:id="@+id/btn_saned_driver"
-                      android:layout_width="0dp"
-                      android:layout_height="40dp"
-                      android:layout_weight="1"
-                      android:text="Saned Driver"
-                      android:textSize="10sp"
-                      android:layout_marginEnd="5dp"/>
-
-                  <Button
-                      android:id="@+id/btn_error"
-                      android:layout_width="0dp"
-                      android:layout_height="40dp"
-                      android:layout_weight="1"
-                      android:text="Errors"
-                      android:textSize="11sp"/>
-
-              </LinearLayout>
-
-              <!-- Control Buttons -->
-              <LinearLayout
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:orientation="horizontal"
-                  android:layout_marginBottom="10dp">
-
-                  <Button
-                      android:id="@+id/btn_start"
-                      android:layout_width="0dp"
-                      android:layout_height="40dp"
-                      android:layout_weight="1"
-                      android:text="▶ Start"
-                      android:textSize="12sp"
-                      android:backgroundTint="#4CAF50"
-                      android:layout_marginEnd="5dp"/>
-
-                  <Button
-                      android:id="@+id/btn_stop"
-                      android:layout_width="0dp"
-                      android:layout_height="40dp"
-                      android:layout_weight="1"
-                      android:text="⏹ Stop"
-                      android:textSize="12sp"
-                      android:backgroundTint="#F44336"
-                      android:layout_marginEnd="5dp"/>
-
-                  <Button
-                      android:id="@+id/btn_clear"
-                      android:layout_width="0dp"
-                      android:layout_height="40dp"
-                      android:layout_weight="1"
-                      android:text="🗑 Clear"
-                      android:textSize="12sp"
-                      android:backgroundTint="#FF9800"/>
-
-              </LinearLayout>
-
-              <!-- Log Display -->
-              <TextView
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="--- Logs ---"
-                  android:textSize="12sp"
-                  android:textColor="#888888"
-                  android:layout_marginBottom="5dp"/>
+                  android:layout_height="40dp"
+                  android:text="Clear Logs"
+                  android:textSize="14sp"
+                  android:backgroundTint="#F44336"
+                  android:layout_marginBottom="10dp"/>
 
               <ScrollView
-                  android:id="@+id/log_scroll"
                   android:layout_width="match_parent"
                   android:layout_height="0dp"
                   android:layout_weight="1"
@@ -244,10 +392,10 @@ jobs:
                   android:padding="10dp">
 
                   <TextView
-                      android:id="@+id/tv_logs"
+                      android:id="@+id/tv_debug_logs"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Waiting for logs...\n\nMake sure:\n1. Root access granted\n2. Start button pressed\n3. Custom filter: type app name"
+                      android:text="Waiting for events...\n\nMake sure:\n1. Accessibility Service is ON\n2. Auto Accept is ON\n3. Saned Driver app is open\n4. Orders are coming"
                       android:textSize="11sp"
                       android:textColor="#AAAAAA"
                       android:fontFamily="monospace"
@@ -256,214 +404,483 @@ jobs:
               </ScrollView>
 
               <TextView
-                  android:id="@+id/tv_status"
+                  android:id="@+id/tv_debug_status"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="Status: Stopped"
+                  android:text="Status: Listening..."
                   android:textSize="11sp"
                   android:textColor="#FF9800"
                   android:gravity="center"
                   android:layout_marginTop="8dp"/>
 
-              <TextView
-                  android:id="@+id/tv_current_filter"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="Filter: all"
-                  android:textSize="10sp"
-                  android:textColor="#666666"
-                  android:gravity="center"/>
-
           </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/logcat/master/MainActivity.java << 'EOF'
-          package com.logcat.master;
+          cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
+          package com.saned.autoswipe;
 
+          import android.content.Intent;
+          import android.content.SharedPreferences;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
+          import android.provider.Settings;
+          import android.view.inputmethod.InputMethodManager;
           import android.widget.Button;
           import android.widget.EditText;
-          import android.widget.ScrollView;
+          import android.widget.SeekBar;
+          import android.widget.Switch;
           import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
-          import java.io.BufferedReader;
-          import java.io.InputStreamReader;
-          import java.util.concurrent.ExecutorService;
-          import java.util.concurrent.Executors;
 
           public class MainActivity extends AppCompatActivity {
 
-              private TextView tvLogs, tvStatus, tvCurrentFilter;
-              private ScrollView scrollView;
-              private EditText etCustomFilter;
-              private Button btnStart, btnStop, btnClear, btnAll, btnSanedAuto, btnSanedDriver, btnError, btnCustom;
-              private ExecutorService executor;
-              private Handler uiHandler;
-              private boolean isRunning = false;
-              private Process logProcess;
-              private String currentFilter = "all";
-              private String customFilterText = "";
+              public static TextView globalStatus;
+              private Switch switchService;
+              private EditText etPickupMax, etDropMax;
+              private TextView tvStatus, tvInfo, tvScreenDelay, tvSwipeDuration;
+              private SeekBar seekScreenDelay, seekSwipeDuration;
+              private Button btnSave, btnAccessibility, btnDebug;
+              private SharedPreferences prefs;
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
 
-                  tvLogs = findViewById(R.id.tv_logs);
+                  prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  switchService = findViewById(R.id.switch_service);
+                  etPickupMax = findViewById(R.id.et_pickup_max);
+                  etDropMax = findViewById(R.id.et_drop_max);
                   tvStatus = findViewById(R.id.tv_status);
-                  tvCurrentFilter = findViewById(R.id.tv_current_filter);
-                  scrollView = findViewById(R.id.log_scroll);
-                  etCustomFilter = findViewById(R.id.et_custom_filter);
-                  btnStart = findViewById(R.id.btn_start);
-                  btnStop = findViewById(R.id.btn_stop);
-                  btnClear = findViewById(R.id.btn_clear);
-                  btnAll = findViewById(R.id.btn_all);
-                  btnSanedAuto = findViewById(R.id.btn_saned_auto);
-                  btnSanedDriver = findViewById(R.id.btn_saned_driver);
-                  btnError = findViewById(R.id.btn_error);
-                  btnCustom = findViewById(R.id.btn_custom);
+                  tvInfo = findViewById(R.id.tv_info);
+                  tvScreenDelay = findViewById(R.id.tv_screen_delay);
+                  tvSwipeDuration = findViewById(R.id.tv_swipe_duration);
+                  seekScreenDelay = findViewById(R.id.seek_screen_delay);
+                  seekSwipeDuration = findViewById(R.id.seek_swipe_duration);
+                  btnSave = findViewById(R.id.btn_save);
+                  btnAccessibility = findViewById(R.id.btn_accessibility);
+                  btnDebug = findViewById(R.id.btn_debug);
+                  
+                  globalStatus = tvStatus;
 
-                  executor = Executors.newSingleThreadExecutor();
-                  uiHandler = new Handler(Looper.getMainLooper());
+                  // Load saved values
+                  etPickupMax.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
+                  etDropMax.setText(String.valueOf(prefs.getFloat("drop_max", 10.0f)));
+                  
+                  int savedScreenDelay = prefs.getInt("screen_delay", 400);
+                  int savedSwipeDuration = prefs.getInt("swipe_duration", 300);
+                  
+                  if (savedScreenDelay < 100) savedScreenDelay = 400;
+                  if (savedScreenDelay > 1000) savedScreenDelay = 400;
+                  if (savedSwipeDuration < 100) savedSwipeDuration = 300;
+                  if (savedSwipeDuration > 1000) savedSwipeDuration = 300;
+                  
+                  seekScreenDelay.setProgress(savedScreenDelay - 100);
+                  seekSwipeDuration.setProgress(savedSwipeDuration - 100);
+                  tvScreenDelay.setText(savedScreenDelay + " ms");
+                  tvSwipeDuration.setText(savedSwipeDuration + " ms");
 
-                  btnStart.setOnClickListener(v -> startLogging());
-                  btnStop.setOnClickListener(v -> stopLogging());
-                  btnClear.setOnClickListener(v -> clearLogs());
-
-                  btnAll.setOnClickListener(v -> { 
-                      currentFilter = "all"; 
-                      customFilterText = "";
-                      tvCurrentFilter.setText("Filter: all");
-                      addLog("--- Filter: ALL ---");
-                  });
-                  
-                  btnSanedAuto.setOnClickListener(v -> { 
-                      currentFilter = "custom"; 
-                      customFilterText = "sanedauto|autoswipe";
-                      tvCurrentFilter.setText("Filter: Saned Auto (sanedauto|autoswipe)");
-                      addLog("--- Filter: SANED AUTO ONLY ---");
-                  });
-                  
-                  btnSanedDriver.setOnClickListener(v -> { 
-                      currentFilter = "custom"; 
-                      customFilterText = "jahez|net.jahez|saned";
-                      tvCurrentFilter.setText("Filter: Saned Driver (jahez|net.jahez|saned)");
-                      addLog("--- Filter: SANED DRIVER ONLY ---");
-                  });
-                  
-                  btnError.setOnClickListener(v -> { 
-                      currentFilter = "error"; 
-                      customFilterText = "";
-                      tvCurrentFilter.setText("Filter: errors only");
-                      addLog("--- Filter: ERRORS ONLY ---");
-                  });
-                  
-                  btnCustom.setOnClickListener(v -> {
-                      String input = etCustomFilter.getText().toString().trim();
-                      if (!input.isEmpty()) {
-                          currentFilter = "custom";
-                          customFilterText = input.toLowerCase();
-                          tvCurrentFilter.setText("Filter: " + customFilterText);
-                          addLog("--- Custom Filter: " + customFilterText + " ---");
-                      } else {
-                          Toast.makeText(this, "Enter filter text", Toast.LENGTH_SHORT).show();
+                  seekScreenDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                          int value = progress + 100;
+                          tvScreenDelay.setText(value + " ms");
+                          if (fromUser) prefs.edit().putInt("screen_delay", value).apply();
                       }
+                      @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                      @Override public void onStopTrackingTouch(SeekBar seekBar) {}
                   });
-              }
-
-              private void startLogging() {
-                  if (isRunning) return;
-                  isRunning = true;
-                  tvStatus.setText("Status: Running...");
-                  Toast.makeText(this, "Logging started", Toast.LENGTH_SHORT).show();
-                  executor.execute(this::readLogs);
-              }
-
-              private void stopLogging() {
-                  isRunning = false;
-                  if (logProcess != null) {
-                      logProcess.destroy();
-                  }
-                  tvStatus.setText("Status: Stopped");
-                  Toast.makeText(this, "Logging stopped", Toast.LENGTH_SHORT).show();
-              }
-
-              private void clearLogs() {
-                  uiHandler.post(() -> {
-                      tvLogs.setText("");
-                      addLog("--- Logs cleared ---");
-                  });
-              }
-
-              private void readLogs() {
-                  try {
-                      ProcessBuilder pb = new ProcessBuilder("logcat", "-v", "brief");
-                      pb.redirectErrorStream(true);
-                      logProcess = pb.start();
-
-                      BufferedReader reader = new BufferedReader(new InputStreamReader(logProcess.getInputStream()));
-                      String line;
-                      while (isRunning && (line = reader.readLine()) != null) {
-                          if (shouldShowLine(line)) {
-                              final String finalLine = line;
-                              uiHandler.post(() -> addLog(finalLine));
-                          }
+                  
+                  seekSwipeDuration.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                          int value = progress + 100;
+                          tvSwipeDuration.setText(value + " ms");
+                          if (fromUser) prefs.edit().putInt("swipe_duration", value).apply();
                       }
-                      reader.close();
-                  } catch (Exception e) {
-                      uiHandler.post(() -> {
-                          tvLogs.setText("Error reading logs!\n\nMake sure you have root access.\n\n" + e.getMessage());
-                          tvStatus.setText("Status: Error - Need root");
-                      });
-                  }
+                      @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                      @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+                  });
+
+                  switchService.setOnCheckedChangeListener((btn, isChecked) ->
+                      updateStatus(isChecked)
+                  );
+
+                  btnSave.setOnClickListener(v -> {
+                      float pMax, dMax;
+                      try { pMax = Float.parseFloat(etPickupMax.getText().toString()); } catch (Exception e) { pMax = 5.0f; }
+                      try { dMax = Float.parseFloat(etDropMax.getText().toString()); } catch (Exception e) { dMax = 10.0f; }
+
+                      prefs.edit()
+                          .putFloat("pickup_max", pMax)
+                          .putFloat("drop_max", dMax)
+                          .putBoolean("enabled", switchService.isChecked())
+                          .apply();
+
+                      etPickupMax.clearFocus();
+                      etDropMax.clearFocus();
+                      InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                      if (imm != null) {
+                          android.view.View view = getCurrentFocus();
+                          if (view == null) view = new android.view.View(this);
+                          imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                      }
+
+                      Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
+                      tvStatus.setText("Settings Saved!");
+                      tvStatus.setTextColor(0xFF1DB954);
+                      new Handler(Looper.getMainLooper()).postDelayed(() ->
+                          updateStatus(switchService.isChecked()), 1500);
+                  });
+
+                  btnAccessibility.setOnClickListener(v ->
+                      startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                  );
+                  
+                  btnDebug.setOnClickListener(v ->
+                      startActivity(new Intent(MainActivity.this, DebugActivity.class))
+                  );
               }
 
-              private boolean shouldShowLine(String line) {
-                  String lowerLine = line.toLowerCase();
-                  
-                  // Skip own app logs
-                  if (lowerLine.contains("logcat.master") || lowerLine.contains("logcatmaster")) {
-                      return false;
+              private void updateStatus(boolean enabled) {
+                  if (enabled) {
+                      tvStatus.setText("Service ON - Waiting for order...");
+                      tvStatus.setTextColor(0xFF1DB954);
+                  } else {
+                      tvStatus.setText("Service OFF");
+                      tvStatus.setTextColor(0xFFFF5555);
                   }
-                  
-                  switch (currentFilter) {
-                      case "error":
-                          return lowerLine.contains("error") || lowerLine.contains("exception") || lowerLine.contains("fail");
-                      case "custom":
-                          if (customFilterText.isEmpty()) return true;
-                          String[] keywords = customFilterText.split("\\|");
-                          for (String kw : keywords) {
-                              if (lowerLine.contains(kw)) return true;
-                          }
-                          return false;
-                      default:
-                          return true;
-                  }
-              }
-
-              private void addLog(String log) {
-                  String current = tvLogs.getText().toString();
-                  String[] lines = current.split("\n");
-                  StringBuilder newLog = new StringBuilder();
-                  
-                  // Keep last 500 lines
-                  int start = Math.max(0, lines.length - 500);
-                  for (int i = start; i < lines.length; i++) {
-                      newLog.append(lines[i]).append("\n");
-                  }
-                  newLog.append(log).append("\n");
-                  
-                  tvLogs.setText(newLog.toString());
-                  scrollView.post(() -> scrollView.fullScroll(ScrollView.FOCUS_DOWN));
               }
 
               @Override
-              protected void onDestroy() {
-                  super.onDestroy();
-                  stopLogging();
+              protected void onResume() {
+                  super.onResume();
+                  boolean enabled = prefs.getBoolean("enabled", false);
+                  switchService.setChecked(enabled);
+                  updateStatus(enabled);
+                  if (isAccessibilityEnabled()) {
+                      tvInfo.setText("Accessibility Service: Active");
+                      tvInfo.setTextColor(0xFF1DB954);
+                  } else {
+                      tvInfo.setText("Pehle Accessibility Service enable karein!");
+                      tvInfo.setTextColor(0xFFFFAA00);
+                  }
+              }
+
+              private boolean isAccessibilityEnabled() {
+                  try {
+                      String s = Settings.Secure.getString(getContentResolver(),
+                          Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+                      return s != null && s.contains(getPackageName());
+                  } catch (Exception e) { return false; }
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/saned/autoswipe/DebugActivity.java << 'EOF'
+          package com.saned.autoswipe;
+
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.widget.Button;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import androidx.appcompat.app.AppCompatActivity;
+          import java.text.SimpleDateFormat;
+          import java.util.ArrayList;
+          import java.util.Date;
+          import java.util.List;
+          import java.util.Locale;
+
+          public class DebugActivity extends AppCompatActivity {
+              
+              private TextView tvLogs, tvStatus;
+              private ScrollView scrollView;
+              private Button btnClear;
+              private static List<String> logList = new ArrayList<>();
+              private static Handler uiHandler = new Handler(Looper.getMainLooper());
+              private static TextView staticTextView;
+              private static ScrollView staticScrollView;
+              
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_debug);
+                  
+                  tvLogs = findViewById(R.id.tv_debug_logs);
+                  tvStatus = findViewById(R.id.tv_debug_status);
+                  scrollView = findViewById(R.id.scrollView);
+                  btnClear = findViewById(R.id.btn_clear_logs);
+                  
+                  staticTextView = tvLogs;
+                  staticScrollView = scrollView;
+                  
+                  // Load existing logs
+                  updateLogDisplay();
+                  
+                  btnClear.setOnClickListener(v -> {
+                      logList.clear();
+                      updateLogDisplay();
+                      addLog("--- Logs cleared ---");
+                  });
+                  
+                  tvStatus.setText("Status: Active - Waiting for events");
+              }
+              
+              public static void addLog(final String message) {
+                  String timestamp = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(new Date());
+                  final String logLine = timestamp + " " + message;
+                  
+                  logList.add(logLine);
+                  
+                  // Keep last 500 logs
+                  while (logList.size() > 500) {
+                      logList.remove(0);
+                  }
+                  
+                  uiHandler.post(() -> {
+                      if (staticTextView != null) {
+                          StringBuilder sb = new StringBuilder();
+                          for (String line : logList) {
+                              sb.append(line).append("\n");
+                          }
+                          staticTextView.setText(sb.toString());
+                          if (staticScrollView != null) {
+                              staticScrollView.post(() -> staticScrollView.fullScroll(ScrollView.FOCUS_DOWN));
+                          }
+                      }
+                  });
+              }
+              
+              private void updateLogDisplay() {
+                  if (tvLogs != null) {
+                      StringBuilder sb = new StringBuilder();
+                      for (String line : logList) {
+                          sb.append(line).append("\n");
+                      }
+                      if (sb.length() == 0) {
+                          sb.append("Waiting for events...\n\nMake sure:\n1. Accessibility Service is ON\n2. Auto Accept is ON\n3. Saned Driver app is open\n4. Orders are coming");
+                      }
+                      tvLogs.setText(sb.toString());
+                  }
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/saned/autoswipe/AutoSwipeService.java << 'EOF'
+          package com.saned.autoswipe;
+
+          import android.accessibilityservice.AccessibilityService;
+          import android.accessibilityservice.GestureDescription;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.content.SharedPreferences;
+          import android.graphics.Path;
+          import android.os.Build;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.util.DisplayMetrics;
+          import android.util.Log;
+          import android.view.accessibility.AccessibilityEvent;
+          import android.view.accessibility.AccessibilityNodeInfo;
+          import java.util.List;
+
+          public class AutoSwipeService extends AccessibilityService {
+
+              private static final String TAG = "SanedAuto";
+              private static final String CHANNEL_ID = "saned_auto_channel";
+              private static final int NOTIF_ID = 1001;
+              private SharedPreferences prefs;
+              private final Handler handler = new Handler(Looper.getMainLooper());
+
+              private void addDebugLog(String message) {
+                  Log.d(TAG, message);
+                  DebugActivity.addLog(message);
+              }
+
+              @Override
+              public void onServiceConnected() {
+                  super.onServiceConnected();
+                  prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  createNotificationChannel();
+                  addDebugLog("✅ Service Connected");
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID,
+                          "Saned Auto Notifications",
+                          NotificationManager.IMPORTANCE_HIGH
+                      );
+                      channel.setDescription("Order accept notifications");
+                      channel.enableVibration(true);
+                      NotificationManager nm = getSystemService(NotificationManager.class);
+                      if (nm != null) nm.createNotificationChannel(channel);
+                  }
+              }
+
+              private void sendOrderNotification(float pickupKm, float dropKm) {
+                  try {
+                      NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                      if (nm == null) return;
+                      Notification.Builder builder;
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          builder = new Notification.Builder(this, CHANNEL_ID);
+                      } else {
+                          builder = new Notification.Builder(this);
+                      }
+                      builder.setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentTitle("Order Accept Ho Gaya!")
+                          .setContentText("Pickup: " + pickupKm + " km | Drop: " + dropKm + " km")
+                          .setAutoCancel(true)
+                          .setPriority(Notification.PRIORITY_HIGH);
+                      nm.notify(NOTIF_ID, builder.build());
+                  } catch (Exception e) {
+                      addDebugLog("❌ Notification error: " + e.getMessage());
+                  }
+              }
+
+              @Override
+              public void onAccessibilityEvent(AccessibilityEvent event) {
+                  if (prefs == null) return;
+                  if (!prefs.getBoolean("enabled", false)) return;
+
+                  String pkg = String.valueOf(event.getPackageName());
+                  addDebugLog("📱 Event from: " + pkg);
+                  
+                  if (!pkg.equals("net.jahez.fleets")) return;
+                  
+                  addDebugLog("✅ Package matched! Processing order...");
+
+                  int screenDelay = prefs.getInt("screen_delay", 400);
+                  addDebugLog("⏱ Screen delay: " + screenDelay + "ms");
+                  handler.postDelayed(this::checkAndAccept, screenDelay);
+              }
+
+              private void checkAndAccept() {
+                  addDebugLog("🔍 Checking for order screen...");
+                  AccessibilityNodeInfo root = getRootInActiveWindow();
+                  if (root == null) {
+                      addDebugLog("❌ Root is null");
+                      return;
+                  }
+                  try {
+                      List<AccessibilityNodeInfo> newOrderList =
+                          root.findAccessibilityNodeInfosByText("New Order");
+                      if (newOrderList == null || newOrderList.isEmpty()) {
+                          addDebugLog("❌ 'New Order' text not found");
+                          return;
+                      }
+                      addDebugLog("✅ 'New Order' found!");
+
+                      float pickupMax = prefs.getFloat("pickup_max", 5.0f);
+                      float dropMax   = prefs.getFloat("drop_max", 10.0f);
+                      addDebugLog("📏 Limits - Pickup: " + pickupMax + "km, Drop: " + dropMax + "km");
+
+                      float pickupKm = findDistance(root, "From You");
+                      float dropKm   = findDistance(root, "From Pickup");
+
+                      addDebugLog("📊 Distances - Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
+
+                      if (pickupKm < 0 || dropKm < 0) {
+                          addDebugLog("⚠️ Could not parse distances");
+                          return;
+                      }
+
+                      if (pickupKm <= pickupMax && dropKm <= dropMax) {
+                          addDebugLog("✅ Distances within limits! Looking for Accept button...");
+                          List<AccessibilityNodeInfo> acceptNodes =
+                              root.findAccessibilityNodeInfosByText("Accept");
+                          if (acceptNodes == null || acceptNodes.isEmpty())
+                              acceptNodes = root.findAccessibilityNodeInfosByText("ACCEPT");
+                          if (acceptNodes == null || acceptNodes.isEmpty())
+                              acceptNodes = root.findAccessibilityNodeInfosByText("قبول");
+
+                          if (acceptNodes != null && !acceptNodes.isEmpty()) {
+                              addDebugLog("🔘 Accept button found!");
+                              DisplayMetrics dm = getResources().getDisplayMetrics();
+                              int screenWidth = dm.widthPixels;
+                              int screenHeight = dm.heightPixels;
+                              int startX = (int)(screenWidth * 0.15f);
+                              int endX   = (int)(screenWidth * 0.85f);
+                              int y      = (int)(screenHeight * 0.80f);
+
+                              int swipeDuration = prefs.getInt("swipe_duration", 300);
+                              addDebugLog("👉 Swiping from " + startX + " to " + endX + " at Y=" + y + " (duration: " + swipeDuration + "ms)");
+
+                              final float pKm = pickupKm;
+                              final float dKm = dropKm;
+
+                              swipeOnScreen(startX, y, endX, y, swipeDuration, () -> {
+                                  addDebugLog("🎉 ACCEPTED! Pickup: " + pKm + "km, Drop: " + dKm + "km");
+                                  prefs.edit().putBoolean("enabled", false).apply();
+                                  sendOrderNotification(pKm, dKm);
+                              });
+                          } else {
+                              addDebugLog("❌ Accept button not found!");
+                          }
+                      } else {
+                          addDebugLog("❌ IGNORED - Distance out of range (Pickup: " + pickupKm + " > " + pickupMax + " OR Drop: " + dropKm + " > " + dropMax + ")");
+                      }
+                  } catch (Exception e) {
+                      addDebugLog("❌ Error: " + e.getMessage());
+                  } finally {
+                      if (root != null) root.recycle();
+                  }
+              }
+
+              private void swipeOnScreen(int x1, int y1, int x2, int y2, int duration, Runnable onDone) {
+                  Path path = new Path();
+                  path.moveTo(x1, y1);
+                  path.lineTo(x2, y2);
+                  GestureDescription gesture = new GestureDescription.Builder()
+                      .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))
+                      .build();
+                  dispatchGesture(gesture, new GestureResultCallback() {
+                      @Override
+                      public void onCompleted(GestureDescription g) {
+                          addDebugLog("✅ Swipe completed");
+                          handler.post(onDone);
+                      }
+                      @Override
+                      public void onCancelled(GestureDescription g) {
+                          addDebugLog("❌ Swipe cancelled");
+                      }
+                  }, null);
+              }
+
+              private float findDistance(AccessibilityNodeInfo root, String keyword) {
+                  List<AccessibilityNodeInfo> nodes =
+                      root.findAccessibilityNodeInfosByText(keyword);
+                  if (nodes == null || nodes.isEmpty()) return -1f;
+                  for (AccessibilityNodeInfo node : nodes) {
+                      String text = node.getText() != null ? node.getText().toString() : "";
+                      node.recycle();
+                      float km = parseKm(text);
+                      if (km >= 0) return km;
+                  }
+                  return -1f;
+              }
+
+              private float parseKm(String text) {
+                  try {
+                      String[] parts = text.trim().split("\\s+");
+                      if (parts.length > 0)
+                          return Float.parseFloat(parts[0].replace(",", "."));
+                  } catch (Exception e) {
+                      addDebugLog("Parse error: " + e.getMessage());
+                  }
+                  return -1f;
+              }
+
+              @Override
+              public void onInterrupt() {
+                  addDebugLog("⚠️ Service interrupted");
               }
           }
           EOF
@@ -474,5 +891,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LogCat-Master
+          name: Saned-Auto-Swipe-v9
           path: app/build/outputs/apk/debug/*.apk
