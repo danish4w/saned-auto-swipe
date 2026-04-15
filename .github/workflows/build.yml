@@ -1,4 +1,4 @@
-name: Build DanishAuto LSPosed Module
+name: Build GufranClick-Pro-V9
 on: workflow_dispatch
 
 jobs:
@@ -13,11 +13,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build LSPosed Module
+      - name: Build Project
         run: |
-          mkdir -p app/src/main/java/com/danish/lsposed
+          mkdir -p app/src/main/java/com/danish/auto
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/assets
           mkdir -p gradle/wrapper
 
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
@@ -26,191 +27,216 @@ jobs:
           chmod +x gradlew
 
           echo "include ':app'" > settings.gradle
-
-          cat > gradle.properties << 'EOF'
-          android.useAndroidX=true
-          android.enableJetifier=false
-          org.gradle.jvmargs=-Xmx2048m
-          EOF
+          echo "android.useAndroidX=true" > gradle.properties
 
           cat > build.gradle << 'EOF'
           buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-                  maven { url 'https://maven.xposed.info/repository' }
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.3.2'
-              }
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
           allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-                  maven { url 'https://maven.xposed.info/repository' }
-              }
+              repositories { google(); mavenCentral() }
           }
           EOF
 
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.danish.lsposed'
+              namespace 'com.danish.auto'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.danish.lsposed'
+                  applicationId 'com.danish.auto'
                   minSdk 26
                   targetSdk 34
-                  versionCode 1
-                  versionName '1.0'
+                  versionCode 9
+                  versionName '9.0'
               }
           }
           dependencies {
-              compileOnly 'de.robv.android.xposed:api:82'
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.9.0'
           }
           EOF
 
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application
-                  android:label="DanishAuto"
-                  android:icon="@android:drawable/ic_menu_share"
-                  android:theme="@style/Theme.AppCompat">
-                  <meta-data
-                      android:name="xposedmodule"
-                      android:value="true" />
-                  <meta-data
-                      android:name="xposeddescription"
-                      android:value="Auto Accept Orders for Jahez Driver" />
-                  <meta-data
-                      android:name="xposedminversion"
-                      android:value="82" />
+              <application android:label="Gufran Click Pro" android:theme="@style/Theme.MaterialComponents.DayNight">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <service android:name=".AutoSwipeService" android:exported="true"
+                      android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+                      <intent-filter>
+                          <action android:name="android.accessibilityservice.AccessibilityService"/>
+                      </intent-filter>
+                      <meta-data android:name="android.accessibilityservice" android:resource="@xml/acc_config"/>
+                  </service>
               </application>
           </manifest>
           EOF
 
-          cat > app/src/main/res/values/strings.xml << 'EOF'
+          cat > app/src/main/res/xml/acc_config.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">DanishAuto</string>
-          </resources>
+          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+              android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+              android:accessibilityFeedbackType="feedbackGeneric"
+              android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows"
+              android:canPerformGestures="true"
+              android:canRetrieveWindowContent="true"
+              android:notificationTimeout="50"
+              android:packageNames="net.jahez.fleets"/>
           EOF
 
-          cat > app/src/main/assets/xposed_init << 'EOF'
-          com.danish.lsposed.MainHook
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:padding="20dp"
+              android:gravity="center">
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gufran Click Settings" android:textSize="22sp" android:textStyle="bold" android:layout_marginBottom="30dp"/>
+              
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Max Pickup (KM)"/>
+              <EditText android:id="@+id/edit_pickup" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="e.g. 5.0" android:inputType="numberDecimal" android:layout_marginBottom="15dp"/>
+              
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Max Drop (KM)"/>
+              <EditText android:id="@+id/edit_drop" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="e.g. 10.0" android:inputType="numberDecimal" android:layout_marginBottom="15dp"/>
+              
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Swipe Speed (ms) (100-1000)"/>
+              <EditText android:id="@+id/edit_speed" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="e.g. 300" android:inputType="number" android:layout_marginBottom="30dp"/>
+              
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="60dp" android:text="Save &amp; Open Accessibility" android:textSize="16sp"/>
+          </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
-          package com.danish.lsposed;
-
-          import android.app.Notification;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.content.Context;
+          cat > app/src/main/java/com/danish/auto/MainActivity.java << 'EOF'
+          package com.danish.auto;
+          import android.content.Intent;
           import android.content.SharedPreferences;
-          import android.os.Build;
           import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.Looper;
-          import android.view.View;
-          import android.widget.Button;
-          import android.widget.TextView;
+          import android.provider.Settings;
+          import android.widget.EditText;
+          import android.widget.Toast;
+          import androidx.appcompat.app.AppCompatActivity;
 
-          import java.util.ArrayList;
-          import java.util.List;
-          import java.util.regex.Matcher;
-          import java.util.regex.Pattern;
-
-          import de.robv.android.xposed.XC_MethodHook;
-          import de.robv.android.xposed.XposedBridge;
-          import de.robv.android.xposed.XposedHelpers;
-          import de.robv.android.xposed.callbacks.XC_LoadPackage;
-
-          public class MainHook implements de.robv.android.xposed.IXposedHookLoadPackage {
-
-              private static final String TAG = "DanishAuto";
-              private static final String PACKAGE_NAME = "net.jahez.fleets";
-              private static SharedPreferences prefs;
-              private static Handler uiHandler = new Handler(Looper.getMainLooper());
-              private static boolean isProcessing = false;
-
+          public class MainActivity extends AppCompatActivity {
               @Override
-              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-                  if (!lpparam.packageName.equals(PACKAGE_NAME)) return;
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_main);
+                  
+                  SharedPreferences prefs = getSharedPreferences("gufran_prefs", MODE_PRIVATE);
+                  EditText editP = findViewById(R.id.edit_pickup);
+                  EditText editD = findViewById(R.id.edit_drop);
+                  EditText editS = findViewById(R.id.edit_speed);
+                  
+                  editP.setText(String.valueOf(prefs.getFloat("max_p", 5.0f)));
+                  editD.setText(String.valueOf(prefs.getFloat("max_d", 10.0f)));
+                  editS.setText(String.valueOf(prefs.getInt("swipe_s", 300)));
 
-                  XposedBridge.log(TAG + " Hooked into Jahez Driver");
+                  findViewById(R.id.btn_save).setOnClickListener(v -> {
+                      try {
+                          float p = Float.parseFloat(editP.getText().toString());
+                          float d = Float.parseFloat(editD.getText().toString());
+                          int s = Integer.parseInt(editS.getText().toString());
+                          
+                          if(s < 100) s = 100;
+                          if(s > 1000) s = 1000;
 
-                  Class<?> orderActivity = XposedHelpers.findClass("com.jahez.fleets.ui.order.OrderActivity", lpparam.classLoader);
-                  XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
-                      @Override
-                      protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                          Context context = (Context) param.thisObject;
-                          prefs = context.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                          if (!prefs.getBoolean("enabled", false)) return;
-
-                          int delay = prefs.getInt("screen_delay", 500);
-                          XposedBridge.log(TAG + " Order screen detected, waiting " + delay + "ms");
-
-                          uiHandler.postDelayed(() -> {
-                              try {
-                                  checkAndAcceptOrder(context);
-                              } catch (Throwable t) {
-                                  XposedBridge.log(TAG + " Error: " + t.getMessage());
-                              }
-                          }, delay);
+                          prefs.edit().putFloat("max_p", p).putFloat("max_d", d).putInt("swipe_s", s).apply();
+                          Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
+                          startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                      } catch (Exception e) {
+                          Toast.makeText(this, "Please enter valid numbers", Toast.LENGTH_SHORT).show();
                       }
                   });
-              }
-
-              private void checkAndAcceptOrder(Context context) {
-                  if (isProcessing) return;
-                  isProcessing = true;
-                  try {
-                      float pickupKm = 2.5f;  // Test value
-                      float dropKm = 3.5f;    // Test value
-                      float pickupMax = prefs.getFloat("pickup_max", 5.0f);
-                      float dropMax = prefs.getFloat("drop_max", 10.0f);
-
-                      XposedBridge.log(TAG + " Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
-                      XposedBridge.log(TAG + " Limits: " + pickupMax + "km / " + dropMax + "km");
-
-                      if (pickupKm <= pickupMax && dropKm <= dropMax) {
-                          XposedBridge.log(TAG + " Order accepted!");
-                          sendNotification(context, pickupKm, dropKm);
-                      }
-                  } finally {
-                      isProcessing = false;
-                  }
-              }
-
-              private void sendNotification(Context context, float pickup, float drop) {
-                  try {
-                      NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          NotificationChannel channel = new NotificationChannel("danish_channel", "DanishAuto", NotificationManager.IMPORTANCE_HIGH);
-                          nm.createNotificationChannel(channel);
-                      }
-                      Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
-                          new Notification.Builder(context, "danish_channel") : new Notification.Builder(context);
-                      builder.setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setContentTitle("✅ Order Accepted")
-                          .setContentText("Pickup: " + pickup + " km | Drop: " + drop + " km")
-                          .setAutoCancel(true);
-                      nm.notify(1001, builder.build());
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + " Notification error: " + e.getMessage());
-                  }
               }
           }
           EOF
 
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          cat > app/src/main/java/com/danish/auto/AutoSwipeService.java << 'EOF'
+          package com.danish.auto;
+
+          import android.accessibilityservice.AccessibilityService;
+          import android.accessibilityservice.GestureDescription;
+          import android.content.SharedPreferences;
+          import android.graphics.Path;
+          import android.graphics.Rect;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.view.accessibility.AccessibilityEvent;
+          import android.view.accessibility.AccessibilityNodeInfo;
+          import java.util.List;
+
+          public class AutoSwipeService extends AccessibilityService {
+              private boolean isProcessing = false;
+
+              @Override
+              public void onAccessibilityEvent(AccessibilityEvent event) {
+                  if (isProcessing) return;
+
+                  AccessibilityNodeInfo root = getRootInActiveWindow();
+                  if (root == null) return;
+
+                  List<AccessibilityNodeInfo> kmNodes = root.findAccessibilityNodeInfosByText("Km");
+                  List<AccessibilityNodeInfo> acceptNodes = root.findAccessibilityNodeInfosByText("Accept");
+
+                  if (kmNodes.size() >= 2 && !acceptNodes.isEmpty()) {
+                      float pickupDist = parseDistance(kmNodes.get(0).getText().toString());
+                      float dropDist = parseDistance(kmNodes.get(1).getText().toString());
+
+                      SharedPreferences prefs = getSharedPreferences("gufran_prefs", MODE_PRIVATE);
+                      float maxP = prefs.getFloat("max_p", 5.0f);
+                      float maxD = prefs.getFloat("max_d", 10.0f);
+                      int speed = prefs.getInt("swipe_s", 300);
+
+                      if (pickupDist <= maxP && dropDist <= maxD) {
+                          isProcessing = true;
+                          Rect r = new Rect();
+                          acceptNodes.get(0).getBoundsInScreen(r);
+                          executeGesture(r, speed);
+                      }
+                  }
+                  root.recycle();
+              }
+
+              private float parseDistance(String s) {
+                  try {
+                      String val = s.toLowerCase().split("km")[0].replaceAll("[^0-9.]", "").trim();
+                      return Float.parseFloat(val);
+                  } catch (Exception e) { return 999f; }
+              }
+
+              private void executeGesture(Rect r, int speed) {
+                  Path path = new Path();
+                  path.moveTo(r.left + 55, r.centerY());
+                  path.lineTo(r.right - 55, r.centerY());
+                  
+                  GestureDescription.Builder gb = new GestureDescription.Builder();
+                  gb.addStroke(new GestureDescription.StrokeDescription(path, 0, speed));
+                  
+                  dispatchGesture(gb.build(), new GestureResultCallback() {
+                      @Override
+                      public void onCompleted(GestureDescription g) {
+                          // Wait before allowing next action to prevent multiple swipes on same order
+                          new Handler(Looper.getMainLooper()).postDelayed(() -> isProcessing = false, 1500);
+                      }
+                  }, null);
+              }
+
+              @Override public void onInterrupt() {}
+          }
+          EOF
+
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DanishAuto-LSPosed
-          path: app/build/outputs/apk/debug/*.apk
+          name: GufranClick-V9-SpeedControl
+          path: app/build/outputs/apk/debug/app-debug.apk
