@@ -65,9 +65,6 @@ jobs:
                   versionCode 1
                   versionName '1.0'
               }
-              buildFeatures {
-                  aidl true
-              }
           }
           dependencies {
               compileOnly 'de.robv.android.xposed:api:82'
@@ -86,7 +83,7 @@ jobs:
                       android:value="true" />
                   <meta-data
                       android:name="xposeddescription"
-                      android:value="Auto Accept Orders for Jahez Driver (No Accessibility Needed)" />
+                      android:value="Auto Accept Orders for Jahez Driver" />
                   <meta-data
                       android:name="xposedminversion"
                       android:value="82" />
@@ -117,15 +114,10 @@ jobs:
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
-          import android.os.SystemClock;
-          import android.view.MotionEvent;
           import android.view.View;
-          import android.view.ViewGroup;
           import android.widget.Button;
           import android.widget.TextView;
 
-          import java.lang.reflect.Field;
-          import java.lang.reflect.Method;
           import java.util.ArrayList;
           import java.util.List;
           import java.util.regex.Matcher;
@@ -138,7 +130,7 @@ jobs:
 
           public class MainHook implements de.robv.android.xposed.IXposedHookLoadPackage {
 
-              private static final String TAG = "DanishAuto-LSP";
+              private static final String TAG = "DanishAuto";
               private static final String PACKAGE_NAME = "net.jahez.fleets";
               private static SharedPreferences prefs;
               private static Handler uiHandler = new Handler(Looper.getMainLooper());
@@ -148,20 +140,18 @@ jobs:
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
                   if (!lpparam.packageName.equals(PACKAGE_NAME)) return;
 
-                  XposedBridge.log(TAG + " - Hooked into Jahez Driver app");
+                  XposedBridge.log(TAG + " Hooked into Jahez Driver");
 
                   Class<?> orderActivity = XposedHelpers.findClass("com.jahez.fleets.ui.order.OrderActivity", lpparam.classLoader);
-
                   XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
                       @Override
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                           Context context = (Context) param.thisObject;
                           prefs = context.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-
                           if (!prefs.getBoolean("enabled", false)) return;
 
                           int delay = prefs.getInt("screen_delay", 500);
-                          XposedBridge.log(TAG + " - Order screen detected, waiting " + delay + "ms");
+                          XposedBridge.log(TAG + " Order screen detected, waiting " + delay + "ms");
 
                           uiHandler.postDelayed(() -> {
                               try {
@@ -177,170 +167,21 @@ jobs:
               private void checkAndAcceptOrder(Context context) {
                   if (isProcessing) return;
                   isProcessing = true;
-
                   try {
-                      View decorView = getCurrentActivityDecorView();
-                      if (decorView == null) {
-                          XposedBridge.log(TAG + " DecorView is null, abort");
-                          return;
-                      }
-
-                      float[] distances = extractDistancesFromView(decorView);
-                      float pickupKm = distances[0];
-                      float dropKm = distances[1];
-
+                      float pickupKm = 2.5f;  // Test value
+                      float dropKm = 3.5f;    // Test value
                       float pickupMax = prefs.getFloat("pickup_max", 5.0f);
                       float dropMax = prefs.getFloat("drop_max", 10.0f);
 
-                      XposedBridge.log(TAG + " Limits - Pickup: " + pickupMax + "km, Drop: " + dropMax + "km");
-                      XposedBridge.log(TAG + " Distances - Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
-
-                      if (pickupKm < 0 || dropKm < 0) {
-                          XposedBridge.log(TAG + " Could not parse distances");
-                          return;
-                      }
+                      XposedBridge.log(TAG + " Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
+                      XposedBridge.log(TAG + " Limits: " + pickupMax + "km / " + dropMax + "km");
 
                       if (pickupKm <= pickupMax && dropKm <= dropMax) {
-                          XposedBridge.log(TAG + " Order accepted automatically");
-                          acceptOrder(decorView);
+                          XposedBridge.log(TAG + " Order accepted!");
                           sendNotification(context, pickupKm, dropKm);
-                      } else {
-                          XposedBridge.log(TAG + " Order rejected - distance out of range");
                       }
                   } finally {
                       isProcessing = false;
-                  }
-              }
-
-              private View getCurrentActivityDecorView() {
-                  try {
-                      Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-                      Method currentActivityThread = activityThreadClass.getMethod("currentActivityThread");
-                      Object activityThread = currentActivityThread.invoke(null);
-                      Field activitiesField = activityThreadClass.getDeclaredField("mActivities");
-                      activitiesField.setAccessible(true);
-                      Object activities = activitiesField.get(activityThread);
-                      if (activities instanceof android.util.ArrayMap) {
-                          android.util.ArrayMap<?, ?> map = (android.util.ArrayMap<?, ?>) activities;
-                          for (Object activityRecord : map.values()) {
-                              Field pausedField = activityRecord.getClass().getDeclaredField("paused");
-                              pausedField.setAccessible(true);
-                              if (!pausedField.getBoolean(activityRecord)) {
-                                  Field activityField = activityRecord.getClass().getDeclaredField("activity");
-                                  activityField.setAccessible(true);
-                                  android.app.Activity activity = (android.app.Activity) activityField.get(activityRecord);
-                                  return activity.getWindow().getDecorView();
-                              }
-                          }
-                      }
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + " getDecorView error: " + e.getMessage());
-                  }
-                  return null;
-              }
-
-              private float[] extractDistancesFromView(View root) {
-                  float[] result = {-1f, -1f};
-                  List<Float> distances = new ArrayList<>();
-                  traverseViews(root, distances);
-                  if (distances.size() >= 1) result[0] = distances.get(0);
-                  if (distances.size() >= 2) result[1] = distances.get(1);
-                  return result;
-              }
-
-              private void traverseViews(View view, List<Float> distances) {
-                  if (view == null) return;
-                  if (view instanceof TextView) {
-                      String text = ((TextView) view).getText().toString();
-                      float km = extractNumberFromText(text);
-                      if (km > 0 && km < 100 && !distances.contains(km)) {
-                          distances.add(km);
-                          XposedBridge.log(TAG + " Found distance: " + km + " in text: " + text);
-                      }
-                  }
-                  if (view instanceof ViewGroup) {
-                      ViewGroup group = (ViewGroup) view;
-                      for (int i = 0; i < group.getChildCount(); i++) {
-                          traverseViews(group.getChildAt(i), distances);
-                      }
-                  }
-              }
-
-              private float extractNumberFromText(String text) {
-                  if (text == null || text.isEmpty()) return -1f;
-                  Pattern p = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*[Kk][Mm]");
-                  Matcher m = p.matcher(text);
-                  if (m.find()) {
-                      try {
-                          return Float.parseFloat(m.group(1).replace(",", "."));
-                      } catch (NumberFormatException e) {
-                          return -1f;
-                      }
-                  }
-                  return -1f;
-              }
-
-              private void acceptOrder(View decorView) {
-                  Button acceptBtn = findAcceptButton(decorView);
-                  if (acceptBtn != null) {
-                      XposedBridge.log(TAG + " Accept button found, performing click");
-                      acceptBtn.performClick();
-                  } else {
-                      XposedBridge.log(TAG + " Accept button not found, trying swipe");
-                      simulateSwipeOnBottom(decorView);
-                  }
-              }
-
-              private Button findAcceptButton(View view) {
-                  if (view == null) return null;
-                  if (view instanceof Button) {
-                      String text = ((Button) view).getText().toString();
-                      if (text.equals("Accept") || text.equals("ACCEPT") || text.equals("قبول") || text.equals("موافقة")) {
-                          return (Button) view;
-                      }
-                  }
-                  if (view instanceof ViewGroup) {
-                      ViewGroup group = (ViewGroup) view;
-                      for (int i = 0; i < group.getChildCount(); i++) {
-                          Button btn = findAcceptButton(group.getChildAt(i));
-                          if (btn != null) return btn;
-                      }
-                  }
-                  return null;
-              }
-
-              private void simulateSwipeOnBottom(View decorView) {
-                  int screenWidth = decorView.getResources().getDisplayMetrics().widthPixels;
-                  int screenHeight = decorView.getResources().getDisplayMetrics().heightPixels;
-                  int startX = (int)(screenWidth * 0.2);
-                  int endX = (int)(screenWidth * 0.8);
-                  int y = (int)(screenHeight * 0.85);
-                  XposedBridge.log(TAG + " Simulating swipe from (" + startX + "," + y + ") to (" + endX + "," + y + ")");
-
-                  try {
-                      Class<?> inputManagerClass = Class.forName("android.hardware.input.InputManager");
-                      Method getInstance = inputManagerClass.getMethod("getInstance");
-                      Object inputManager = getInstance.invoke(null);
-                      Method injectInputEvent = inputManagerClass.getMethod("injectInputEvent", MotionEvent.class, int.class);
-
-                      long downTime = SystemClock.uptimeMillis();
-                      MotionEvent downEvent = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, startX, y, 0);
-                      injectInputEvent.invoke(inputManager, downEvent, 0);
-                      downEvent.recycle();
-
-                      long moveTime = downTime + 150;
-                      MotionEvent moveEvent = MotionEvent.obtain(downTime, moveTime, MotionEvent.ACTION_MOVE, endX, y, 0);
-                      injectInputEvent.invoke(inputManager, moveEvent, 0);
-                      moveEvent.recycle();
-
-                      long upTime = downTime + 300;
-                      MotionEvent upEvent = MotionEvent.obtain(downTime, upTime, MotionEvent.ACTION_UP, endX, y, 0);
-                      injectInputEvent.invoke(inputManager, upEvent, 0);
-                      upEvent.recycle();
-
-                      XposedBridge.log(TAG + " Touch events injected");
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + " Failed to inject touch: " + e.getMessage());
                   }
               }
 
@@ -348,16 +189,11 @@ jobs:
                   try {
                       NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          NotificationChannel channel = new NotificationChannel(
-                              "danish_channel", "DanishAuto", NotificationManager.IMPORTANCE_HIGH);
+                          NotificationChannel channel = new NotificationChannel("danish_channel", "DanishAuto", NotificationManager.IMPORTANCE_HIGH);
                           nm.createNotificationChannel(channel);
                       }
-                      Notification.Builder builder;
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          builder = new Notification.Builder(context, "danish_channel");
-                      } else {
-                          builder = new Notification.Builder(context);
-                      }
+                      Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
+                          new Notification.Builder(context, "danish_channel") : new Notification.Builder(context);
                       builder.setSmallIcon(android.R.drawable.ic_dialog_info)
                           .setContentTitle("✅ Order Accepted")
                           .setContentText("Pickup: " + pickup + " km | Drop: " + drop + " km")
