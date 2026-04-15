@@ -15,19 +15,15 @@ jobs:
 
       - name: Prepare Project Structure
         run: |
-          mkdir -p app/libs
           mkdir -p app/src/main/java/com/danish/lsposed
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
-          mkdir -p gradle/wrapper
 
       - name: Create Build Files
         run: |
-          # Settings file
           echo "include ':app'" > settings.gradle
 
-          # Root build.gradle
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
@@ -38,7 +34,6 @@ jobs:
           }
           EOF
 
-          # App build.gradle (Fixed Dependencies)
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
@@ -51,11 +46,6 @@ jobs:
                   versionCode 1
                   versionName '1.0'
               }
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                  }
-              }
           }
           dependencies {
               compileOnly 'de.robv.android.xposed:api:82'
@@ -64,35 +54,11 @@ jobs:
           }
           EOF
 
-      - name: Create Android Resources
-        run: |
-          cat > app/src/main/res/values/strings.xml << 'EOF'
-          <resources>
-              <string name="app_name">DanishAuto</string>
-          </resources>
-          EOF
-
-          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:orientation="vertical"
-              android:padding="20dp">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DanishAuto Settings" android:textSize="20sp" />
-              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Pickup Max Km" android:inputType="numberDecimal" />
-              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Drop Max Km" android:inputType="numberDecimal" />
-              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Enable Auto Accept" />
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Save Settings" />
-          </LinearLayout>
-          EOF
-
-      - name: Create Java Source (Fixed Imports & XSharedPreferences)
+      - name: Create Java Source Files
         run: |
           # Settings Activity
           cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
           package com.danish.lsposed;
-          import android.annotation.SuppressLint;
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.os.Bundle;
@@ -105,7 +71,6 @@ jobs:
 
           public class SettingsActivity extends AppCompatActivity {
               private SharedPreferences prefs;
-              @SuppressLint("WorldReadableFiles")
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
@@ -114,7 +79,7 @@ jobs:
                   
                   EditText etP = findViewById(R.id.et_pickup_max);
                   EditText etD = findViewById(R.id.et_drop_max);
-                  @SuppressLint("UseSwitchCompatOrMaterialCode") Switch sw = findViewById(R.id.switch_enabled);
+                  Switch sw = findViewById(R.id.switch_enabled);
                   Button btn = findViewById(R.id.btn_save);
 
                   etP.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
@@ -128,33 +93,21 @@ jobs:
                           .putBoolean("enabled", sw.isChecked())
                           .apply();
                       
-                      // Fix permissions for LSPosed to read
                       File prefFile = new File(getFilesDir().getParent(), "shared_prefs/danish_prefs.xml");
                       if (prefFile.exists()) prefFile.setReadable(true, false);
-                      
-                      Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
+                      Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
                   });
               }
           }
           EOF
 
-          # Main Hook (Fixed Symbols Error)
+          # Main Hook
           cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
           package com.danish.lsposed;
 
-          import android.content.Context;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
-          import android.view.View;
-          import android.view.ViewGroup;
-          import android.widget.Button;
-          import android.widget.TextView;
-          import java.util.ArrayList;
-          import java.util.List;
-          import java.util.regex.Matcher;
-          import java.util.regex.Pattern;
-
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XSharedPreferences;
@@ -163,7 +116,6 @@ jobs:
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
           public class MainHook implements IXposedHookLoadPackage {
-              private static final String TAG = "DanishAuto";
               private static XSharedPreferences xPrefs;
 
               @Override
@@ -171,27 +123,38 @@ jobs:
                   if (!lpparam.packageName.equals("net.jahez.fleets")) return;
 
                   xPrefs = new XSharedPreferences("com.danish.lsposed", "danish_prefs");
-                  xPrefs.makeWorldReadable();
-
+                  
                   XposedHelpers.findAndHookMethod("com.jahez.fleets.ui.order.OrderActivity", lpparam.classLoader, 
                       "onCreate", Bundle.class, new XC_MethodHook() {
                       @Override
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                           xPrefs.reload();
                           if (!xPrefs.getBoolean("enabled", false)) return;
-                          
-                          new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                              XposedBridge.log(TAG + " Checking Order...");
-                              // Custom logic for auto-accept goes here
-                          }, 1000);
+                          XposedBridge.log("DanishAuto: Hooked Jahez Order Screen");
                       }
                   });
               }
           }
           EOF
 
-      - name: Finalize & Build
+      - name: Create Resources & Manifest
         run: |
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <resources><string name="app_name">DanishAuto</string></resources>
+          EOF
+
+          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:padding="20dp">
+              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Pickup Km" />
+              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Drop Km" />
+              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Enable" />
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Save" />
+          </LinearLayout>
+          EOF
+
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application android:label="DanishAuto" android:theme="@style/Theme.AppCompat">
@@ -212,13 +175,16 @@ jobs:
           com.danish.lsposed.MainHook
           EOF
 
-          # Setup Gradle Wrapper
-          wget https://services.gradle.org/distributions/gradle-8.3-bin.zip
-          unzip -q gradle-8.3-bin.zip
-          ./gradle-8.3/bin/gradle assembleDebug
+      - name: Setup Gradle 8.4
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
+
+      - name: Build with Gradle
+        run: gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DanishAuto-LSPosed-Fixed
+          name: DanishAuto-LSPosed
           path: app/build/outputs/apk/debug/*.apk
