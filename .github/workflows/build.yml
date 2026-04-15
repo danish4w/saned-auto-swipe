@@ -1,4 +1,4 @@
-name: Build DanishAuto LSPosed Module
+name: Build Gufran Pro Slider
 on: workflow_dispatch
 
 jobs:
@@ -23,11 +23,6 @@ jobs:
       - name: Create Build Files
         run: |
           echo "include ':app'" > settings.gradle
-          cat > gradle.properties << 'EOF'
-          android.useAndroidX=true
-          android.enableJetifier=true
-          EOF
-
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
@@ -50,8 +45,8 @@ jobs:
                   applicationId 'com.danish.lsposed'
                   minSdk 26
                   targetSdk 34
-                  versionCode 1
-                  versionName '1.0'
+                  versionCode 3
+                  versionName '3.0'
               }
           }
           dependencies {
@@ -61,8 +56,138 @@ jobs:
           }
           EOF
 
-      - name: Create MainHook with Swipe Logic
+      - name: Create Slider UI & Logic
         run: |
+          # Colorful Theme
+          cat > app/src/main/res/values/colors.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="jahez_red">#FF4B3A</color>
+              <color name="dark_bg">#121212</color>
+              <color name="card_bg">#1E1E1E</color>
+              <color name="text_white">#FFFFFF</color>
+          </resources>
+          EOF
+
+          # UI with Slider (SeekBar)
+          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:padding="24dp" android:background="@color/dark_bg"
+              android:focusable="true" android:focusableInTouchMode="true">
+              
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
+                  android:text="Gufran Click Pro V3" android:textColor="@color/jahez_red" 
+                  android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center"/>
+
+              <View android:layout_width="match_parent" android:layout_height="1dp" 
+                  android:background="#22FFFFFF" android:layout_marginVertical="20dp"/>
+
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
+                  android:text="Pickup Limit (KM)" android:textColor="@color/text_white"/>
+              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" 
+                  android:layout_height="50dp" android:backgroundTint="@color/jahez_red" 
+                  android:textColor="@color/text_white" android:inputType="numberDecimal" android:hint="5.0"/>
+
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
+                  android:text="Drop Limit (KM)" android:textColor="@color/text_white" android:layout_marginTop="10dp"/>
+              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" 
+                  android:layout_height="50dp" android:backgroundTint="@color/jahez_red" 
+                  android:textColor="@color/text_white" android:inputType="numberDecimal" android:hint="10.0"/>
+
+              <TextView android:id="@+id/tv_delay_label" android:layout_width="wrap_content" 
+                  android:layout_height="wrap_content" android:text="System Delay: 800ms" 
+                  android:textColor="@color/jahez_red" android:layout_marginTop="20dp" android:textStyle="bold"/>
+              
+              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent" 
+                  android:layout_height="wrap_content" android:layout_marginTop="10dp"
+                  android:max="1100" android:progress="400"
+                  android:thumbTint="@color/jahez_red" android:progressTint="@color/jahez_red"/>
+
+              <Switch android:id="@+id/switch_enabled" android:layout_width="match_parent" 
+                  android:layout_height="wrap_content" android:text="Auto Swipe Enable" 
+                  android:textColor="@color/text_white" android:layout_marginTop="20dp"
+                  android:thumbTint="@color/jahez_red"/>
+
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" 
+                  android:layout_height="60dp" android:text="SAVE SETTINGS" 
+                  android:backgroundTint="@color/jahez_red" android:textColor="@color/text_white"
+                  android:layout_marginTop="30dp" android:textStyle="bold"/>
+          </LinearLayout>
+          EOF
+
+          # Settings Activity with SeekBar Handling
+          cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
+          package com.danish.lsposed;
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.os.Bundle;
+          import android.view.inputmethod.InputMethodManager;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.SeekBar;
+          import android.widget.Switch;
+          import android.widget.TextView;
+          import android.widget.Toast;
+          import androidx.appcompat.app.AppCompatActivity;
+          import java.io.File;
+
+          public class SettingsActivity extends AppCompatActivity {
+              private int currentDelay = 800;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_settings);
+                  SharedPreferences p = getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                  
+                  EditText etP = findViewById(R.id.et_pickup_max);
+                  EditText etD = findViewById(R.id.et_drop_max);
+                  TextView tvDelay = findViewById(R.id.tv_delay_label);
+                  SeekBar sbDelay = findViewById(R.id.sb_delay);
+                  Switch s = findViewById(R.id.switch_enabled);
+                  Button btn = findViewById(R.id.btn_save);
+
+                  // Load saved values
+                  etP.setText(String.valueOf(p.getFloat("pickup_max", 5.0f)));
+                  etD.setText(String.valueOf(p.getFloat("drop_max", 10.0f)));
+                  currentDelay = p.getInt("system_delay", 800);
+                  s.setChecked(p.getBoolean("enabled", false));
+                  
+                  // Setup SeekBar (Min 400, Max 1500)
+                  sbDelay.setProgress(currentDelay - 400);
+                  tvDelay.setText("System Delay: " + currentDelay + "ms");
+
+                  sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                          currentDelay = progress + 400;
+                          tvDelay.setText("System Delay: " + currentDelay + "ms");
+                      }
+                      @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                      @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+                  });
+
+                  btn.setOnClickListener(v -> {
+                      p.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
+                             .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
+                             .putInt("system_delay", currentDelay)
+                             .putBoolean("enabled", s.isChecked()).apply();
+                      
+                      File pf = new File(getFilesDir().getParent(), "shared_prefs/danish_prefs.xml");
+                      if (pf.exists()) pf.setReadable(true, false);
+
+                      etP.clearFocus(); etD.clearFocus();
+                      InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                      imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                      Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
+                  });
+              }
+          }
+          EOF
+
+          # MainHook remains same logic, just reads currentDelay
           cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
           package com.danish.lsposed;
 
@@ -75,10 +200,7 @@ jobs:
           import android.view.View;
           import android.view.ViewGroup;
           import android.widget.TextView;
-          import java.util.ArrayList;
-          import java.util.List;
-          import java.util.regex.Matcher;
-          import java.util.regex.Pattern;
+          import android.widget.Toast;
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
@@ -87,14 +209,17 @@ jobs:
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.regex.Matcher;
+          import java.util.regex.Pattern;
+
           public class MainHook implements IXposedHookLoadPackage {
-              private static final String TAG = "DanishAuto: ";
               private static XSharedPreferences xPrefs;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
                   if (!lpparam.packageName.equals("net.jahez.fleets")) return;
-
                   xPrefs = new XSharedPreferences("com.danish.lsposed", "danish_prefs");
 
                   XposedHelpers.findAndHookMethod("com.jahez.fleets.ui.order.OrderActivity", lpparam.classLoader, 
@@ -104,137 +229,89 @@ jobs:
                           xPrefs.reload();
                           if (!xPrefs.getBoolean("enabled", false)) return;
 
-                          final Activity activity = (Activity) param.thisObject;
-                          final View decorView = activity.getWindow().getDecorView();
-                          
+                          final Activity act = (Activity) param.thisObject;
+                          int userDelay = xPrefs.getInt("system_delay", 800);
+
                           new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                              processOrder(decorView);
-                          }, 1500);
+                              processOrder(act);
+                          }, userDelay);
                       }
                   });
               }
 
-              private void processOrder(View root) {
-                  List<Float> distances = new ArrayList<>();
-                  scanForKm(root, distances);
-                  
-                  if (distances.size() >= 2) {
-                      float p = distances.get(0);
-                      float d = distances.get(1);
-                      
+              private void processOrder(Activity act) {
+                  List<Float> kms = new ArrayList<>();
+                  scanKm(act.getWindow().getDecorView(), kms);
+                  if (kms.size() >= 2) {
+                      float p = kms.get(0);
+                      float d = kms.get(1);
                       if (p <= xPrefs.getFloat("pickup_max", 5.0f) && d <= xPrefs.getFloat("drop_max", 10.0f)) {
-                          XposedBridge.log(TAG + "Match! Swiping to accept...");
-                          performSwipe(root);
+                          findAndSwipe(act.getWindow().getDecorView());
                       }
                   }
               }
 
-              private void scanForKm(View view, List<Float> found) {
-                  if (view instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) scanForKm(((ViewGroup) view).getChildAt(i), found);
-                  } else if (view instanceof TextView) {
-                      String t = ((TextView) view).getText().toString().toLowerCase();
-                      if (t.contains("km")) {
-                          Matcher m = Pattern.compile("(\\d+\\.?\\d*)").matcher(t);
-                          if (m.find()) found.add(Float.parseFloat(m.group(1)));
+              private void scanKm(View v, List<Float> found) {
+                  if (v instanceof ViewGroup) {
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scanKm(((ViewGroup) v).getChildAt(i), found);
+                  } else if (v instanceof TextView) {
+                      String t = ((TextView) v).getText().toString();
+                      Matcher m = Pattern.compile("(\\d+\\.?\\d*)").matcher(t);
+                      if (t.contains("km") && m.find()) found.add(Float.parseFloat(m.group(1)));
+                  }
+              }
+
+              private void findAndSwipe(View v) {
+                  if (v instanceof ViewGroup) {
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
+                          View c = ((ViewGroup) v).getChildAt(i);
+                          if (c instanceof TextView && ((TextView) c).getText().toString().equalsIgnoreCase("Accept")) {
+                              doSwipe(c);
+                              return;
+                          }
+                          findAndSwipe(c);
                       }
                   }
               }
 
-              private void performSwipe(View view) {
-                  int width = view.getWidth();
-                  int height = view.getHeight();
-
-                  // Swipe coordinates (Screen ke bottom se thoda upar)
-                  float startX = width * 0.2f;
-                  float endX = width * 0.8f;
-                  float y = height * 0.85f; 
-
-                  long downTime = SystemClock.uptimeMillis();
-                  long eventTime = SystemClock.uptimeMillis();
-
-                  // ACTION_DOWN
-                  view.dispatchTouchEvent(MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_DOWN, startX, y, 0));
-                  
-                  // ACTION_MOVE (Swipe movement)
+              private void doSwipe(View v) {
+                  int[] pos = new int[2];
+                  v.getLocationOnScreen(pos);
+                  float startX = pos[0] + (v.getWidth() * 0.15f);
+                  float endX = pos[0] + (v.getWidth() * 0.85f);
+                  float y = pos[1] + (v.getHeight() / 2f);
+                  long time = SystemClock.uptimeMillis();
+                  v.dispatchTouchEvent(MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, startX, y, 0));
                   for (int i = 1; i <= 10; i++) {
-                      eventTime += 20;
-                      float currentX = startX + (endX - startX) * i / 10f;
-                      view.dispatchTouchEvent(MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_MOVE, currentX, y, 0));
+                      v.dispatchTouchEvent(MotionEvent.obtain(time, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, startX + (endX - startX) * i / 10f, y, 0));
                   }
-
-                  // ACTION_UP
-                  eventTime += 20;
-                  view.dispatchTouchEvent(MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_UP, endX, y, 0));
-                  XposedBridge.log(TAG + "Swipe Action Dispatched");
+                  v.dispatchTouchEvent(MotionEvent.obtain(time, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, endX, y, 0));
               }
           }
           EOF
 
-      - name: Create Resources & UI
+      - name: Create Manifest & Assets
         run: |
-          # (Isme wahi settings UI aur Manifest file rahengi jo pehle thin)
-          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="20dp">
-              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Pickup Km" android:inputType="numberDecimal" />
-              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Drop Km" android:inputType="numberDecimal" />
-              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Enable Swipe" />
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="SAVE" />
-          </LinearLayout>
-          EOF
-
-          cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
-          package com.danish.lsposed;
-          import android.content.Context;
-          import android.content.SharedPreferences;
-          import android.os.Bundle;
-          import android.widget.Button;
-          import android.widget.EditText;
-          import android.widget.Switch;
-          import androidx.appcompat.app.AppCompatActivity;
-          public class SettingsActivity extends AppCompatActivity {
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_settings);
-                  SharedPreferences p = getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                  EditText etP = findViewById(R.id.et_pickup_max);
-                  EditText etD = findViewById(R.id.et_drop_max);
-                  Switch s = findViewById(R.id.switch_enabled);
-                  findViewById(R.id.btn_save).setOnClickListener(v -> {
-                      p.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString())).putFloat("drop_max", Float.parseFloat(etD.getText().toString())).putBoolean("enabled", s.isChecked()).apply();
-                  });
-              }
-          }
-          EOF
-
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="DanishSwipe" android:theme="@style/Theme.AppCompat.Light">
+              <application android:label="Gufran Click Slider" android:theme="@style/Theme.AppCompat.NoActionBar">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Jahez Auto Swipe" />
+                  <meta-data android:name="xposeddescription" android:value="Jahez Auto Slider with SeekBar" />
                   <meta-data android:name="xposedminversion" android:value="82" />
-                  <activity android:name=".SettingsActivity" android:exported="true">
+                  <activity android:name=".SettingsActivity" android:exported="true" android:windowSoftInputMode="stateHidden">
                       <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
                   </activity>
               </application>
           </manifest>
           EOF
+          echo "com.danish.lsposed.MainHook" > app/src/main/assets/xposed_init
 
-          cat > app/src/main/assets/xposed_init << 'EOF'
-          com.danish.lsposed.MainHook
-          EOF
-
-      - name: Setup Gradle
+      - name: Build & Upload
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.4'
-
-      - name: Build APK
-        run: gradle assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - run: gradle assembleDebug
+      - uses: actions/upload-artifact@v4
         with:
-          name: Gufran-Swipe-Module
+          name: Gufran-Slider-Final-V3
           path: app/build/outputs/apk/debug/*.apk
