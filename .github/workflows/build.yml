@@ -53,8 +53,8 @@ jobs:
                   applicationId 'com.danish.auto'
                   minSdk 26
                   targetSdk 34
-                  versionCode 2
-                  versionName '2.0'
+                  versionCode 3
+                  versionName '3.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -686,6 +686,7 @@ jobs:
           import android.app.NotificationManager;
           import android.content.SharedPreferences;
           import android.graphics.Path;
+          import android.graphics.Rect;
           import android.os.Build;
           import android.os.Handler;
           import android.os.Looper;
@@ -693,6 +694,7 @@ jobs:
           import android.util.Log;
           import android.view.accessibility.AccessibilityEvent;
           import android.view.accessibility.AccessibilityNodeInfo;
+          import java.util.ArrayList;
           import java.util.List;
           import java.util.regex.Matcher;
           import java.util.regex.Pattern;
@@ -801,14 +803,16 @@ jobs:
                       float dropMax = prefs.getFloat("drop_max", 10.0f);
                       addDebugLog("📏 Limits - Pickup Max: " + pickupMax + "km, Drop Max: " + dropMax + "km");
 
-                      // Direct search for numbers with "Km"
-                      float pickupKm = extractDistanceByKeyword(root, "From You");
-                      float dropKm = extractDistanceByKeyword(root, "From Pickup");
+                      // Get distances by finding "Km" pattern
+                      float[] distances = extractAllDistances(root);
+                      float pickupKm = distances[0];
+                      float dropKm = distances[1];
 
                       addDebugLog("📊 Distances - Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
 
                       if (pickupKm < 0 || dropKm < 0) {
-                          addDebugLog("⚠️ Could not parse distances");
+                          addDebugLog("⚠️ Could not parse distances, retrying...");
+                          handler.postDelayed(this::checkAndAccept, 800);
                           return;
                       }
 
@@ -828,20 +832,20 @@ jobs:
                           }
                           
                           if (acceptBtn != null) {
-                              DisplayMetrics dm = getResources().getDisplayMetrics();
-                              int screenWidth = dm.widthPixels;
-                              int screenHeight = dm.heightPixels;
-                              int startX = (int)(screenWidth * 0.15f);
-                              int endX = (int)(screenWidth * 0.85f);
-                              int y = (int)(screenHeight * 0.85f);
-
+                              // Get button position and swipe
+                              Rect bounds = new Rect();
+                              acceptBtn.getBoundsInScreen(bounds);
+                              int startX = bounds.left + 20;
+                              int endX = bounds.right - 20;
+                              int y = bounds.centerY();
+                              
                               int swipeDuration = prefs.getInt("swipe_duration", 300);
-                              addDebugLog("👉 Swiping from " + startX + " to " + endX + " at Y=" + y + " (duration: " + swipeDuration + "ms)");
+                              addDebugLog("👉 Swiping from " + startX + " to " + endX + " at Y=" + y);
 
                               final float pKm = pickupKm;
                               final float dKm = dropKm;
 
-                              swipeOnScreen(startX, y, endX, y, swipeDuration, () -> {
+                              performSwipe(startX, y, endX, y, swipeDuration, () -> {
                                   addDebugLog("🎉 ACCEPTED! Pickup: " + pKm + "km, Drop: " + dKm + "km");
                                   prefs.edit().putBoolean("enabled", false).apply();
                                   sendOrderNotification(pKm, dKm);
@@ -860,61 +864,47 @@ jobs:
                   }
               }
 
-              private float extractDistanceByKeyword(AccessibilityNodeInfo root, String keyword) {
-                  // Search for text containing keyword
-                  List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(keyword);
-                  addDebugLog("🔍 Searching for '" + keyword + "', found " + (nodes != null ? nodes.size() : 0) + " nodes");
+              private float[] extractAllDistances(AccessibilityNodeInfo root) {
+                  float[] distances = {-1f, -1f};
+                  List<Float> foundDistances = new ArrayList<>();
                   
-                  if (nodes != null && !nodes.isEmpty()) {
-                      for (AccessibilityNodeInfo node : nodes) {
+                  // Find all nodes containing "Km"
+                  List<AccessibilityNodeInfo> kmNodes = root.findAccessibilityNodeInfosByText("Km");
+                  if (kmNodes == null || kmNodes.isEmpty()) {
+                      kmNodes = root.findAccessibilityNodeInfosByText("km");
+                  }
+                  
+                  if (kmNodes != null && !kmNodes.isEmpty()) {
+                      for (AccessibilityNodeInfo node : kmNodes) {
                           String text = node.getText() != null ? node.getText().toString() : "";
-                          addDebugLog("📝 Text: '" + text + "'");
-                          
-                          // Extract any number from the text
                           float km = extractNumberFromText(text);
-                          if (km > 0) {
-                              addDebugLog("📏 Extracted distance: " + km + " km");
-                              node.recycle();
-                              for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
-                              return km;
+                          if (km > 0 && km < 100) {
+                              foundDistances.add(km);
+                              addDebugLog("📏 Found distance: " + km + " km in text: " + text);
                           }
                           node.recycle();
                       }
-                      for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
                   }
-                  return -1f;
+                  
+                  if (foundDistances.size() >= 1) distances[0] = foundDistances.get(0);
+                  if (foundDistances.size() >= 2) distances[1] = foundDistances.get(1);
+                  
+                  return distances;
               }
 
               private float extractNumberFromText(String text) {
                   if (text == null || text.isEmpty()) return -1f;
                   try {
-                      // Find all digits and decimal points
-                      StringBuilder num = new StringBuilder();
-                      boolean foundDecimal = false;
-                      for (char c : text.toCharArray()) {
-                          if (Character.isDigit(c)) {
-                              num.append(c);
-                          } else if (c == '.' && !foundDecimal) {
-                              num.append(c);
-                              foundDecimal = true;
-                          } else if (num.length() > 0) {
-                              // Stop when we hit non-digit after number
-                              break;
-                          }
+                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)");
+                      Matcher m = p.matcher(text);
+                      if (m.find()) {
+                          return Float.parseFloat(m.group(1).replace(",", "."));
                       }
-                      if (num.length() > 0) {
-                          float value = Float.parseFloat(num.toString());
-                          if (value > 0 && value < 100) {
-                              return value;
-                          }
-                      }
-                  } catch (Exception e) {
-                      addDebugLog("Number parse error: " + e.getMessage());
-                  }
+                  } catch (Exception e) {}
                   return -1f;
               }
 
-              private void swipeOnScreen(int x1, int y1, int x2, int y2, int duration, Runnable onDone) {
+              private void performSwipe(int x1, int y1, int x2, int y2, int duration, Runnable onDone) {
                   Path path = new Path();
                   path.moveTo(x1, y1);
                   path.lineTo(x2, y2);
