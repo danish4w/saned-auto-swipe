@@ -13,10 +13,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Xposed API jar
+      - name: Download Xposed API jar (correct URL)
         run: |
           mkdir -p app/libs
-          curl -L -o app/libs/api-82.jar https://github.com/rovo89/XposedBridge/raw/master/api/api-82.jar
+          curl -L -o app/libs/api-82.jar https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar
 
       - name: Build LSPosed Module
         run: |
@@ -231,11 +231,13 @@ jobs:
           import android.view.ViewGroup;
           import android.widget.Button;
           import android.widget.TextView;
+
           import java.lang.reflect.Method;
           import java.util.ArrayList;
           import java.util.List;
           import java.util.regex.Matcher;
           import java.util.regex.Pattern;
+
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XposedBridge;
           import de.robv.android.xposed.XposedHelpers;
