@@ -385,6 +385,7 @@ jobs:
                   android:layout_marginBottom="10dp"/>
 
               <ScrollView
+                  android:id="@+id/log_scroll"
                   android:layout_width="match_parent"
                   android:layout_height="0dp"
                   android:layout_weight="1"
@@ -612,7 +613,7 @@ jobs:
                   
                   tvLogs = findViewById(R.id.tv_debug_logs);
                   tvStatus = findViewById(R.id.tv_debug_status);
-                  scrollView = findViewById(R.id.scrollView);
+                  scrollView = findViewById(R.id.log_scroll);
                   btnClear = findViewById(R.id.btn_clear_logs);
                   
                   staticTextView = tvLogs;
@@ -641,15 +642,23 @@ jobs:
                       logList.remove(0);
                   }
                   
-                  uiHandler.post(() -> {
-                      if (staticTextView != null) {
-                          StringBuilder sb = new StringBuilder();
-                          for (String line : logList) {
-                              sb.append(line).append("\n");
-                          }
-                          staticTextView.setText(sb.toString());
-                          if (staticScrollView != null) {
-                              staticScrollView.post(() -> staticScrollView.fullScroll(ScrollView.FOCUS_DOWN));
+                  uiHandler.post(new Runnable() {
+                      @Override
+                      public void run() {
+                          if (staticTextView != null) {
+                              StringBuilder sb = new StringBuilder();
+                              for (String line : logList) {
+                                  sb.append(line).append("\n");
+                              }
+                              staticTextView.setText(sb.toString());
+                              if (staticScrollView != null) {
+                                  staticScrollView.post(new Runnable() {
+                                      @Override
+                                      public void run() {
+                                          staticScrollView.fullScroll(ScrollView.FOCUS_DOWN);
+                                      }
+                                  });
+                              }
                           }
                       }
                   });
