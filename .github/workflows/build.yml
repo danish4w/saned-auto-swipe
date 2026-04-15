@@ -1,4 +1,4 @@
-name: Build DanishAuto Final
+name: Build DanishAuto LSPosed Module
 on: workflow_dispatch
 
 jobs:
@@ -13,12 +13,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build Project
+      - name: Build LSPosed Module
         run: |
-          mkdir -p app/src/main/java/com/danish/auto
+          mkdir -p app/src/main/java/com/danish/lsposed
           mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/assets
           mkdir -p gradle/wrapper
 
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
@@ -36,82 +36,68 @@ jobs:
 
           cat > build.gradle << 'EOF'
           buildscript {
-              repositories { google(); mavenCentral() }
-              dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://maven.xposed.info/repository' }
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.3.2'
+              }
           }
           allprojects {
-              repositories { google(); mavenCentral() }
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://maven.xposed.info/repository' }
+              }
           }
           EOF
 
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.danish.auto'
+              namespace 'com.danish.lsposed'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.danish.auto'
+                  applicationId 'com.danish.lsposed'
                   minSdk 26
                   targetSdk 34
-                  versionCode 5
-                  versionName '5.0'
-              }
-              packagingOptions {
-                  exclude 'META-INF/LICENSE.md'
-                  exclude 'META-INF/LICENSE-notice.md'
+                  versionCode 1
+                  versionName '1.0'
               }
           }
           dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
+              compileOnly 'de.robv.android.xposed:api:82'
           }
           EOF
 
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <application
                   android:label="DanishAuto"
+                  android:icon="@android:drawable/ic_menu_share"
                   android:theme="@style/Theme.AppCompat">
+                  <meta-data
+                      android:name="xposedmodule"
+                      android:value="true" />
+                  <meta-data
+                      android:name="xposeddescription"
+                      android:value="Auto Accept Orders for Jahez Driver (No Accessibility Needed)" />
+                  <meta-data
+                      android:name="xposedminversion"
+                      android:value="82" />
                   <activity
-                      android:name=".MainActivity"
+                      android:name=".SettingsActivity"
                       android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
-                  <activity
-                      android:name=".DebugActivity"
-                      android:exported="false"
-                      android:label="Debug Logs"/>
-                  <service
-                      android:name=".AutoSwipeService"
-                      android:exported="true"
-                      android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-                      <intent-filter>
-                          <action android:name="android.accessibilityservice.AccessibilityService"/>
-                      </intent-filter>
-                      <meta-data
-                          android:name="android.accessibilityservice"
-                          android:resource="@xml/acc_config"/>
-                  </service>
               </application>
           </manifest>
-          EOF
-
-          cat > app/src/main/res/xml/acc_config.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <accessibility-service
-              xmlns:android="http://schemas.android.com/apk/res/android"
-              android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
-              android:accessibilityFeedbackType="feedbackGeneric"
-              android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows"
-              android:canPerformGestures="true"
-              android:canRetrieveWindowContent="true"
-              android:notificationTimeout="100"
-              android:packageNames="net.jahez.fleets"/>
           EOF
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
@@ -121,814 +107,275 @@ jobs:
           </resources>
           EOF
 
-          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:background="#121212">
-              <LinearLayout
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:orientation="vertical"
-                  android:gravity="center_horizontal"
-                  android:padding="24dp">
-
-                  <TextView
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="DanishAuto"
-                      android:textSize="24sp"
-                      android:textColor="#FFFFFF"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="6dp"/>
-
-                  <TextView
-                      android:id="@+id/tv_status"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="Service OFF"
-                      android:textSize="15sp"
-                      android:textColor="#FF5555"
-                      android:layout_marginBottom="28dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Pickup Distance (From You)"
-                      android:textColor="#1DB954"
-                      android:textSize="15sp"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="8dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Max (Km)"
-                      android:textColor="#AAAAAA"
-                      android:textSize="13sp"
-                      android:gravity="center"/>
-                  <EditText
-                      android:id="@+id/et_pickup_max"
-                      android:layout_width="200dp"
-                      android:layout_height="wrap_content"
-                      android:inputType="numberDecimal"
-                      android:text="5.0"
-                      android:textColor="#FFFFFF"
-                      android:backgroundTint="#333333"
-                      android:gravity="center"
-                      android:padding="10dp"
-                      android:layout_marginBottom="4dp"/>
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="(0 se is tak ke orders accept honge)"
-                      android:textColor="#777777"
-                      android:textSize="11sp"
-                      android:gravity="center"
-                      android:layout_marginBottom="16dp"/>
-
-                  <View
-                      android:layout_width="match_parent"
-                      android:layout_height="1dp"
-                      android:background="#333333"
-                      android:layout_marginVertical="8dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Drop Distance (From Pickup)"
-                      android:textColor="#FF9500"
-                      android:textSize="15sp"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="8dp"
-                      android:layout_marginTop="8dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Max (Km)"
-                      android:textColor="#AAAAAA"
-                      android:textSize="13sp"
-                      android:gravity="center"/>
-                  <EditText
-                      android:id="@+id/et_drop_max"
-                      android:layout_width="200dp"
-                      android:layout_height="wrap_content"
-                      android:inputType="numberDecimal"
-                      android:text="10.0"
-                      android:textColor="#FFFFFF"
-                      android:backgroundTint="#333333"
-                      android:gravity="center"
-                      android:padding="10dp"
-                      android:layout_marginBottom="4dp"/>
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="(0 se is tak ke orders accept honge)"
-                      android:textColor="#777777"
-                      android:textSize="11sp"
-                      android:gravity="center"
-                      android:layout_marginBottom="16dp"/>
-
-                  <View
-                      android:layout_width="match_parent"
-                      android:layout_height="1dp"
-                      android:background="#333333"
-                      android:layout_marginVertical="8dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Timing Settings"
-                      android:textColor="#FF9500"
-                      android:textSize="15sp"
-                      android:textStyle="bold"
-                      android:layout_marginBottom="8dp"
-                      android:layout_marginTop="8dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Screen Detection Delay (0.1-1 sec)"
-                      android:textColor="#AAAAAA"
-                      android:textSize="13sp"/>
-                  <SeekBar
-                      android:id="@+id/seek_screen_delay"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:max="900"
-                      android:progress="300"
-                      android:layout_marginBottom="4dp"/>
-                  <TextView
-                      android:id="@+id/tv_screen_delay"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="400 ms"
-                      android:textColor="#1DB954"
-                      android:textSize="12sp"
-                      android:layout_marginBottom="8dp"/>
-
-                  <TextView
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Swipe Duration (0.1-1 sec)"
-                      android:textColor="#AAAAAA"
-                      android:textSize="13sp"/>
-                  <SeekBar
-                      android:id="@+id/seek_swipe_duration"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:max="900"
-                      android:progress="200"
-                      android:layout_marginBottom="4dp"/>
-                  <TextView
-                      android:id="@+id/tv_swipe_duration"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="300 ms"
-                      android:textColor="#1DB954"
-                      android:textSize="12sp"
-                      android:layout_marginBottom="16dp"/>
-
-                  <View
-                      android:layout_width="match_parent"
-                      android:layout_height="1dp"
-                      android:background="#333333"
-                      android:layout_marginVertical="8dp"/>
-
-                  <Switch
-                      android:id="@+id/switch_service"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="Auto Accept"
-                      android:textColor="#FFFFFF"
-                      android:textSize="18sp"
-                      android:layout_marginTop="12dp"
-                      android:layout_marginBottom="16dp"/>
-
-                  <Button
-                      android:id="@+id/btn_save"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="OK - Save Settings"
-                      android:textSize="16sp"
-                      android:textStyle="bold"
-                      android:backgroundTint="#1DB954"
-                      android:layout_marginBottom="16dp"/>
-
-                  <Button
-                      android:id="@+id/btn_debug"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="🐛 Debug Logs"
-                      android:textSize="14sp"
-                      android:backgroundTint="#FF9800"
-                      android:layout_marginBottom="16dp"/>
-
-                  <TextView
-                      android:id="@+id/tv_info"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="Pehle Accessibility Service enable karein"
-                      android:textColor="#FFAA00"
-                      android:textSize="13sp"
-                      android:gravity="center"
-                      android:layout_marginBottom="12dp"/>
-
-                  <Button
-                      android:id="@+id/btn_accessibility"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Open Accessibility Settings"
-                      android:backgroundTint="#444444"/>
-
-              </LinearLayout>
-          </ScrollView>
-          EOF
-
-          cat > app/src/main/res/layout/activity_debug.xml << 'EOF'
+          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:orientation="vertical"
-              android:background="#121212"
-              android:padding="16dp">
-
+              android:padding="20dp"
+              android:background="#121212">
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="🐛 Debug Logs"
-                  android:textSize="20sp"
+                  android:text="DanishAuto Settings"
+                  android:textSize="22sp"
                   android:textColor="#FFFFFF"
-                  android:textStyle="bold"
-                  android:layout_gravity="center"
-                  android:layout_marginBottom="10dp"/>
-
+                  android:layout_marginBottom="20dp"/>
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="Real-time status"
-                  android:textSize="12sp"
-                  android:textColor="#AAAAAA"
-                  android:layout_gravity="center"
-                  android:layout_marginBottom="20dp"/>
-
-              <Button
-                  android:id="@+id/btn_clear_logs"
-                  android:layout_width="match_parent"
-                  android:layout_height="40dp"
-                  android:text="Clear Logs"
-                  android:textSize="14sp"
-                  android:backgroundTint="#F44336"
-                  android:layout_marginBottom="10dp"/>
-
-              <ScrollView
-                  android:id="@+id/log_scroll"
-                  android:layout_width="match_parent"
-                  android:layout_height="0dp"
-                  android:layout_weight="1"
-                  android:background="#1E1E1E"
-                  android:padding="10dp">
-
-                  <TextView
-                      android:id="@+id/tv_debug_logs"
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:text="Waiting for events..."
-                      android:textSize="11sp"
-                      android:textColor="#AAAAAA"
-                      android:fontFamily="monospace"
-                      android:lineSpacingExtra="2dp"/>
-
-              </ScrollView>
-
-              <TextView
-                  android:id="@+id/tv_debug_status"
+                  android:text="Pickup Max (km)"
+                  android:textColor="#AAAAAA"/>
+              <EditText
+                  android:id="@+id/et_pickup_max"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:text="Status: Listening..."
-                  android:textSize="11sp"
-                  android:textColor="#FF9800"
-                  android:gravity="center"
-                  android:layout_marginTop="8dp"/>
-
+                  android:inputType="numberDecimal"
+                  android:text="5.0"
+                  android:textColor="#FFFFFF"
+                  android:background="#333333"
+                  android:padding="10dp"
+                  android:layout_marginBottom="16dp"/>
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Drop Max (km)"
+                  android:textColor="#AAAAAA"/>
+              <EditText
+                  android:id="@+id/et_drop_max"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:inputType="numberDecimal"
+                  android:text="10.0"
+                  android:textColor="#FFFFFF"
+                  android:background="#333333"
+                  android:padding="10dp"
+                  android:layout_marginBottom="16dp"/>
+              <Switch
+                  android:id="@+id/switch_enabled"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Auto Accept"
+                  android:textColor="#FFFFFF"
+                  android:layout_marginBottom="20dp"/>
+              <Button
+                  android:id="@+id/btn_save"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="Save"
+                  android:backgroundTint="#4CAF50"/>
           </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/danish/auto/MainActivity.java << 'EOF'
-          package com.danish.auto;
+          cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
+          package com.danish.lsposed;
 
-          import android.content.Intent;
           import android.content.SharedPreferences;
           import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.Looper;
-          import android.provider.Settings;
-          import android.view.inputmethod.InputMethodManager;
           import android.widget.Button;
           import android.widget.EditText;
-          import android.widget.SeekBar;
           import android.widget.Switch;
-          import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
 
-          public class MainActivity extends AppCompatActivity {
-
-              public static TextView globalStatus;
-              private Switch switchService;
-              private EditText etPickupMax, etDropMax;
-              private TextView tvStatus, tvInfo, tvScreenDelay, tvSwipeDuration;
-              private SeekBar seekScreenDelay, seekSwipeDuration;
-              private Button btnSave, btnAccessibility, btnDebug;
+          public class SettingsActivity extends AppCompatActivity {
               private SharedPreferences prefs;
+              private EditText etPickupMax, etDropMax;
+              private Switch switchEnabled;
+              private Button btnSave;
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_main);
-
+                  setContentView(R.layout.activity_settings);
                   prefs = getSharedPreferences("danish_prefs", MODE_PRIVATE);
-                  switchService = findViewById(R.id.switch_service);
                   etPickupMax = findViewById(R.id.et_pickup_max);
                   etDropMax = findViewById(R.id.et_drop_max);
-                  tvStatus = findViewById(R.id.tv_status);
-                  tvInfo = findViewById(R.id.tv_info);
-                  tvScreenDelay = findViewById(R.id.tv_screen_delay);
-                  tvSwipeDuration = findViewById(R.id.tv_swipe_duration);
-                  seekScreenDelay = findViewById(R.id.seek_screen_delay);
-                  seekSwipeDuration = findViewById(R.id.seek_swipe_duration);
+                  switchEnabled = findViewById(R.id.switch_enabled);
                   btnSave = findViewById(R.id.btn_save);
-                  btnAccessibility = findViewById(R.id.btn_accessibility);
-                  btnDebug = findViewById(R.id.btn_debug);
-                  
-                  globalStatus = tvStatus;
 
                   etPickupMax.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
                   etDropMax.setText(String.valueOf(prefs.getFloat("drop_max", 10.0f)));
-                  
-                  int savedScreenDelay = prefs.getInt("screen_delay", 400);
-                  int savedSwipeDuration = prefs.getInt("swipe_duration", 300);
-                  
-                  if (savedScreenDelay < 100) savedScreenDelay = 400;
-                  if (savedScreenDelay > 1000) savedScreenDelay = 400;
-                  if (savedSwipeDuration < 100) savedSwipeDuration = 300;
-                  if (savedSwipeDuration > 1000) savedSwipeDuration = 300;
-                  
-                  seekScreenDelay.setProgress(savedScreenDelay - 100);
-                  seekSwipeDuration.setProgress(savedSwipeDuration - 100);
-                  tvScreenDelay.setText(savedScreenDelay + " ms");
-                  tvSwipeDuration.setText(savedSwipeDuration + " ms");
-
-                  seekScreenDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                      @Override
-                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                          int value = progress + 100;
-                          tvScreenDelay.setText(value + " ms");
-                          if (fromUser) prefs.edit().putInt("screen_delay", value).apply();
-                      }
-                      @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-                      @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-                  });
-                  
-                  seekSwipeDuration.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                      @Override
-                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                          int value = progress + 100;
-                          tvSwipeDuration.setText(value + " ms");
-                          if (fromUser) prefs.edit().putInt("swipe_duration", value).apply();
-                      }
-                      @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-                      @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-                  });
-
-                  switchService.setOnCheckedChangeListener((btn, isChecked) ->
-                      updateStatus(isChecked)
-                  );
+                  switchEnabled.setChecked(prefs.getBoolean("enabled", false));
 
                   btnSave.setOnClickListener(v -> {
-                      float pMax, dMax;
-                      try { pMax = Float.parseFloat(etPickupMax.getText().toString()); } catch (Exception e) { pMax = 5.0f; }
-                      try { dMax = Float.parseFloat(etDropMax.getText().toString()); } catch (Exception e) { dMax = 10.0f; }
-
+                      float pickup, drop;
+                      try { pickup = Float.parseFloat(etPickupMax.getText().toString()); } catch(Exception e) { pickup = 5.0f; }
+                      try { drop = Float.parseFloat(etDropMax.getText().toString()); } catch(Exception e) { drop = 10.0f; }
                       prefs.edit()
-                          .putFloat("pickup_max", pMax)
-                          .putFloat("drop_max", dMax)
-                          .putBoolean("enabled", switchService.isChecked())
+                          .putFloat("pickup_max", pickup)
+                          .putFloat("drop_max", drop)
+                          .putBoolean("enabled", switchEnabled.isChecked())
                           .apply();
-
-                      etPickupMax.clearFocus();
-                      etDropMax.clearFocus();
-                      InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                      if (imm != null) {
-                          android.view.View view = getCurrentFocus();
-                          if (view == null) view = new android.view.View(this);
-                          imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
-                      }
-
-                      Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
-                      tvStatus.setText("Settings Saved!");
-                      tvStatus.setTextColor(0xFF1DB954);
-                      new Handler(Looper.getMainLooper()).postDelayed(() ->
-                          updateStatus(switchService.isChecked()), 1500);
+                      Toast.makeText(this, "Settings Saved", Toast.LENGTH_SHORT).show();
                   });
-
-                  btnAccessibility.setOnClickListener(v ->
-                      startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                  );
-                  
-                  btnDebug.setOnClickListener(v ->
-                      startActivity(new Intent(MainActivity.this, DebugActivity.class))
-                  );
-              }
-
-              private void updateStatus(boolean enabled) {
-                  if (enabled) {
-                      tvStatus.setText("Service ON - Waiting for order...");
-                      tvStatus.setTextColor(0xFF1DB954);
-                  } else {
-                      tvStatus.setText("Service OFF");
-                      tvStatus.setTextColor(0xFFFF5555);
-                  }
-              }
-
-              @Override
-              protected void onResume() {
-                  super.onResume();
-                  boolean enabled = prefs.getBoolean("enabled", false);
-                  switchService.setChecked(enabled);
-                  updateStatus(enabled);
-                  if (isAccessibilityEnabled()) {
-                      tvInfo.setText("Accessibility Service: Active");
-                      tvInfo.setTextColor(0xFF1DB954);
-                  } else {
-                      tvInfo.setText("Pehle Accessibility Service enable karein!");
-                      tvInfo.setTextColor(0xFFFFAA00);
-                  }
-              }
-
-              private boolean isAccessibilityEnabled() {
-                  try {
-                      String s = Settings.Secure.getString(getContentResolver(),
-                          Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-                      return s != null && s.contains(getPackageName());
-                  } catch (Exception e) { return false; }
               }
           }
           EOF
 
-          cat > app/src/main/java/com/danish/auto/DebugActivity.java << 'EOF'
-          package com.danish.auto;
-
-          import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.Looper;
-          import android.widget.Button;
-          import android.widget.ScrollView;
-          import android.widget.TextView;
-          import androidx.appcompat.app.AppCompatActivity;
-          import java.text.SimpleDateFormat;
-          import java.util.ArrayList;
-          import java.util.Date;
-          import java.util.List;
-          import java.util.Locale;
-
-          public class DebugActivity extends AppCompatActivity {
-              
-              private TextView tvLogs, tvStatus;
-              private ScrollView scrollView;
-              private Button btnClear;
-              private static List<String> logList = new ArrayList<>();
-              private static Handler uiHandler = new Handler(Looper.getMainLooper());
-              private static TextView staticTextView;
-              private static ScrollView staticScrollView;
-              
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_debug);
-                  
-                  tvLogs = findViewById(R.id.tv_debug_logs);
-                  tvStatus = findViewById(R.id.tv_debug_status);
-                  scrollView = findViewById(R.id.log_scroll);
-                  btnClear = findViewById(R.id.btn_clear_logs);
-                  
-                  staticTextView = tvLogs;
-                  staticScrollView = scrollView;
-                  
-                  updateLogDisplay();
-                  
-                  btnClear.setOnClickListener(v -> {
-                      logList.clear();
-                      updateLogDisplay();
-                      addLog("--- Logs cleared ---");
-                  });
-                  
-                  tvStatus.setText("Status: Active - Waiting for events");
-              }
-              
-              public static void addLog(final String message) {
-                  String timestamp = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(new Date());
-                  final String logLine = timestamp + " " + message;
-                  
-                  logList.add(logLine);
-                  
-                  while (logList.size() > 500) {
-                      logList.remove(0);
-                  }
-                  
-                  uiHandler.post(new Runnable() {
-                      @Override
-                      public void run() {
-                          if (staticTextView != null) {
-                              StringBuilder sb = new StringBuilder();
-                              for (String line : logList) {
-                                  sb.append(line).append("\n");
-                              }
-                              staticTextView.setText(sb.toString());
-                              if (staticScrollView != null) {
-                                  staticScrollView.post(new Runnable() {
-                                      @Override
-                                      public void run() {
-                                          staticScrollView.fullScroll(ScrollView.FOCUS_DOWN);
-                                      }
-                                  });
-                              }
-                          }
-                      }
-                  });
-              }
-              
-              private void updateLogDisplay() {
-                  if (tvLogs != null) {
-                      StringBuilder sb = new StringBuilder();
-                      for (String line : logList) {
-                          sb.append(line).append("\n");
-                      }
-                      if (sb.length() == 0) {
-                          sb.append("Waiting for events...\n\nMake sure:\n1. Accessibility Service is ON\n2. Auto Accept is ON\n3. Jahez Driver app is open\n4. Orders are coming");
-                      }
-                      tvLogs.setText(sb.toString());
-                  }
-              }
-          }
+          cat > app/src/main/assets/xposed_init << 'EOF'
+          com.danish.lsposed.MainHook
           EOF
 
-          cat > app/src/main/java/com/danish/auto/AutoSwipeService.java << 'EOF'
-          package com.danish.auto;
+          cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
+          package com.danish.lsposed;
 
-          import android.accessibilityservice.AccessibilityService;
-          import android.accessibilityservice.GestureDescription;
           import android.app.Notification;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
+          import android.content.Context;
           import android.content.SharedPreferences;
-          import android.graphics.Path;
-          import android.graphics.Rect;
           import android.os.Build;
+          import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
-          import android.util.DisplayMetrics;
-          import android.util.Log;
-          import android.view.accessibility.AccessibilityEvent;
-          import android.view.accessibility.AccessibilityNodeInfo;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.Button;
+          import android.widget.TextView;
           import java.util.ArrayList;
           import java.util.List;
           import java.util.regex.Matcher;
           import java.util.regex.Pattern;
+          import de.robv.android.xposed.XC_MethodHook;
+          import de.robv.android.xposed.XposedBridge;
+          import de.robv.android.xposed.XposedHelpers;
+          import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
-          public class AutoSwipeService extends AccessibilityService {
-
+          public class MainHook implements de.robv.android.xposed.IXposedHookLoadPackage {
               private static final String TAG = "DanishAuto";
-              private static final String CHANNEL_ID = "danish_auto_channel";
-              private static final int NOTIF_ID = 1001;
-              private SharedPreferences prefs;
-              private final Handler handler = new Handler(Looper.getMainLooper());
-              private boolean isProcessing = false;
-
-              private void addDebugLog(String message) {
-                  Log.d(TAG, message);
-                  DebugActivity.addLog(message);
-              }
+              private static final String PACKAGE_NAME = "net.jahez.fleets";
+              private static SharedPreferences prefs;
+              private static Handler uiHandler = new Handler(Looper.getMainLooper());
+              private static boolean isProcessing = false;
 
               @Override
-              public void onServiceConnected() {
-                  super.onServiceConnected();
-                  prefs = getSharedPreferences("danish_prefs", MODE_PRIVATE);
-                  createNotificationChannel();
-                  addDebugLog("✅ Service Connected - DanishAuto");
-              }
-
-              private void createNotificationChannel() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      NotificationChannel channel = new NotificationChannel(
-                          CHANNEL_ID,
-                          "DanishAuto Notifications",
-                          NotificationManager.IMPORTANCE_HIGH
-                      );
-                      channel.setDescription("Order accept notifications");
-                      channel.enableVibration(true);
-                      NotificationManager nm = getSystemService(NotificationManager.class);
-                      if (nm != null) nm.createNotificationChannel(channel);
-                  }
-              }
-
-              private void sendOrderNotification(float pickupKm, float dropKm) {
-                  try {
-                      NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                      if (nm == null) return;
-                      Notification.Builder builder;
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                          builder = new Notification.Builder(this, CHANNEL_ID);
-                      } else {
-                          builder = new Notification.Builder(this);
+              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
+                  if (!lpparam.packageName.equals(PACKAGE_NAME)) return;
+                  XposedBridge.log(TAG + " Hooked into Jahez Driver");
+                  Class<?> orderActivity = XposedHelpers.findClass("com.jahez.fleets.ui.order.OrderActivity", lpparam.classLoader);
+                  XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
+                      @Override
+                      protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                          Context context = (Context) param.thisObject;
+                          prefs = context.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                          if (!prefs.getBoolean("enabled", false)) return;
+                          uiHandler.postDelayed(() -> {
+                              try { processOrder(context); }
+                              catch (Throwable t) { XposedBridge.log(TAG + " Error: " + t.getMessage()); }
+                          }, 800);
                       }
-                      builder.setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setContentTitle("✅ Order Accepted!")
-                          .setContentText("Pickup: " + pickupKm + " km | Drop: " + dropKm + " km")
-                          .setAutoCancel(true)
-                          .setPriority(Notification.PRIORITY_HIGH);
-                      nm.notify(NOTIF_ID, builder.build());
-                  } catch (Exception e) {
-                      addDebugLog("❌ Notification error: " + e.getMessage());
-                  }
+                  });
               }
 
-              @Override
-              public void onAccessibilityEvent(AccessibilityEvent event) {
-                  if (prefs == null) return;
-                  if (!prefs.getBoolean("enabled", false)) return;
+              private void processOrder(Context context) {
                   if (isProcessing) return;
-
-                  String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
-                  if (!pkg.equals("net.jahez.fleets")) return;
-
-                  addDebugLog("📱 Order event detected");
-
                   isProcessing = true;
-                  int delay = prefs.getInt("screen_delay", 500);
-                  handler.postDelayed(() -> {
-                      try {
-                          checkAndAccept();
-                      } catch (Exception e) {
-                          addDebugLog("❌ Error: " + e.getMessage());
-                      } finally {
-                          isProcessing = false;
-                      }
-                  }, delay);
-              }
-
-              private void checkAndAccept() {
-                  AccessibilityNodeInfo root = null;
-                  
-                  // Retry to get root (MIUI fix)
-                  for (int i = 0; i < 10; i++) {
-                      root = getRootInActiveWindow();
-                      if (root != null) break;
-                      try { Thread.sleep(200); } catch (Exception e) {}
-                  }
-                  
-                  if (root == null) {
-                      addDebugLog("❌ Root is null after 10 attempts");
-                      return;
-                  }
-                  
-                  addDebugLog("✅ Root obtained");
-                  
                   try {
-                      // Check for "New Order" text
-                      boolean hasNewOrder = false;
-                      List<AccessibilityNodeInfo> newOrderNodes = root.findAccessibilityNodeInfosByText("New Order");
-                      if (newOrderNodes != null && !newOrderNodes.isEmpty()) {
-                          hasNewOrder = true;
-                          for (AccessibilityNodeInfo n : newOrderNodes) n.recycle();
-                      }
-                      
-                      if (!hasNewOrder) {
-                          addDebugLog("❌ Not an order screen (no 'New Order')");
-                          return;
-                      }
-                      addDebugLog("✅ Order screen confirmed");
-
-                      // Get distances from settings
+                      View decorView = getDecorView();
+                      if (decorView == null) return;
+                      // Extract distances: first number+Km = pickup, second = drop
+                      List<Float> distances = new ArrayList<>();
+                      scanForKm(distances, decorView);
+                      if (distances.size() < 2) return;
+                      float pickupKm = distances.get(0);
+                      float dropKm = distances.get(1);
                       float pickupMax = prefs.getFloat("pickup_max", 5.0f);
                       float dropMax = prefs.getFloat("drop_max", 10.0f);
-                      addDebugLog("📏 Limits - Pickup Max: " + pickupMax + "km, Drop Max: " + dropMax + "km");
-
-                      // Extract distances from screen
-                      float pickupKm = extractDistance(root, "From You");
-                      float dropKm = extractDistance(root, "From Pickup");
-
-                      addDebugLog("📊 Distances - Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
-
-                      if (pickupKm < 0 || dropKm < 0) {
-                          addDebugLog("⚠️ Could not parse distances");
-                          return;
-                      }
-
+                      XposedBridge.log(TAG + " Distances: P " + pickupKm + " D " + dropKm + " | Limits: P " + pickupMax + " D " + dropMax);
                       if (pickupKm <= pickupMax && dropKm <= dropMax) {
-                          addDebugLog("✅ Within limits, accepting order");
-                          performSwipeAccept(root);
-                          sendOrderNotification(pickupKm, dropKm);
-                          prefs.edit().putBoolean("enabled", false).apply();
-                      } else {
-                          addDebugLog("❌ Rejected: distance out of range");
+                          XposedBridge.log(TAG + " Accepting order");
+                          clickAcceptButton(decorView);
+                          sendNotification(context, pickupKm, dropKm);
                       }
                   } catch (Exception e) {
-                      addDebugLog("❌ Exception: " + e.getMessage());
-                  } finally {
-                      if (root != null) root.recycle();
-                  }
+                      XposedBridge.log(TAG + " Error: " + e.getMessage());
+                  } finally { isProcessing = false; }
               }
 
-              private float extractDistance(AccessibilityNodeInfo root, String keyword) {
-                  List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(keyword);
-                  if (nodes != null && !nodes.isEmpty()) {
-                      for (AccessibilityNodeInfo node : nodes) {
-                          String text = node.getText() != null ? node.getText().toString() : "";
-                          addDebugLog("🔍 Found text: " + text);
-                          
-                          // Extract number from text like "1.5 Km From You"
-                          Pattern p = Pattern.compile("(\\d+\\.?\\d*)");
-                          Matcher m = p.matcher(text);
-                          if (m.find()) {
-                              float km = Float.parseFloat(m.group(1).replace(",", "."));
-                              if (km > 0 && km < 100) {
-                                  node.recycle();
-                                  for (AccessibilityNodeInfo n : nodes) n.recycle();
-                                  return km;
+              private View getDecorView() {
+                  try {
+                      Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+                      Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
+                      Object activities = activityThreadClass.getDeclaredField("mActivities").get(activityThread);
+                      // android.util.ArrayMap is used internally; we access via reflection safely
+                      if (activities instanceof android.util.ArrayMap) {
+                          android.util.ArrayMap<?,?> map = (android.util.ArrayMap<?,?>) activities;
+                          for (Object record : map.values()) {
+                              Object activity = record.getClass().getDeclaredField("activity").get(record);
+                              if (activity instanceof android.app.Activity) {
+                                  return ((android.app.Activity) activity).getWindow().getDecorView();
                               }
                           }
-                          node.recycle();
                       }
-                      for (AccessibilityNodeInfo n : nodes) n.recycle();
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + " getDecorView error: " + e.getMessage());
                   }
-                  return -1f;
+                  return null;
               }
 
-              private void performSwipeAccept(AccessibilityNodeInfo root) {
-                  // First try to find Accept button
-                  String[] acceptTexts = {"Accept", "ACCEPT", "قبول"};
-                  AccessibilityNodeInfo acceptBtn = null;
-                  
-                  for (String text : acceptTexts) {
-                      List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(text);
-                      if (nodes != null && !nodes.isEmpty()) {
-                          acceptBtn = nodes.get(0);
-                          addDebugLog("🔘 Found accept button: " + text);
-                          break;
+              private void scanForKm(List<Float> out, View view) {
+                  if (view == null) return;
+                  if (view instanceof TextView) {
+                      String text = ((TextView) view).getText().toString();
+                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
+                      Matcher m = p.matcher(text);
+                      if (m.find()) {
+                          try {
+                              float val = Float.parseFloat(m.group(1).replace(",", "."));
+                              if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
+                          } catch(Exception e) {}
+                      }
+                  } else if (view instanceof ViewGroup) {
+                      ViewGroup group = (ViewGroup) view;
+                      for (int i = 0; i < group.getChildCount(); i++) {
+                          scanForKm(out, group.getChildAt(i));
                       }
                   }
-                  
-                  int startX, endX, y;
-                  int duration = prefs.getInt("swipe_duration", 300);
-                  
-                  if (acceptBtn != null) {
-                      // Use button bounds
-                      Rect bounds = new Rect();
-                      acceptBtn.getBoundsInScreen(bounds);
-                      startX = bounds.left + 20;
-                      endX = bounds.right - 20;
-                      y = bounds.centerY();
-                      acceptBtn.recycle();
-                      addDebugLog("👉 Swiping on button at Y=" + y);
+              }
+
+              private void clickAcceptButton(View root) {
+                  Button btn = findAcceptButton(root);
+                  if (btn != null) {
+                      XposedBridge.log(TAG + " Clicking Accept button");
+                      btn.performClick();
                   } else {
-                      // Fallback: swipe at bottom of screen
-                      DisplayMetrics dm = getResources().getDisplayMetrics();
-                      int screenWidth = dm.widthPixels;
-                      int screenHeight = dm.heightPixels;
-                      startX = (int)(screenWidth * 0.2);
-                      endX = (int)(screenWidth * 0.8);
-                      y = (int)(screenHeight * 0.85);
-                      addDebugLog("👉 Fallback swipe at bottom Y=" + y);
+                      XposedBridge.log(TAG + " Accept button not found");
                   }
-                  
-                  Path path = new Path();
-                  path.moveTo(startX, y);
-                  path.lineTo(endX, y);
-                  
-                  GestureDescription gesture = new GestureDescription.Builder()
-                      .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))
-                      .build();
-                  
-                  dispatchGesture(gesture, new GestureResultCallback() {
-                      @Override
-                      public void onCompleted(GestureDescription g) {
-                          addDebugLog("✅ Swipe completed");
-                      }
-                      @Override
-                      public void onCancelled(GestureDescription g) {
-                          addDebugLog("❌ Swipe cancelled");
-                      }
-                  }, null);
               }
 
-              @Override
-              public void onInterrupt() {
-                  addDebugLog("⚠️ Service interrupted");
-                  isProcessing = false;
+              private Button findAcceptButton(View view) {
+                  if (view instanceof Button) {
+                      String text = ((Button) view).getText().toString();
+                      if (text.equals("Accept") || text.equals("ACCEPT") || text.equals("قبول")) return (Button) view;
+                  }
+                  if (view instanceof ViewGroup) {
+                      ViewGroup group = (ViewGroup) view;
+                      for (int i = 0; i < group.getChildCount(); i++) {
+                          Button b = findAcceptButton(group.getChildAt(i));
+                          if (b != null) return b;
+                      }
+                  }
+                  return null;
+              }
+
+              private void sendNotification(Context ctx, float p, float d) {
+                  try {
+                      NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+                      if (Build.VERSION.SDK_INT >= 26) {
+                          NotificationChannel ch = new NotificationChannel("danish_ch", "DanishAuto", NotificationManager.IMPORTANCE_HIGH);
+                          nm.createNotificationChannel(ch);
+                      }
+                      Notification.Builder builder = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(ctx, "danish_ch") : new Notification.Builder(ctx);
+                      builder.setSmallIcon(android.R.drawable.ic_dialog_info)
+                             .setContentTitle("✅ Order Accepted")
+                             .setContentText("Pickup: " + p + "km, Drop: " + d + "km")
+                             .setAutoCancel(true);
+                      nm.notify(1001, builder.build());
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + " Notification error: " + e.getMessage());
+                  }
               }
           }
           EOF
@@ -939,5 +386,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DanishAuto
+          name: DanishAuto-LSPosed
           path: app/build/outputs/apk/debug/*.apk
