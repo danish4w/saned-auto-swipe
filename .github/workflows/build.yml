@@ -13,11 +13,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Xposed API jar
-        run: |
-          mkdir -p app/libs
-          curl -L -o app/libs/api-82.jar https://github.com/rovo89/XposedBridge/raw/master/api/api-82.jar
-
       - name: Build LSPosed Module
         run: |
           mkdir -p app/src/main/java/com/danish/lsposed
@@ -41,11 +36,19 @@ jobs:
 
           cat > build.gradle << 'EOF'
           buildscript {
-              repositories { google(); mavenCentral() }
-              dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.3.2'
+              }
           }
           allprojects {
-              repositories { google(); mavenCentral() }
+              repositories {
+                  google()
+                  mavenCentral()
+              }
           }
           EOF
 
@@ -63,7 +66,7 @@ jobs:
               }
           }
           dependencies {
-              compileOnly files('libs/api-82.jar')
+              compileOnly 'de.robv.android.xposed:api:82'
           }
           EOF
 
@@ -79,7 +82,7 @@ jobs:
                       android:value="true" />
                   <meta-data
                       android:name="xposeddescription"
-                      android:value="Auto Accept Orders for Jahez Driver (No Accessibility Needed)" />
+                      android:value="Auto Accept Orders for Jahez Driver (Swipe Support)" />
                   <meta-data
                       android:name="xposedminversion"
                       android:value="82" />
@@ -93,6 +96,13 @@ jobs:
                   </activity>
               </application>
           </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="Theme.AppCompat" parent="android:Theme.DeviceDefault" />
+          </resources>
           EOF
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
@@ -225,6 +235,8 @@ jobs:
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
+          import android.os.SystemClock;
+          import android.view.MotionEvent;
           import android.view.View;
           import android.view.ViewGroup;
           import android.widget.Button;
@@ -279,8 +291,8 @@ jobs:
                       float dropMax = prefs.getFloat("drop_max", 10.0f);
                       XposedBridge.log(TAG + " Distances: P " + pickupKm + " D " + dropKm + " | Limits: P " + pickupMax + " D " + dropMax);
                       if (pickupKm <= pickupMax && dropKm <= dropMax) {
-                          XposedBridge.log(TAG + " Accepting order");
-                          clickAcceptButton(decorView);
+                          XposedBridge.log(TAG + " Accepting order - performing swipe");
+                          performSwipeOnAcceptButton(decorView);
                           sendNotification(context, pickupKm, dropKm);
                       }
                   } catch (Exception e) {
@@ -328,13 +340,58 @@ jobs:
                   }
               }
 
-              private void clickAcceptButton(View root) {
-                  Button btn = findAcceptButton(root);
-                  if (btn != null) {
-                      XposedBridge.log(TAG + " Clicking Accept button");
-                      btn.performClick();
+              private void performSwipeOnAcceptButton(View root) {
+                  // Try to find Accept button first
+                  Button acceptBtn = findAcceptButton(root);
+                  int startX, endX, y;
+                  int screenWidth = root.getResources().getDisplayMetrics().widthPixels;
+                  int screenHeight = root.getResources().getDisplayMetrics().heightPixels;
+
+                  if (acceptBtn != null) {
+                      int[] location = new int[2];
+                      acceptBtn.getLocationOnScreen(location);
+                      startX = location[0] + 20;
+                      endX = location[0] + acceptBtn.getWidth() - 20;
+                      y = location[1] + acceptBtn.getHeight() / 2;
+                      XposedBridge.log(TAG + " Swiping on button at: " + startX + " to " + endX + ", Y=" + y);
                   } else {
-                      XposedBridge.log(TAG + " Accept button not found");
+                      // Fallback: swipe at bottom of screen
+                      startX = (int)(screenWidth * 0.2);
+                      endX = (int)(screenWidth * 0.8);
+                      y = (int)(screenHeight * 0.85);
+                      XposedBridge.log(TAG + " Fallback swipe at bottom");
+                  }
+
+                  try {
+                      // Inject touch events for swipe
+                      Class<?> inputManagerClass = Class.forName("android.hardware.input.InputManager");
+                      Method getInstance = inputManagerClass.getMethod("getInstance");
+                      Object inputManager = getInstance.invoke(null);
+                      Method injectInputEvent = inputManagerClass.getMethod("injectInputEvent", MotionEvent.class, int.class);
+
+                      long downTime = SystemClock.uptimeMillis();
+                      // DOWN event
+                      MotionEvent downEvent = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, startX, y, 0);
+                      injectInputEvent.invoke(inputManager, downEvent, 0);
+                      downEvent.recycle();
+
+                      // MOVE event (after 50ms)
+                      Thread.sleep(50);
+                      long moveTime = SystemClock.uptimeMillis();
+                      MotionEvent moveEvent = MotionEvent.obtain(downTime, moveTime, MotionEvent.ACTION_MOVE, endX, y, 0);
+                      injectInputEvent.invoke(inputManager, moveEvent, 0);
+                      moveEvent.recycle();
+
+                      // UP event (after 100ms total)
+                      Thread.sleep(50);
+                      long upTime = SystemClock.uptimeMillis();
+                      MotionEvent upEvent = MotionEvent.obtain(downTime, upTime, MotionEvent.ACTION_UP, endX, y, 0);
+                      injectInputEvent.invoke(inputManager, upEvent, 0);
+                      upEvent.recycle();
+
+                      XposedBridge.log(TAG + " Swipe injected successfully");
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + " Swipe failed: " + e.getMessage());
                   }
               }
 
