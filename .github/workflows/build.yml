@@ -1,4 +1,4 @@
-name: Build Saned Auto Swipe with Debug
+name: Build DanishAuto
 on: workflow_dispatch
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
 
       - name: Build Project
         run: |
-          mkdir -p app/src/main/java/com/saned/autoswipe
+          mkdir -p app/src/main/java/com/danish/auto
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
@@ -47,14 +47,14 @@ jobs:
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.saned.autoswipe'
+              namespace 'com.danish.auto'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.saned.autoswipe'
+                  applicationId 'com.danish.auto'
                   minSdk 26
                   targetSdk 34
-                  versionCode 9
-                  versionName '9.0'
+                  versionCode 1
+                  versionName '1.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -72,7 +72,7 @@ jobs:
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <application
-                  android:label="Saned Auto"
+                  android:label="DanishAuto"
                   android:theme="@style/Theme.AppCompat">
                   <activity
                       android:name=".MainActivity"
@@ -117,7 +117,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">Saned Auto</string>
+              <string name="app_name">DanishAuto</string>
           </resources>
           EOF
 
@@ -137,7 +137,7 @@ jobs:
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="Saned Auto Swipe"
+                      android:text="DanishAuto"
                       android:textSize="24sp"
                       android:textColor="#FFFFFF"
                       android:textStyle="bold"
@@ -369,7 +369,7 @@ jobs:
               <TextView
                   android:layout_width="wrap_content"
                   android:layout_height="wrap_content"
-                  android:text="Real-time status from AutoSwipe Service"
+                  android:text="Real-time status"
                   android:textSize="12sp"
                   android:textColor="#AAAAAA"
                   android:layout_gravity="center"
@@ -396,7 +396,7 @@ jobs:
                       android:id="@+id/tv_debug_logs"
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:text="Waiting for events...\n\nMake sure:\n1. Accessibility Service is ON\n2. Auto Accept is ON\n3. Saned Driver app is open\n4. Orders are coming"
+                      android:text="Waiting for events..."
                       android:textSize="11sp"
                       android:textColor="#AAAAAA"
                       android:fontFamily="monospace"
@@ -417,8 +417,8 @@ jobs:
           </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/saned/autoswipe/MainActivity.java << 'EOF'
-          package com.saned.autoswipe;
+          cat > app/src/main/java/com/danish/auto/MainActivity.java << 'EOF'
+          package com.danish.auto;
 
           import android.content.Intent;
           import android.content.SharedPreferences;
@@ -450,7 +450,7 @@ jobs:
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
 
-                  prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  prefs = getSharedPreferences("danish_prefs", MODE_PRIVATE);
                   switchService = findViewById(R.id.switch_service);
                   etPickupMax = findViewById(R.id.et_pickup_max);
                   etDropMax = findViewById(R.id.et_drop_max);
@@ -466,7 +466,6 @@ jobs:
                   
                   globalStatus = tvStatus;
 
-                  // Load saved values
                   etPickupMax.setText(String.valueOf(prefs.getFloat("pickup_max", 5.0f)));
                   etDropMax.setText(String.valueOf(prefs.getFloat("drop_max", 10.0f)));
                   
@@ -580,8 +579,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/saned/autoswipe/DebugActivity.java << 'EOF'
-          package com.saned.autoswipe;
+          cat > app/src/main/java/com/danish/auto/DebugActivity.java << 'EOF'
+          package com.danish.auto;
 
           import android.os.Bundle;
           import android.os.Handler;
@@ -619,7 +618,6 @@ jobs:
                   staticTextView = tvLogs;
                   staticScrollView = scrollView;
                   
-                  // Load existing logs
                   updateLogDisplay();
                   
                   btnClear.setOnClickListener(v -> {
@@ -637,7 +635,6 @@ jobs:
                   
                   logList.add(logLine);
                   
-                  // Keep last 500 logs
                   while (logList.size() > 500) {
                       logList.remove(0);
                   }
@@ -679,8 +676,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/saned/autoswipe/AutoSwipeService.java << 'EOF'
-          package com.saned.autoswipe;
+          cat > app/src/main/java/com/danish/auto/AutoSwipeService.java << 'EOF'
+          package com.danish.auto;
 
           import android.accessibilityservice.AccessibilityService;
           import android.accessibilityservice.GestureDescription;
@@ -697,14 +694,17 @@ jobs:
           import android.view.accessibility.AccessibilityEvent;
           import android.view.accessibility.AccessibilityNodeInfo;
           import java.util.List;
+          import java.util.regex.Matcher;
+          import java.util.regex.Pattern;
 
           public class AutoSwipeService extends AccessibilityService {
 
-              private static final String TAG = "SanedAuto";
-              private static final String CHANNEL_ID = "saned_auto_channel";
+              private static final String TAG = "DanishAuto";
+              private static final String CHANNEL_ID = "danish_auto_channel";
               private static final int NOTIF_ID = 1001;
               private SharedPreferences prefs;
               private final Handler handler = new Handler(Looper.getMainLooper());
+              private int retryCount = 0;
 
               private void addDebugLog(String message) {
                   Log.d(TAG, message);
@@ -714,16 +714,16 @@ jobs:
               @Override
               public void onServiceConnected() {
                   super.onServiceConnected();
-                  prefs = getSharedPreferences("saned_prefs", MODE_PRIVATE);
+                  prefs = getSharedPreferences("danish_prefs", MODE_PRIVATE);
                   createNotificationChannel();
-                  addDebugLog("✅ Service Connected");
+                  addDebugLog("✅ Service Connected - DanishAuto");
               }
 
               private void createNotificationChannel() {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       NotificationChannel channel = new NotificationChannel(
                           CHANNEL_ID,
-                          "Saned Auto Notifications",
+                          "DanishAuto Notifications",
                           NotificationManager.IMPORTANCE_HIGH
                       );
                       channel.setDescription("Order accept notifications");
@@ -744,7 +744,7 @@ jobs:
                           builder = new Notification.Builder(this);
                       }
                       builder.setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setContentTitle("Order Accept Ho Gaya!")
+                          .setContentTitle("✅ Order Accepted!")
                           .setContentText("Pickup: " + pickupKm + " km | Drop: " + dropKm + " km")
                           .setAutoCancel(true)
                           .setPriority(Notification.PRIORITY_HIGH);
@@ -774,11 +774,23 @@ jobs:
               private void checkAndAccept() {
                   addDebugLog("🔍 Checking for order screen...");
                   AccessibilityNodeInfo root = getRootInActiveWindow();
+                  
+                  // Retry logic if root is null
                   if (root == null) {
-                      addDebugLog("❌ Root is null");
+                      retryCount++;
+                      addDebugLog("❌ Root is null, retry " + retryCount + "/5");
+                      if (retryCount <= 5) {
+                          handler.postDelayed(this::checkAndAccept, 300);
+                      } else {
+                          retryCount = 0;
+                          addDebugLog("❌ Failed after 5 retries");
+                      }
                       return;
                   }
+                  retryCount = 0;
+                  
                   try {
+                      // Check for New Order text
                       List<AccessibilityNodeInfo> newOrderList =
                           root.findAccessibilityNodeInfosByText("New Order");
                       if (newOrderList == null || newOrderList.isEmpty()) {
@@ -786,11 +798,13 @@ jobs:
                           return;
                       }
                       addDebugLog("✅ 'New Order' found!");
+                      for (AccessibilityNodeInfo n : newOrderList) { if (n != null) n.recycle(); }
 
                       float pickupMax = prefs.getFloat("pickup_max", 5.0f);
                       float dropMax   = prefs.getFloat("drop_max", 10.0f);
-                      addDebugLog("📏 Limits - Pickup: " + pickupMax + "km, Drop: " + dropMax + "km");
+                      addDebugLog("📏 Limits - Pickup Max: " + pickupMax + "km, Drop Max: " + dropMax + "km");
 
+                      // Find distances using regex on "From You" and "From Pickup" nodes
                       float pickupKm = findDistance(root, "From You");
                       float dropKm   = findDistance(root, "From Pickup");
 
@@ -803,15 +817,21 @@ jobs:
 
                       if (pickupKm <= pickupMax && dropKm <= dropMax) {
                           addDebugLog("✅ Distances within limits! Looking for Accept button...");
-                          List<AccessibilityNodeInfo> acceptNodes =
-                              root.findAccessibilityNodeInfosByText("Accept");
-                          if (acceptNodes == null || acceptNodes.isEmpty())
-                              acceptNodes = root.findAccessibilityNodeInfosByText("ACCEPT");
-                          if (acceptNodes == null || acceptNodes.isEmpty())
-                              acceptNodes = root.findAccessibilityNodeInfosByText("قبول");
-
-                          if (acceptNodes != null && !acceptNodes.isEmpty()) {
-                              addDebugLog("🔘 Accept button found!");
+                          
+                          // Try different accept button texts
+                          String[] acceptTexts = {"Accept", "ACCEPT", "قبول", "موافقة"};
+                          AccessibilityNodeInfo acceptBtn = null;
+                          
+                          for (String text : acceptTexts) {
+                              List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(text);
+                              if (nodes != null && !nodes.isEmpty()) {
+                                  acceptBtn = nodes.get(0);
+                                  addDebugLog("🔘 Found accept button with text: " + text);
+                                  break;
+                              }
+                          }
+                          
+                          if (acceptBtn != null) {
                               DisplayMetrics dm = getResources().getDisplayMetrics();
                               int screenWidth = dm.widthPixels;
                               int screenHeight = dm.heightPixels;
@@ -830,17 +850,56 @@ jobs:
                                   prefs.edit().putBoolean("enabled", false).apply();
                                   sendOrderNotification(pKm, dKm);
                               });
+                              acceptBtn.recycle();
                           } else {
                               addDebugLog("❌ Accept button not found!");
                           }
                       } else {
-                          addDebugLog("❌ IGNORED - Distance out of range (Pickup: " + pickupKm + " > " + pickupMax + " OR Drop: " + dropKm + " > " + dropMax + ")");
+                          addDebugLog("❌ IGNORED - Distance out of range");
                       }
                   } catch (Exception e) {
                       addDebugLog("❌ Error: " + e.getMessage());
                   } finally {
                       if (root != null) root.recycle();
                   }
+              }
+
+              private float findDistance(AccessibilityNodeInfo root, String keyword) {
+                  // Search for text containing keyword (e.g., "From You")
+                  List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(keyword);
+                  if (nodes != null && !nodes.isEmpty()) {
+                      for (AccessibilityNodeInfo node : nodes) {
+                          String fullText = node.getText() != null ? node.getText().toString() : "";
+                          addDebugLog("🔍 Found text: " + fullText);
+                          
+                          // Extract number before "Km" using regex
+                          float km = extractKmValue(fullText);
+                          if (km > 0) {
+                              addDebugLog("📏 Extracted distance: " + km + " km");
+                              node.recycle();
+                              for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
+                              return km;
+                          }
+                          node.recycle();
+                      }
+                      for (AccessibilityNodeInfo n : nodes) { if (n != null) n.recycle(); }
+                  }
+                  return -1f;
+              }
+
+              private float extractKmValue(String text) {
+                  try {
+                      // Pattern: number followed by optional space, then "Km" (case insensitive)
+                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
+                      Matcher m = p.matcher(text);
+                      if (m.find()) {
+                          String numStr = m.group(1).replace(",", ".");
+                          return Float.parseFloat(numStr);
+                      }
+                  } catch (Exception e) {
+                      addDebugLog("Parse error: " + e.getMessage());
+                  }
+                  return -1f;
               }
 
               private void swipeOnScreen(int x1, int y1, int x2, int y2, int duration, Runnable onDone) {
@@ -863,30 +922,6 @@ jobs:
                   }, null);
               }
 
-              private float findDistance(AccessibilityNodeInfo root, String keyword) {
-                  List<AccessibilityNodeInfo> nodes =
-                      root.findAccessibilityNodeInfosByText(keyword);
-                  if (nodes == null || nodes.isEmpty()) return -1f;
-                  for (AccessibilityNodeInfo node : nodes) {
-                      String text = node.getText() != null ? node.getText().toString() : "";
-                      node.recycle();
-                      float km = parseKm(text);
-                      if (km >= 0) return km;
-                  }
-                  return -1f;
-              }
-
-              private float parseKm(String text) {
-                  try {
-                      String[] parts = text.trim().split("\\s+");
-                      if (parts.length > 0)
-                          return Float.parseFloat(parts[0].replace(",", "."));
-                  } catch (Exception e) {
-                      addDebugLog("Parse error: " + e.getMessage());
-                  }
-                  return -1f;
-              }
-
               @Override
               public void onInterrupt() {
                   addDebugLog("⚠️ Service interrupted");
@@ -900,5 +935,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Saned-Auto-Swipe-v9
+          name: DanishAuto
           path: app/build/outputs/apk/debug/*.apk
