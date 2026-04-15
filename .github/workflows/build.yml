@@ -24,7 +24,6 @@ jobs:
         run: |
           echo "include ':app'" > settings.gradle
 
-          # Fix for AndroidX error (Screenshot #58)
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
@@ -32,11 +31,20 @@ jobs:
 
           cat > build.gradle << 'EOF'
           buildscript {
-              repositories { google(); mavenCentral() }
+              repositories { 
+                  google()
+                  mavenCentral()
+              }
               dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
           allprojects {
-              repositories { google(); mavenCentral() }
+              repositories { 
+                  google()
+                  mavenCentral()
+                  // Xposed API ke liye naya repo link
+                  maven { url 'https://api.xposed.info/' }
+                  maven { url 'https://www.jitpack.io' }
+              }
           }
           EOF
 
@@ -54,6 +62,7 @@ jobs:
               }
           }
           dependencies {
+              // LSPosed/Xposed API Fix
               compileOnly 'de.robv.android.xposed:api:82'
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'com.google.android.material:material:1.9.0'
@@ -134,7 +143,7 @@ jobs:
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                           xPrefs.reload();
                           if (!xPrefs.getBoolean("enabled", false)) return;
-                          XposedBridge.log("DanishAuto: Module is Active for Jahez");
+                          XposedBridge.log("DanishAuto: Module Active");
                       }
                   });
               }
@@ -155,7 +164,7 @@ jobs:
               <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Pickup Km" />
               <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Drop Km" />
               <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Enable" />
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Save Settings" />
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Save" />
           </LinearLayout>
           EOF
 
@@ -190,5 +199,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DanishAuto-LSPosed-Final
+          name: DanishAuto-LSPosed-Final-v2
           path: app/build/outputs/apk/debug/*.apk
