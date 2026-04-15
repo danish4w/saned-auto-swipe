@@ -53,8 +53,8 @@ jobs:
                   applicationId 'com.danish.auto'
                   minSdk 26
                   targetSdk 34
-                  versionCode 1
-                  versionName '1.0'
+                  versionCode 2
+                  versionName '2.0'
               }
               packagingOptions {
                   exclude 'META-INF/LICENSE.md'
@@ -775,12 +775,11 @@ jobs:
                   addDebugLog("🔍 Checking for order screen...");
                   AccessibilityNodeInfo root = getRootInActiveWindow();
                   
-                  // Retry logic if root is null
                   if (root == null) {
                       retryCount++;
                       addDebugLog("❌ Root is null, retry " + retryCount + "/5");
                       if (retryCount <= 5) {
-                          handler.postDelayed(this::checkAndAccept, 300);
+                          handler.postDelayed(this::checkAndAccept, 500);
                       } else {
                           retryCount = 0;
                           addDebugLog("❌ Failed after 5 retries");
@@ -790,9 +789,7 @@ jobs:
                   retryCount = 0;
                   
                   try {
-                      // Check for New Order text
-                      List<AccessibilityNodeInfo> newOrderList =
-                          root.findAccessibilityNodeInfosByText("New Order");
+                      List<AccessibilityNodeInfo> newOrderList = root.findAccessibilityNodeInfosByText("New Order");
                       if (newOrderList == null || newOrderList.isEmpty()) {
                           addDebugLog("❌ 'New Order' text not found");
                           return;
@@ -801,12 +798,12 @@ jobs:
                       for (AccessibilityNodeInfo n : newOrderList) { if (n != null) n.recycle(); }
 
                       float pickupMax = prefs.getFloat("pickup_max", 5.0f);
-                      float dropMax   = prefs.getFloat("drop_max", 10.0f);
+                      float dropMax = prefs.getFloat("drop_max", 10.0f);
                       addDebugLog("📏 Limits - Pickup Max: " + pickupMax + "km, Drop Max: " + dropMax + "km");
 
-                      // Find distances using regex on "From You" and "From Pickup" nodes
-                      float pickupKm = findDistance(root, "From You");
-                      float dropKm   = findDistance(root, "From Pickup");
+                      // Direct search for numbers with "Km"
+                      float pickupKm = extractDistanceByKeyword(root, "From You");
+                      float dropKm = extractDistanceByKeyword(root, "From Pickup");
 
                       addDebugLog("📊 Distances - Pickup: " + pickupKm + "km, Drop: " + dropKm + "km");
 
@@ -818,7 +815,6 @@ jobs:
                       if (pickupKm <= pickupMax && dropKm <= dropMax) {
                           addDebugLog("✅ Distances within limits! Looking for Accept button...");
                           
-                          // Try different accept button texts
                           String[] acceptTexts = {"Accept", "ACCEPT", "قبول", "موافقة"};
                           AccessibilityNodeInfo acceptBtn = null;
                           
@@ -836,8 +832,8 @@ jobs:
                               int screenWidth = dm.widthPixels;
                               int screenHeight = dm.heightPixels;
                               int startX = (int)(screenWidth * 0.15f);
-                              int endX   = (int)(screenWidth * 0.85f);
-                              int y      = (int)(screenHeight * 0.80f);
+                              int endX = (int)(screenWidth * 0.85f);
+                              int y = (int)(screenHeight * 0.85f);
 
                               int swipeDuration = prefs.getInt("swipe_duration", 300);
                               addDebugLog("👉 Swiping from " + startX + " to " + endX + " at Y=" + y + " (duration: " + swipeDuration + "ms)");
@@ -864,16 +860,18 @@ jobs:
                   }
               }
 
-              private float findDistance(AccessibilityNodeInfo root, String keyword) {
-                  // Search for text containing keyword (e.g., "From You")
+              private float extractDistanceByKeyword(AccessibilityNodeInfo root, String keyword) {
+                  // Search for text containing keyword
                   List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(keyword);
+                  addDebugLog("🔍 Searching for '" + keyword + "', found " + (nodes != null ? nodes.size() : 0) + " nodes");
+                  
                   if (nodes != null && !nodes.isEmpty()) {
                       for (AccessibilityNodeInfo node : nodes) {
-                          String fullText = node.getText() != null ? node.getText().toString() : "";
-                          addDebugLog("🔍 Found text: " + fullText);
+                          String text = node.getText() != null ? node.getText().toString() : "";
+                          addDebugLog("📝 Text: '" + text + "'");
                           
-                          // Extract number before "Km" using regex
-                          float km = extractKmValue(fullText);
+                          // Extract any number from the text
+                          float km = extractNumberFromText(text);
                           if (km > 0) {
                               addDebugLog("📏 Extracted distance: " + km + " km");
                               node.recycle();
@@ -887,17 +885,31 @@ jobs:
                   return -1f;
               }
 
-              private float extractKmValue(String text) {
+              private float extractNumberFromText(String text) {
+                  if (text == null || text.isEmpty()) return -1f;
                   try {
-                      // Pattern: number followed by optional space, then "Km" (case insensitive)
-                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
-                      Matcher m = p.matcher(text);
-                      if (m.find()) {
-                          String numStr = m.group(1).replace(",", ".");
-                          return Float.parseFloat(numStr);
+                      // Find all digits and decimal points
+                      StringBuilder num = new StringBuilder();
+                      boolean foundDecimal = false;
+                      for (char c : text.toCharArray()) {
+                          if (Character.isDigit(c)) {
+                              num.append(c);
+                          } else if (c == '.' && !foundDecimal) {
+                              num.append(c);
+                              foundDecimal = true;
+                          } else if (num.length() > 0) {
+                              // Stop when we hit non-digit after number
+                              break;
+                          }
+                      }
+                      if (num.length() > 0) {
+                          float value = Float.parseFloat(num.toString());
+                          if (value > 0 && value < 100) {
+                              return value;
+                          }
                       }
                   } catch (Exception e) {
-                      addDebugLog("Parse error: " + e.getMessage());
+                      addDebugLog("Number parse error: " + e.getMessage());
                   }
                   return -1f;
               }
