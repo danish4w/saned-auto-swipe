@@ -1,4 +1,4 @@
-name: Build Gufran Pro Slider Fixed
+name: Build Gufran Slider Final
 on: workflow_dispatch
 
 jobs:
@@ -20,11 +20,9 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
 
-      - name: Create Build Files (FIXED)
+      - name: Create Build Files
         run: |
           echo "include ':app'" > settings.gradle
-          
-          # YEH HAI FIX: AndroidX ko enable karna zaroori hai
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
@@ -52,8 +50,8 @@ jobs:
                   applicationId 'com.danish.lsposed'
                   minSdk 26
                   targetSdk 34
-                  versionCode 4
-                  versionName '3.1'
+                  versionCode 5
+                  versionName '4.0'
               }
           }
           dependencies {
@@ -78,11 +76,10 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:padding="24dp" android:background="@color/dark_bg"
-              android:focusable="true" android:focusableInTouchMode="true">
+              android:orientation="vertical" android:padding="24dp" android:background="@color/dark_bg">
               
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
-                  android:text="Gufran Click Slider" android:textColor="@color/jahez_red" 
+                  android:text="Gufran Click V4" android:textColor="@color/jahez_red" 
                   android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center"/>
 
               <View android:layout_width="match_parent" android:layout_height="1dp" 
@@ -92,16 +89,16 @@ jobs:
                   android:text="Pickup Max (KM)" android:textColor="@color/text_white"/>
               <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" 
                   android:layout_height="50dp" android:backgroundTint="@color/jahez_red" 
-                  android:textColor="@color/text_white" android:inputType="numberDecimal" android:hint="5.0"/>
+                  android:textColor="@color/text_white" android:inputType="numberDecimal" android:text="5.0"/>
 
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
                   android:text="Drop Max (KM)" android:textColor="@color/text_white" android:layout_marginTop="10dp"/>
               <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" 
                   android:layout_height="50dp" android:backgroundTint="@color/jahez_red" 
-                  android:textColor="@color/text_white" android:inputType="numberDecimal" android:hint="10.0"/>
+                  android:textColor="@color/text_white" android:inputType="numberDecimal" android:text="10.0"/>
 
               <TextView android:id="@+id/tv_delay_label" android:layout_width="wrap_content" 
-                  android:layout_height="wrap_content" android:text="System Delay: 800ms" 
+                  android:layout_height="wrap_content" android:text="Delay: 800ms" 
                   android:textColor="@color/jahez_red" android:layout_marginTop="20dp" android:textStyle="bold"/>
               
               <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent" 
@@ -110,12 +107,12 @@ jobs:
                   android:thumbTint="@color/jahez_red" android:progressTint="@color/jahez_red"/>
 
               <Switch android:id="@+id/switch_enabled" android:layout_width="match_parent" 
-                  android:layout_height="wrap_content" android:text="Auto Swipe Enable" 
+                  android:layout_height="wrap_content" android:text="Module Enable" 
                   android:textColor="@color/text_white" android:layout_marginTop="20dp"
                   android:thumbTint="@color/jahez_red"/>
 
               <Button android:id="@+id/btn_save" android:layout_width="match_parent" 
-                  android:layout_height="60dp" android:text="SAVE SETTINGS" 
+                  android:layout_height="60dp" android:text="SAVE & APPLY" 
                   android:backgroundTint="@color/jahez_red" android:textColor="@color/text_white"
                   android:layout_marginTop="30dp" android:textStyle="bold"/>
           </LinearLayout>
@@ -157,12 +154,12 @@ jobs:
                   s.setChecked(p.getBoolean("enabled", false));
                   
                   sbDelay.setProgress(currentDelay - 400);
-                  tvDelay.setText("System Delay: " + currentDelay + "ms");
+                  tvDelay.setText("Delay: " + currentDelay + "ms");
 
                   sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                       @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                           currentDelay = progress + 400;
-                          tvDelay.setText("System Delay: " + currentDelay + "ms");
+                          tvDelay.setText("Delay: " + currentDelay + "ms");
                       }
                       @Override public void onStartTrackingTouch(SeekBar seekBar) {}
                       @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -176,11 +173,7 @@ jobs:
                       
                       File pf = new File(getFilesDir().getParent(), "shared_prefs/danish_prefs.xml");
                       if (pf.exists()) pf.setReadable(true, false);
-
-                      etP.clearFocus(); etD.clearFocus();
-                      InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                      imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                      Toast.makeText(this, "Saved Successfully!", Toast.LENGTH_SHORT).show();
+                      Toast.makeText(this, "Module Settings Applied!", Toast.LENGTH_SHORT).show();
                   });
               }
           }
@@ -200,6 +193,7 @@ jobs:
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XSharedPreferences;
+          import de.robv.android.xposed.XposedBridge;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
           import java.util.ArrayList;
@@ -213,21 +207,25 @@ jobs:
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
                   if (!lpparam.packageName.equals("net.jahez.fleets")) return;
                   xPrefs = new XSharedPreferences("com.danish.lsposed", "danish_prefs");
+                  xPrefs.makeWorldReadable();
 
-                  XposedHelpers.findAndHookMethod("com.jahez.fleets.ui.order.OrderActivity", lpparam.classLoader, 
-                      "onCreate", Bundle.class, new XC_MethodHook() {
+                  // FIX: Specific Class ki bajaye Generic Activity Hook
+                  XposedHelpers.findAndHookMethod(Activity.class, "onResume", new XC_MethodHook() {
                       @Override
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                          Activity act = (Activity) param.thisObject;
                           xPrefs.reload();
                           if (!xPrefs.getBoolean("enabled", false)) return;
-                          final Activity act = (Activity) param.thisObject;
+
                           int userDelay = xPrefs.getInt("system_delay", 800);
-                          new Handler(Looper.getMainLooper()).postDelayed(() -> { processOrder(act); }, userDelay);
+                          new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                              checkScreenAndSwipe(act);
+                          }, userDelay);
                       }
                   });
               }
 
-              private void processOrder(Activity act) {
+              private void checkScreenAndSwipe(Activity act) {
                   List<Float> kms = new ArrayList<>();
                   scanKm(act.getWindow().getDecorView(), kms);
                   if (kms.size() >= 2) {
@@ -244,8 +242,10 @@ jobs:
                       for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scanKm(((ViewGroup) v).getChildAt(i), found);
                   } else if (v instanceof TextView) {
                       String t = ((TextView) v).getText().toString();
-                      Matcher m = Pattern.compile("(\\d+\\.?\\d*)").matcher(t);
-                      if (t.contains("km") && m.find()) found.add(Float.parseFloat(m.group(1)));
+                      if (t.toLowerCase().contains("km")) {
+                          Matcher m = Pattern.compile("(\\d+\\.?\\d*)").matcher(t);
+                          if (m.find()) found.add(Float.parseFloat(m.group(1)));
+                      }
                   }
               }
 
@@ -265,15 +265,13 @@ jobs:
               private void doSwipe(View v) {
                   int[] pos = new int[2];
                   v.getLocationOnScreen(pos);
-                  float startX = pos[0] + (v.getWidth() * 0.15f);
-                  float endX = pos[0] + (v.getWidth() * 0.85f);
+                  float startX = pos[0] + (v.getWidth() * 0.2f);
+                  float endX = pos[0] + (v.getWidth() * 0.8f);
                   float y = pos[1] + (v.getHeight() / 2f);
                   long time = SystemClock.uptimeMillis();
                   v.dispatchTouchEvent(MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, startX, y, 0));
-                  for (int i = 1; i <= 10; i++) {
-                      v.dispatchTouchEvent(MotionEvent.obtain(time, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE, startX + (endX - startX) * i / 10f, y, 0));
-                  }
-                  v.dispatchTouchEvent(MotionEvent.obtain(time, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, endX, y, 0));
+                  v.dispatchTouchEvent(MotionEvent.obtain(time, time + 200, MotionEvent.ACTION_MOVE, endX, y, 0));
+                  v.dispatchTouchEvent(MotionEvent.obtain(time, time + 210, MotionEvent.ACTION_UP, endX, y, 0));
               }
           }
           EOF
@@ -282,11 +280,11 @@ jobs:
         run: |
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="Gufran Slider Fixed" android:theme="@style/Theme.AppCompat.NoActionBar">
+              <application android:label="Gufran Slider V4" android:theme="@style/Theme.AppCompat.NoActionBar">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Jahez Fixed AndroidX" />
+                  <meta-data android:name="xposeddescription" android:value="Jahez Auto Hook Dynamic" />
                   <meta-data android:name="xposedminversion" android:value="82" />
-                  <activity android:name=".SettingsActivity" android:exported="true" android:windowSoftInputMode="stateHidden">
+                  <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
                   </activity>
               </application>
@@ -301,5 +299,5 @@ jobs:
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Gufran-Slider-Fixed-APK
+          name: Gufran-Slider-Final-V4
           path: app/build/outputs/apk/debug/*.apk
