@@ -61,7 +61,7 @@ jobs:
           }
           EOF
 
-      - name: Create Manifest and Assets (IMPORTANT)
+      - name: Create Manifest and Assets (FIX FOR BUILD #66)
         run: |
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -89,10 +89,10 @@ jobs:
           </manifest>
           EOF
 
-          # Asset for LSPosed to find the hook class
+          # Ye file LSPosed ko batati hai ki hook kahan hai
           echo "com.danish.lsposed.MainHook" > app/src/main/assets/xposed_init
 
-      - name: Create Slider UI & Logic
+      - name: Create Slider UI & Logic (FIXED XML SYMBOL)
         run: |
           cat > app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
