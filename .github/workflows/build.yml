@@ -1,4 +1,4 @@
-name: Build Gufran V7.5 LogMonitor Fixed
+name: Build Gufran V7.5.1 Final Fixed
 on: workflow_dispatch
 
 jobs:
@@ -18,6 +18,13 @@ jobs:
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
+
+      - name: Create Properties (Fix for AndroidX)
+        run: |
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
 
       - name: Create Root Build Files
         run: |
@@ -43,8 +50,8 @@ jobs:
                   applicationId 'com.danish.lsposed'
                   minSdk 26
                   targetSdk 34
-                  versionCode 20
-                  versionName '7.5-LogMonitor'
+                  versionCode 21
+                  versionName '7.5.1-LogMonitor'
               }
           }
           dependencies {
@@ -59,9 +66,9 @@ jobs:
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="Gufran V7.5" android:theme="@style/Theme.AppCompat.NoActionBar">
+              <application android:label="Gufran V7.5.1" android:theme="@style/Theme.AppCompat.NoActionBar">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="V7.5 - Real-time Log Monitor" />
+                  <meta-data android:name="xposeddescription" android:value="V7.5.1 - Real-time Log Monitor" />
                   <meta-data android:name="xposedminversion" android:value="82" />
                   <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter>
@@ -81,7 +88,7 @@ jobs:
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent"
               android:orientation="vertical" android:padding="20dp" android:background="#121212">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gufran V7.5" android:textColor="#FF4B3A" android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gufran V7.5.1" android:textColor="#FF4B3A" android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center"/>
               <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="55dp" android:textColor="#FFFFFF" android:hint="Pickup KM" android:backgroundTint="#FF4B3A" android:inputType="numberDecimal" android:text="5.0" android:layout_marginTop="20dp"/>
               <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="55dp" android:textColor="#FFFFFF" android:hint="Drop KM" android:backgroundTint="#FF4B3A" android:inputType="numberDecimal" android:text="10.0"/>
               <TextView android:id="@+id/tv_delay_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FF4B3A" android:text="Delay: 800ms" android:layout_marginTop="10dp"/>
@@ -102,7 +109,7 @@ jobs:
           </LinearLayout>
           EOF
 
-      - name: Java Code (Fixing Errors)
+      - name: Java Code
         run: |
           cat > app/src/main/java/com/danish/lsposed/LogActivity.java << 'EOF'
           package com.danish.lsposed;
@@ -290,5 +297,5 @@ jobs:
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Gufran-V7.5-Fixed
+          name: Gufran-V7.5.1-Final
           path: app/build/outputs/apk/debug/*.apk
