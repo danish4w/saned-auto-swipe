@@ -13,10 +13,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Xposed API jar
+      - name: Download Xposed API jar (reliable source)
         run: |
           mkdir -p app/libs
-          curl -L -o app/libs/api-82.jar https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar
+          # Use the official Maven Central URL with proper redirect following
+          curl -L -o app/libs/api-82.jar "https://search.maven.org/remotecontent?filepath=de/robv/android/xposed/api/82/api-82.jar"
+          # Verify the jar is valid
+          if ! unzip -t app/libs/api-82.jar >/dev/null 2>&1; then
+            echo "JAR is corrupt, trying alternative source..."
+            curl -L -o app/libs/api-82.jar "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar"
+            unzip -t app/libs/api-82.jar || { echo "JAR still corrupt"; exit 1; }
+          fi
+          ls -la app/libs/
 
       - name: Prepare project structure
         run: |
@@ -89,7 +97,7 @@ jobs:
           </resources>
           EOF
 
-      - name: Create layout (default values 1.5 and 3.5)
+      - name: Create layout (default 1.5 and 3.5)
         run: |
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -130,7 +138,7 @@ jobs:
           </LinearLayout>
           EOF
 
-      - name: Create SettingsActivity (defaults 1.5, 3.5)
+      - name: Create SettingsActivity
         run: |
           cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
           package com.danish.lsposed;
@@ -159,7 +167,6 @@ jobs:
                   Switch sw = findViewById(R.id.switch_enabled);
                   Button btn = findViewById(R.id.btn_save);
 
-                  // Default 1.5 and 3.5
                   etP.setText(String.valueOf(p.getFloat("pickup_max", 1.5f)));
                   etD.setText(String.valueOf(p.getFloat("drop_max", 3.5f)));
                   int d = p.getInt("system_delay", 800);
@@ -215,7 +222,7 @@ jobs:
           EOF
           echo "com.danish.lsposed.MainHook" > app/src/main/assets/xposed_init
 
-      - name: Create MainHook (with default 1.5, 3.5 for safety)
+      - name: Create MainHook
         run: |
           cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
           package com.danish.lsposed;
@@ -259,45 +266,37 @@ jobs:
                           Activity act = (Activity) param.thisObject;
                           prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
                           if (!prefs.getBoolean("enabled", false)) {
-                              XposedBridge.log(TAG + " Module is disabled in settings");
+                              XposedBridge.log(TAG + " Module disabled");
                               return;
                           }
                           int delay = prefs.getInt("system_delay", 800);
-                          XposedBridge.log(TAG + " Order screen detected! Will process in " + delay + "ms");
-                          new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                              XposedBridge.log(TAG + " Starting order processing...");
-                              processOrder(act);
-                          }, delay);
+                          XposedBridge.log(TAG + " Order screen, delay " + delay + "ms");
+                          new Handler(Looper.getMainLooper()).postDelayed(() -> processOrder(act), delay);
                       }
                   });
               }
 
               private void processOrder(Activity act) {
                   try {
-                      XposedBridge.log(TAG + " Scanning screen for distances...");
                       List<Float> distances = new ArrayList<>();
                       scanKm(act.getWindow().getDecorView(), distances);
-                      XposedBridge.log(TAG + " Distances found: " + distances.toString());
-
                       if (distances.size() < 2) {
-                          XposedBridge.log(TAG + " Not enough distances (need at least 2)");
+                          XposedBridge.log(TAG + " Not enough distances");
                           return;
                       }
                       float pickup = distances.get(0);
                       float drop = distances.get(1);
                       float pickupMax = prefs.getFloat("pickup_max", 1.5f);
                       float dropMax = prefs.getFloat("drop_max", 3.5f);
-                      XposedBridge.log(TAG + " Pickup: " + pickup + " km, Drop: " + drop + " km");
-                      XposedBridge.log(TAG + " Limits: Pickup ≤ " + pickupMax + " AND Drop ≤ " + dropMax);
-
+                      XposedBridge.log(TAG + " Pickup: " + pickup + " Drop: " + drop + " Limits: " + pickupMax + "/" + dropMax);
                       if (pickup <= pickupMax && drop <= dropMax) {
-                          XposedBridge.log(TAG + " ✅ Order within limits! Attempting to accept...");
+                          XposedBridge.log(TAG + " Accepting order");
                           performSwipeOnAccept(act.getWindow().getDecorView());
                       } else {
-                          XposedBridge.log(TAG + " ❌ Order rejected: distances out of range");
+                          XposedBridge.log(TAG + " Out of range");
                       }
                   } catch (Exception e) {
-                      XposedBridge.log(TAG + " Error in processOrder: " + e.getMessage());
+                      XposedBridge.log(TAG + " Error: " + e.getMessage());
                   }
               }
 
@@ -310,49 +309,37 @@ jobs:
                           if (m.find()) {
                               try {
                                   float val = Float.parseFloat(m.group(1));
-                                  if (val > 0 && val < 100 && !out.contains(val)) {
-                                      out.add(val);
-                                      XposedBridge.log(TAG + " Found distance: " + val + " in text: " + text);
-                                  }
+                                  if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
                               } catch (Exception e) {}
                           }
                       }
                   } else if (v instanceof ViewGroup) {
-                      ViewGroup g = (ViewGroup) v;
-                      for (int i = 0; i < g.getChildCount(); i++) {
-                          scanKm(g.getChildAt(i), out);
-                      }
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scanKm(((ViewGroup) v).getChildAt(i), out);
                   }
               }
 
               private void performSwipeOnAccept(View root) {
                   View acceptBtn = findAcceptButton(root);
                   if (acceptBtn == null) {
-                      XposedBridge.log(TAG + " ❌ Accept button not found");
+                      XposedBridge.log(TAG + " Accept button not found");
                       return;
                   }
-                  XposedBridge.log(TAG + " ✅ Accept button found!");
                   int[] loc = new int[2];
                   acceptBtn.getLocationOnScreen(loc);
                   int startX = loc[0] + acceptBtn.getWidth() / 5;
                   int endX = loc[0] + acceptBtn.getWidth() * 4 / 5;
                   int y = loc[1] + acceptBtn.getHeight() / 2;
-                  XposedBridge.log(TAG + " Swipe coordinates: start(" + startX + "," + y + ") -> end(" + endX + "," + y + ")");
                   injectSwipe(startX, y, endX, y, 300);
               }
 
               private View findAcceptButton(View v) {
                   if (v instanceof TextView) {
                       String text = ((TextView) v).getText().toString();
-                      if (text.equalsIgnoreCase("Accept") || text.equals("قبول")) {
-                          XposedBridge.log(TAG + " Found accept button text: " + text);
-                          return v;
-                      }
+                      if (text.equalsIgnoreCase("Accept") || text.equals("قبول")) return v;
                   }
                   if (v instanceof ViewGroup) {
-                      ViewGroup g = (ViewGroup) v;
-                      for (int i = 0; i < g.getChildCount(); i++) {
-                          View found = findAcceptButton(g.getChildAt(i));
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
+                          View found = findAcceptButton(((ViewGroup) v).getChildAt(i));
                           if (found != null) return found;
                       }
                   }
@@ -381,9 +368,9 @@ jobs:
                       injectInputEvent.invoke(inputManager, up, 0);
                       up.recycle();
 
-                      XposedBridge.log(TAG + " ✅ Swipe event injected successfully");
+                      XposedBridge.log(TAG + " Swipe success");
                   } catch (Exception e) {
-                      XposedBridge.log(TAG + " ❌ Swipe injection failed: " + e.getMessage());
+                      XposedBridge.log(TAG + " Swipe failed: " + e.getMessage());
                   }
               }
           }
