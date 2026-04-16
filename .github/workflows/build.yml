@@ -28,7 +28,7 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.properties -o gradle/wrapper/gradle-wrapper.properties
           chmod +x gradlew
 
-      - name: Create build files (correct repository)
+      - name: Create build files (correct repo)
         run: |
           echo "include ':app'" > settings.gradle
           cat > gradle.properties << 'EOF'
@@ -94,7 +94,7 @@ jobs:
           </resources>
           EOF
 
-      - name: Create layout (default 1.5 and 3.5)
+      - name: Create layout (default 1.5 pickup, 3.5 drop)
         run: |
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
