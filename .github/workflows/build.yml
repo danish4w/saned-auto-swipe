@@ -1,4 +1,4 @@
-name: Build Gufran Slider V6 Final
+name: Build Gufran Slider V7 Final
 on: workflow_dispatch
 
 jobs:
@@ -50,8 +50,8 @@ jobs:
                   applicationId 'com.danish.lsposed'
                   minSdk 26
                   targetSdk 34
-                  versionCode 7
-                  versionName '6.0'
+                  versionCode 8
+                  versionName '7.0'
               }
           }
           dependencies {
@@ -61,7 +61,38 @@ jobs:
           }
           EOF
 
-      - name: Create Slider UI & Logic (FIXED XML SYMBOL)
+      - name: Create Manifest and Assets (IMPORTANT)
+        run: |
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:allowBackup="true"
+                  android:label="Gufran Slider V7"
+                  android:theme="@style/Theme.AppCompat.NoActionBar">
+                  <meta-data
+                      android:name="xposedmodule"
+                      android:value="true" />
+                  <meta-data
+                      android:name="xposeddescription"
+                      android:value="Gufran Auto Click for Jahez" />
+                  <meta-data
+                      android:name="xposedminversion"
+                      android:value="82" />
+                  <activity android:name=".SettingsActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          # Asset for LSPosed to find the hook class
+          echo "com.danish.lsposed.MainHook" > app/src/main/assets/xposed_init
+
+      - name: Create Slider UI & Logic
         run: |
           cat > app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -79,7 +110,7 @@ jobs:
               android:orientation="vertical" android:padding="24dp" android:background="@color/dark_bg">
               
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
-                  android:text="Gufran Click V6" android:textColor="@color/jahez_red" 
+                  android:text="Gufran Click V7" android:textColor="@color/jahez_red" 
                   android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center"/>
 
               <View android:layout_width="match_parent" android:layout_height="1dp" 
@@ -278,5 +309,5 @@ jobs:
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Gufran-Slider-V6-FINAL
+          name: Gufran-Slider-V7-FINAL
           path: app/build/outputs/apk/debug/*.apk
