@@ -1,4 +1,4 @@
-name: Build Gufran V7.5.1 Final Fixed
+name: Build Gufran V7.5.4 FinalFix
 on: workflow_dispatch
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
 
-      - name: Create Properties (Fix for AndroidX)
+      - name: Create Properties
         run: |
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
@@ -50,8 +50,8 @@ jobs:
                   applicationId 'com.danish.lsposed'
                   minSdk 26
                   targetSdk 34
-                  versionCode 21
-                  versionName '7.5.1-LogMonitor'
+                  versionCode 24
+                  versionName '7.5.4-Final'
               }
           }
           dependencies {
@@ -66,11 +66,11 @@ jobs:
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="Gufran V7.5.1" android:theme="@style/Theme.AppCompat.NoActionBar">
+              <application android:label="Gufran V7.5.4" android:theme="@style/Theme.AppCompat.NoActionBar">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="V7.5.1 - Real-time Log Monitor" />
+                  <meta-data android:name="xposeddescription" android:value="V7.5.4 - Default 1.5/3.5 KM" />
                   <meta-data android:name="xposedminversion" android:value="82" />
-                  <activity android:name=".SettingsActivity" android:exported="true">
+                  <activity android:name=".SettingsActivity" android:windowSoftInputMode="stateAlwaysHidden" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -82,90 +82,52 @@ jobs:
           EOF
           echo "com.danish.lsposed.MainHook" > app/src/main/assets/xposed_init
 
-      - name: UI Layouts
+      - name: UI Layouts (With Labels)
         run: |
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:padding="20dp" android:background="#121212">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gufran V7.5.1" android:textColor="#FF4B3A" android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center"/>
-              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="55dp" android:textColor="#FFFFFF" android:hint="Pickup KM" android:backgroundTint="#FF4B3A" android:inputType="numberDecimal" android:text="5.0" android:layout_marginTop="20dp"/>
-              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="55dp" android:textColor="#FFFFFF" android:hint="Drop KM" android:backgroundTint="#FF4B3A" android:inputType="numberDecimal" android:text="10.0"/>
-              <TextView android:id="@+id/tv_delay_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FF4B3A" android:text="Delay: 800ms" android:layout_marginTop="10dp"/>
-              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="1100" android:progress="400"/>
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="55dp" android:text="SAVE SETTINGS" android:backgroundTint="#FF4B3A" android:layout_marginTop="20dp"/>
-              <Button android:id="@+id/btn_logs" android:layout_width="match_parent" android:layout_height="55dp" android:text="VIEW LIVE LOGS" android:backgroundTint="#4CAF50" android:layout_marginTop="10dp"/>
+              android:orientation="vertical" android:padding="20dp" android:background="#121212"
+              android:focusable="true" android:focusableInTouchMode="true">
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gufran V7.5.4" android:textColor="#FF4B3A" android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center" android:layout_marginBottom="20dp"/>
+              
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Max Pickup KM" android:textColor="#888888" android:textSize="14sp"/>
+              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="55dp" android:textColor="#FFFFFF" android:backgroundTint="#FF4B3A" android:inputType="numberDecimal" android:layout_marginBottom="15dp"/>
+              
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Max Drop KM" android:textColor="#888888" android:textSize="14sp"/>
+              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="55dp" android:textColor="#FFFFFF" android:backgroundTint="#FF4B3A" android:inputType="numberDecimal" android:layout_marginBottom="15dp"/>
+              
+              <TextView android:id="@+id/tv_delay_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FF4B3A" android:text="Delay: 800ms"/>
+              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="1100" android:progress="400" android:layout_marginBottom="20dp"/>
+              
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="55dp" android:text="SAVE SETTINGS" android:backgroundTint="#FF4B3A" android:layout_marginBottom="10dp"/>
+              <Button android:id="@+id/btn_logs" android:layout_width="match_parent" android:layout_height="55dp" android:text="VIEW LIVE LOGS" android:backgroundTint="#4CAF50"/>
           </LinearLayout>
           EOF
           cat > app/src/main/res/layout/activity_log.xml << 'EOF'
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent"
               android:orientation="vertical" android:padding="10dp" android:background="#000000">
-              <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="LIVE MONITOR (MS)" android:textColor="#4CAF50" android:textSize="20sp" android:gravity="center" android:padding="10dp"/>
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="LIVE MONITOR" android:textColor="#4CAF50" android:textSize="20sp" android:gravity="center" android:padding="10dp"/>
               <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-                  <TextView android:id="@+id/tv_logs" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#00FF00" android:fontFamily="monospace" android:text="Waiting for orders..."/>
+                  <TextView android:id="@+id/tv_logs" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#00FF00" android:fontFamily="monospace" android:text="Waiting..."/>
               </ScrollView>
-              <Button android:id="@+id/btn_clear" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="CLEAR LOGS" android:backgroundTint="#FF0000"/>
+              <Button android:id="@+id/btn_clear" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="CLEAR SCREEN ONLY" android:backgroundTint="#FF0000"/>
           </LinearLayout>
           EOF
 
-      - name: Java Code
+      - name: Java Activities (With Default Fix & Cursor Logic)
         run: |
-          cat > app/src/main/java/com/danish/lsposed/LogActivity.java << 'EOF'
-          package com.danish.lsposed;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.widget.TextView;
-          import androidx.appcompat.app.AppCompatActivity;
-
-          public class LogActivity extends AppCompatActivity {
-              private TextView tvLogs;
-              private BroadcastReceiver receiver = new BroadcastReceiver() {
-                  @Override
-                  public void onReceive(Context context, Intent intent) {
-                      String msg = intent.getStringExtra("log_msg");
-                      if(tvLogs != null) tvLogs.append("\n" + msg + "\n----------");
-                  }
-              };
-
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_log);
-                  tvLogs = findViewById(R.id.tv_logs);
-                  findViewById(R.id.btn_clear).setOnClickListener(v -> tvLogs.setText("Logs Cleared."));
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      registerReceiver(receiver, new IntentFilter("GUFRAN_LOG_ACTION"), Context.RECEIVER_EXPORTED);
-                  } else {
-                      registerReceiver(receiver, new IntentFilter("GUFRAN_LOG_ACTION"));
-                  }
-              }
-
-              @Override
-              protected void onDestroy() {
-                  super.onDestroy();
-                  unregisterReceiver(receiver);
-              }
-          }
-          EOF
-
           cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
           package com.danish.lsposed;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.SharedPreferences;
+          import android.content.*;
           import android.os.Bundle;
+          import android.view.inputmethod.InputMethodManager;
           import android.widget.*;
           import androidx.appcompat.app.AppCompatActivity;
-          import java.io.File;
 
           public class SettingsActivity extends AppCompatActivity {
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
+              @Override protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_settings);
                   final SharedPreferences p = getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
@@ -174,8 +136,9 @@ jobs:
                   final SeekBar sb = findViewById(R.id.sb_delay);
                   final TextView tvL = findViewById(R.id.tv_delay_label);
 
-                  etP.setText(String.valueOf(p.getFloat("pickup_max", 5.0f)));
-                  etD.setText(String.valueOf(p.getFloat("drop_max", 10.0f)));
+                  // Default set to 1.5 and 3.5 if not saved
+                  etP.setText(String.valueOf(p.getFloat("pickup_max", 1.5f)));
+                  etD.setText(String.valueOf(p.getFloat("drop_max", 3.5f)));
                   sb.setProgress(p.getInt("system_delay", 800) - 400);
 
                   sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -188,16 +151,49 @@ jobs:
                       p.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
                              .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
                              .putInt("system_delay", sb.getProgress() + 400).apply();
-                      File pf = new File(getFilesDir().getParentFile(), "shared_prefs/danish_prefs.xml");
-                      if (pf.exists()) pf.setReadable(true, false);
+                      
+                      // Hide keyboard and remove focus/cursor
+                      etP.clearFocus(); etD.clearFocus();
+                      InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                      imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                      
                       Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
                   });
-
                   findViewById(R.id.btn_logs).setOnClickListener(v -> startActivity(new Intent(this, LogActivity.class)));
               }
           }
           EOF
 
+          cat > app/src/main/java/com/danish/lsposed/LogActivity.java << 'EOF'
+          package com.danish.lsposed;
+          import android.content.*;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.widget.TextView;
+          import androidx.appcompat.app.AppCompatActivity;
+          public class LogActivity extends AppCompatActivity {
+              private TextView tvLogs;
+              private BroadcastReceiver receiver = new BroadcastReceiver() {
+                  @Override public void onReceive(Context context, Intent intent) {
+                      String msg = intent.getStringExtra("log_msg");
+                      if(tvLogs != null) tvLogs.append("\n" + msg + "\n----------");
+                  }
+              };
+              @Override protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_log);
+                  tvLogs = findViewById(R.id.tv_logs);
+                  findViewById(R.id.btn_clear).setOnClickListener(v -> tvLogs.setText("Display Cleared. Module still running..."));
+                  IntentFilter filter = new IntentFilter("GUFRAN_LOG_ACTION");
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
+                  else registerReceiver(receiver, filter);
+              }
+              @Override protected void onDestroy() { super.onDestroy(); unregisterReceiver(receiver); }
+          }
+          EOF
+
+      - name: MainHook (Smart Logic)
+        run: |
           cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
           package com.danish.lsposed;
           import android.app.Activity;
@@ -213,59 +209,60 @@ jobs:
 
           public class MainHook implements IXposedHookLoadPackage {
               private XSharedPreferences xP;
+              private Handler handler = new Handler(Looper.getMainLooper());
+
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpp) throws Throwable {
                   if (!lpp.packageName.equals("net.jahez.fleets")) return;
                   xP = new XSharedPreferences("com.danish.lsposed", "danish_prefs");
 
                   XposedHelpers.findAndHookMethod(Activity.class, "onResume", new XC_MethodHook() {
-                      @Override
-                      protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                      @Override protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                           final Activity act = (Activity) param.thisObject;
                           xP.reload();
-                          long start = System.currentTimeMillis();
-                          new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                              process(act, start);
-                          }, xP.getInt("system_delay", 800));
+                          handler.postDelayed(() -> startSmartScan(act, true), xP.getInt("system_delay", 800));
                       }
                   });
               }
 
-              private void process(Activity act, long startTime) {
+              private void startSmartScan(final Activity act, boolean isFirstTry) {
                   List<Float> kms = new ArrayList<>();
-                  scan(act.getWindow().getDecorView(), kms);
-                  long scanTime = System.currentTimeMillis() - startTime;
-                  String timeStr = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(new Date());
-                  StringBuilder log = new StringBuilder("[" + timeStr + "]\n");
-                  log.append("Scan: ").append(scanTime).append("ms | KMs: ").append(kms.toString());
-
+                  scanView(act.getWindow().getDecorView(), kms);
+                  String time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+                  
                   if (kms.size() >= 2) {
                       float p = kms.get(0), d = kms.get(1);
-                      float pM = xP.getFloat("pickup_max", 5.0f), dM = xP.getFloat("drop_max", 10.0f);
+                      float pM = xP.getFloat("pickup_max", 1.5f), dM = xP.getFloat("drop_max", 3.5f);
                       if (p <= pM && d <= dM) {
-                          log.append("\nResult: MATCH ✅ (Swiping...)");
+                          sendLog(act, "[" + time + "] MATCH ✅ ("+p+"/"+d+") Swiping...");
                           findAndSwipe(act.getWindow().getDecorView());
-                      } else {
-                          log.append("\nResult: REJECT ❌ (Lmt: ").append(pM).append("/").append(dM).append(")");
+                      } else { 
+                          sendLog(act, "[" + time + "] REJECT ❌ ("+p+"/"+d+")");
                       }
-                  } else { log.append("\nResult: NO DATA ⚠️"); }
-                  
-                  Intent intent = new Intent("GUFRAN_LOG_ACTION");
-                  intent.setPackage("com.danish.lsposed");
-                  intent.putExtra("log_msg", log.toString());
-                  act.sendBroadcast(intent);
+                  } else if (isFirstTry) {
+                      handler.postDelayed(() -> startSmartScan(act, false), 1500);
+                  } else {
+                      sendLog(act, "[" + time + "] NO DATA ⚠️");
+                  }
               }
 
-              private void scan(View v, List<Float> l) {
+              private void sendLog(Activity act, String msg) {
+                  Intent i = new Intent("GUFRAN_LOG_ACTION");
+                  i.setPackage("com.danish.lsposed");
+                  i.putExtra("log_msg", msg);
+                  act.sendBroadcast(i);
+              }
+
+              private void scanView(View v, List<Float> l) {
                   if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scan(((ViewGroup) v).getChildAt(i), l);
-                  } else if (v instanceof TextView) {
-                      String t = ((TextView) v).getText().toString().toLowerCase();
-                      if (t.contains("km")) {
-                          Matcher m = Pattern.compile("(\\d+[.,]?\\d*)").matcher(t);
-                          if (m.find()) {
-                              try { l.add(Float.parseFloat(m.group(1).replace(",", "."))); } catch (Exception e) {}
-                          }
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scanView(((ViewGroup) v).getChildAt(i), l);
+                  }
+                  CharSequence txt = (v instanceof TextView) ? ((TextView) v).getText() : v.getContentDescription();
+                  if (txt != null) {
+                      String s = txt.toString().toLowerCase();
+                      if (s.contains("km")) {
+                          Matcher m = Pattern.compile("(\\d+[.,]?\\d*)").matcher(s);
+                          while (m.find()) { try { l.add(Float.parseFloat(m.group(1).replace(",", "."))); } catch(Exception e){} }
                       }
                   }
               }
@@ -273,19 +270,16 @@ jobs:
               private void findAndSwipe(View v) {
                   if (v instanceof ViewGroup) {
                       for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) findAndSwipe(((ViewGroup) v).getChildAt(i));
-                  } else if (v instanceof TextView) {
-                      String s = ((TextView) v).getText().toString().toLowerCase();
-                      if (s.contains("accept") || s.contains("قبول")) swipe(v);
                   }
-              }
-
-              private void swipe(View v) {
-                  int[] c = new int[2]; v.getLocationOnScreen(c);
-                  float x1 = c[0] + (v.getWidth() * 0.2f), x2 = c[0] + (v.getWidth() * 0.8f), y = c[1] + (v.getHeight() / 2f);
-                  long t = SystemClock.uptimeMillis();
-                  v.dispatchTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x1, y, 0));
-                  v.dispatchTouchEvent(MotionEvent.obtain(t, t+150, MotionEvent.ACTION_MOVE, x2, y, 0));
-                  v.dispatchTouchEvent(MotionEvent.obtain(t, t+160, MotionEvent.ACTION_UP, x2, y, 0));
+                  String s = (v instanceof TextView) ? ((TextView) v).getText().toString().toLowerCase() : "";
+                  if (s.contains("accept") || s.contains("قبول")) {
+                      int[] pos = new int[2]; v.getLocationOnScreen(pos);
+                      float x1 = pos[0] + (v.getWidth() * 0.2f), x2 = pos[0] + (v.getWidth() * 0.8f), y = pos[1] + (v.getHeight() / 2f);
+                      long t = SystemClock.uptimeMillis();
+                      v.dispatchTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x1, y, 0));
+                      v.dispatchTouchEvent(MotionEvent.obtain(t, t+150, MotionEvent.ACTION_MOVE, x2, y, 0));
+                      v.dispatchTouchEvent(MotionEvent.obtain(t, t+160, MotionEvent.ACTION_UP, x2, y, 0));
+                  }
               }
           }
           EOF
@@ -297,5 +291,5 @@ jobs:
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Gufran-V7.5.1-Final
+          name: Gufran-V7.5.4-FinalFix
           path: app/build/outputs/apk/debug/*.apk
