@@ -1,4 +1,4 @@
-name: Build Gufran Slider Final
+name: Build Gufran Slider V6 Final
 on: workflow_dispatch
 
 jobs:
@@ -50,8 +50,8 @@ jobs:
                   applicationId 'com.danish.lsposed'
                   minSdk 26
                   targetSdk 34
-                  versionCode 5
-                  versionName '4.0'
+                  versionCode 7
+                  versionName '6.0'
               }
           }
           dependencies {
@@ -61,7 +61,7 @@ jobs:
           }
           EOF
 
-      - name: Create Slider UI & Logic
+      - name: Create Slider UI & Logic (FIXED XML SYMBOL)
         run: |
           cat > app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -79,7 +79,7 @@ jobs:
               android:orientation="vertical" android:padding="24dp" android:background="@color/dark_bg">
               
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
-                  android:text="Gufran Click V4" android:textColor="@color/jahez_red" 
+                  android:text="Gufran Click V6" android:textColor="@color/jahez_red" 
                   android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center"/>
 
               <View android:layout_width="match_parent" android:layout_height="1dp" 
@@ -112,7 +112,7 @@ jobs:
                   android:thumbTint="@color/jahez_red"/>
 
               <Button android:id="@+id/btn_save" android:layout_width="match_parent" 
-                  android:layout_height="60dp" android:text="SAVE & APPLY" 
+                  android:layout_height="60dp" android:text="SAVE AND APPLY" 
                   android:backgroundTint="@color/jahez_red" android:textColor="@color/text_white"
                   android:layout_marginTop="30dp" android:textStyle="bold"/>
           </LinearLayout>
@@ -123,7 +123,6 @@ jobs:
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.os.Bundle;
-          import android.view.inputmethod.InputMethodManager;
           import android.widget.Button;
           import android.widget.EditText;
           import android.widget.SeekBar;
@@ -173,7 +172,7 @@ jobs:
                       
                       File pf = new File(getFilesDir().getParent(), "shared_prefs/danish_prefs.xml");
                       if (pf.exists()) pf.setReadable(true, false);
-                      Toast.makeText(this, "Module Settings Applied!", Toast.LENGTH_SHORT).show();
+                      Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
                   });
               }
           }
@@ -182,7 +181,6 @@ jobs:
           cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
           package com.danish.lsposed;
           import android.app.Activity;
-          import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
           import android.os.SystemClock;
@@ -193,7 +191,6 @@ jobs:
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XSharedPreferences;
-          import de.robv.android.xposed.XposedBridge;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
           import java.util.ArrayList;
@@ -209,7 +206,6 @@ jobs:
                   xPrefs = new XSharedPreferences("com.danish.lsposed", "danish_prefs");
                   xPrefs.makeWorldReadable();
 
-                  // FIX: Specific Class ki bajaye Generic Activity Hook
                   XposedHelpers.findAndHookMethod(Activity.class, "onResume", new XC_MethodHook() {
                       @Override
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
@@ -217,15 +213,14 @@ jobs:
                           xPrefs.reload();
                           if (!xPrefs.getBoolean("enabled", false)) return;
 
-                          int userDelay = xPrefs.getInt("system_delay", 800);
                           new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                              checkScreenAndSwipe(act);
-                          }, userDelay);
+                              checkScreen(act);
+                          }, xPrefs.getInt("system_delay", 800));
                       }
                   });
               }
 
-              private void checkScreenAndSwipe(Activity act) {
+              private void checkScreen(Activity act) {
                   List<Float> kms = new ArrayList<>();
                   scanKm(act.getWindow().getDecorView(), kms);
                   if (kms.size() >= 2) {
@@ -276,22 +271,6 @@ jobs:
           }
           EOF
 
-      - name: Create Manifest & Assets
-        run: |
-          cat > app/src/main/AndroidManifest.xml << 'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="Gufran Slider V4" android:theme="@style/Theme.AppCompat.NoActionBar">
-                  <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Jahez Auto Hook Dynamic" />
-                  <meta-data android:name="xposedminversion" android:value="82" />
-                  <activity android:name=".SettingsActivity" android:exported="true">
-                      <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
-          echo "com.danish.lsposed.MainHook" > app/src/main/assets/xposed_init
-
       - name: Build & Upload
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -299,5 +278,5 @@ jobs:
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Gufran-Slider-Final-V4
+          name: Gufran-Slider-V6-FINAL
           path: app/build/outputs/apk/debug/*.apk
