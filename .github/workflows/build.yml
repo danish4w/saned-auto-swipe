@@ -1,4 +1,4 @@
-name: Build Gufran Slider V7.5 Log Monitor
+name: Build Gufran V7.5 LogMonitor Fixed
 on: workflow_dispatch
 
 jobs:
@@ -19,11 +19,23 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
 
-      - name: Create Build Config
+      - name: Create Root Build Files
         run: |
           echo "include ':app'" > settings.gradle
+          cat > build.gradle << 'EOF'
+          buildscript {
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
+          }
+          allprojects {
+              repositories { google(); mavenCentral(); maven { url 'https://api.xposed.info/' } }
+          }
+          EOF
+
+      - name: Create App Build Config
+        run: |
           cat > app/build.gradle << 'EOF'
-          plugins { id 'com.android.application' }
+          apply plugin: 'com.android.application'
           android {
               namespace 'com.danish.lsposed'
               compileSdk 34
@@ -31,7 +43,7 @@ jobs:
                   applicationId 'com.danish.lsposed'
                   minSdk 26
                   targetSdk 34
-                  versionCode 19
+                  versionCode 20
                   versionName '7.5-LogMonitor'
               }
           }
@@ -42,14 +54,14 @@ jobs:
           }
           EOF
 
-      - name: Android Manifest (2 Activities)
+      - name: Android Manifest
         run: |
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application android:label="Gufran V7.5" android:theme="@style/Theme.AppCompat.NoActionBar">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="V7.5 - Real-time Log Monitor with MS Precision" />
+                  <meta-data android:name="xposeddescription" android:value="V7.5 - Real-time Log Monitor" />
                   <meta-data android:name="xposedminversion" android:value="82" />
                   <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter>
@@ -63,9 +75,8 @@ jobs:
           EOF
           echo "com.danish.lsposed.MainHook" > app/src/main/assets/xposed_init
 
-      - name: UI Layouts (Settings & Logs)
+      - name: UI Layouts
         run: |
-          # Settings Page
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent"
@@ -79,7 +90,6 @@ jobs:
               <Button android:id="@+id/btn_logs" android:layout_width="match_parent" android:layout_height="55dp" android:text="VIEW LIVE LOGS" android:backgroundTint="#4CAF50" android:layout_marginTop="10dp"/>
           </LinearLayout>
           EOF
-          # Log Page
           cat > app/src/main/res/layout/activity_log.xml << 'EOF'
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent"
@@ -92,17 +102,16 @@ jobs:
           </LinearLayout>
           EOF
 
-      - name: Java Activities & Hook
+      - name: Java Code (Fixing Errors)
         run: |
-          # LogActivity logic
           cat > app/src/main/java/com/danish/lsposed/LogActivity.java << 'EOF'
           package com.danish.lsposed;
           import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
           import android.content.IntentFilter;
+          import android.os.Build;
           import android.os.Bundle;
-          import android.widget.Button;
           import android.widget.TextView;
           import androidx.appcompat.app.AppCompatActivity;
 
@@ -112,7 +121,7 @@ jobs:
                   @Override
                   public void onReceive(Context context, Intent intent) {
                       String msg = intent.getStringExtra("log_msg");
-                      tvLogs.append("\n" + msg + "\n--------------------");
+                      if(tvLogs != null) tvLogs.append("\n" + msg + "\n----------");
                   }
               };
 
@@ -122,7 +131,11 @@ jobs:
                   setContentView(R.layout.activity_log);
                   tvLogs = findViewById(R.id.tv_logs);
                   findViewById(R.id.btn_clear).setOnClickListener(v -> tvLogs.setText("Logs Cleared."));
-                  registerReceiver(receiver, new IntentFilter("GUFRAN_LOG_ACTION"), RECEIVER_EXPORTED);
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      registerReceiver(receiver, new IntentFilter("GUFRAN_LOG_ACTION"), Context.RECEIVER_EXPORTED);
+                  } else {
+                      registerReceiver(receiver, new IntentFilter("GUFRAN_LOG_ACTION"));
+                  }
               }
 
               @Override
@@ -133,7 +146,6 @@ jobs:
           }
           EOF
 
-          # SettingsActivity logic
           cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
           package com.danish.lsposed;
           import android.content.Context;
@@ -179,7 +191,6 @@ jobs:
           }
           EOF
 
-          # MainHook logic (The Engine)
           cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
           package com.danish.lsposed;
           import android.app.Activity;
@@ -215,38 +226,32 @@ jobs:
 
               private void process(Activity act, long startTime) {
                   List<Float> kms = new ArrayList<>();
-                  StringBuilder raw = new StringBuilder();
-                  scan(act.getWindow().getDecorView(), kms, raw);
-                  
+                  scan(act.getWindow().getDecorView(), kms);
                   long scanTime = System.currentTimeMillis() - startTime;
                   String timeStr = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(new Date());
-                  
                   StringBuilder log = new StringBuilder("[" + timeStr + "]\n");
-                  log.append("Scan Time: ").append(scanTime).append("ms\n");
-                  log.append("Found KMs: ").append(kms.toString()).append("\n");
+                  log.append("Scan: ").append(scanTime).append("ms | KMs: ").append(kms.toString());
 
                   if (kms.size() >= 2) {
                       float p = kms.get(0), d = kms.get(1);
                       float pM = xP.getFloat("pickup_max", 5.0f), dM = xP.getFloat("drop_max", 10.0f);
                       if (p <= pM && d <= dM) {
-                          log.append("Result: MATCH ✅ (Swiping...)");
+                          log.append("\nResult: MATCH ✅ (Swiping...)");
                           findAndSwipe(act.getWindow().getDecorView());
                       } else {
-                          log.append("Result: REJECT ❌ (Limit: ").append(pM).append("/").append(dM).append(")");
+                          log.append("\nResult: REJECT ❌ (Lmt: ").append(pM).append("/").append(dM).append(")");
                       }
-                  } else {
-                      log.append("Result: NO DATA ⚠️");
-                  }
+                  } else { log.append("\nResult: NO DATA ⚠️"); }
                   
-                  // Send to Log Page
                   Intent intent = new Intent("GUFRAN_LOG_ACTION");
+                  intent.setPackage("com.danish.lsposed");
                   intent.putExtra("log_msg", log.toString());
                   act.sendBroadcast(intent);
               }
 
-              private void scan(View v, List<Float> l, StringBuilder raw) {
+              private void scan(View v, List<Float> l) {
                   if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scan(((ViewGroup) v).getChildAt(i), l, raw);
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scan(((ViewGroup) v).getChildAt(i), l);
                   } else if (v instanceof TextView) {
                       String t = ((TextView) v).getText().toString().toLowerCase();
                       if (t.contains("km")) {
@@ -285,5 +290,5 @@ jobs:
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Gufran-V7.5-LogMonitor
+          name: Gufran-V7.5-Fixed
           path: app/build/outputs/apk/debug/*.apk
