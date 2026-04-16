@@ -1,4 +1,4 @@
-name: Build Gufran Slider V9 Final
+name: Build Gufran Slider V7.1 Logs Only
 on: workflow_dispatch
 
 jobs:
@@ -19,41 +19,23 @@ jobs:
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
-          mkdir -p gradle/wrapper
-
-      - name: Setup Gradle Wrapper
-        run: |
-          # Download gradlew and wrapper files (same as DanishAuto working workflow)
-          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
-          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
-          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.properties -o gradle/wrapper/gradle-wrapper.properties
-          chmod +x gradlew
 
       - name: Create Build Files
         run: |
           echo "include ':app'" > settings.gradle
-
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
-          org.gradle.jvmargs=-Xmx2048m
           EOF
-
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
               dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
           allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-                  // FIX: Correct Xposed API repo (jitpack)
-                  maven { url 'https://jitpack.io' }
-              }
+              repositories { google(); mavenCentral(); maven { url 'https://api.xposed.info/' } }
           }
           EOF
-
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
@@ -63,17 +45,12 @@ jobs:
                   applicationId 'com.danish.lsposed'
                   minSdk 26
                   targetSdk 34
-                  versionCode 10
-                  versionName '9.0'
-              }
-              packagingOptions {
-                  exclude 'META-INF/LICENSE.md'
-                  exclude 'META-INF/LICENSE-notice.md'
+                  versionCode 13
+                  versionName '7.1-Logs'
               }
           }
           dependencies {
-              // FIX: Correct Xposed API dependency via jitpack
-              compileOnly 'com.github.rovo89.XposedBridge:api:89'
+              compileOnly 'de.robv.android.xposed:api:82'
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'com.google.android.material:material:1.9.0'
           }
@@ -86,10 +63,10 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
                   android:allowBackup="true"
-                  android:label="Gufran Slider V9"
+                  android:label="Gufran Slider V7.1"
                   android:theme="@style/Theme.AppCompat.NoActionBar">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Gufran Auto V9 - Smart Order Accept" />
+                  <meta-data android:name="xposeddescription" android:value="V7.1 - Debug Logs Enabled" />
                   <meta-data android:name="xposedminversion" android:value="82" />
                   <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter>
@@ -100,69 +77,18 @@ jobs:
               </application>
           </manifest>
           EOF
-
           echo "com.danish.lsposed.MainHook" > app/src/main/assets/xposed_init
 
-      - name: Create UI Resources
-        run: |
-          cat > app/src/main/res/values/colors.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <color name="jahez_red">#FF4B3A</color>
-              <color name="dark_bg">#121212</color>
-              <color name="text_white">#FFFFFF</color>
-          </resources>
-          EOF
-
-          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:padding="24dp" android:background="@color/dark_bg">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                  android:text="Gufran Slider V9" android:textColor="@color/jahez_red"
-                  android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center"/>
-              <View android:layout_width="match_parent" android:layout_height="1dp"
-                  android:background="#22FFFFFF" android:layout_marginVertical="20dp"/>
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                  android:text="Pickup Max (KM)" android:textColor="@color/text_white"/>
-              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent"
-                  android:layout_height="50dp" android:backgroundTint="@color/jahez_red"
-                  android:textColor="@color/text_white" android:inputType="numberDecimal" android:text="5.0"/>
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                  android:text="Drop Max (KM)" android:textColor="@color/text_white" android:layout_marginTop="10dp"/>
-              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent"
-                  android:layout_height="50dp" android:backgroundTint="@color/jahez_red"
-                  android:textColor="@color/text_white" android:inputType="numberDecimal" android:text="10.0"/>
-              <TextView android:id="@+id/tv_delay_label" android:layout_width="wrap_content"
-                  android:layout_height="wrap_content" android:text="Delay: 800ms"
-                  android:textColor="@color/jahez_red" android:layout_marginTop="20dp" android:textStyle="bold"/>
-              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent"
-                  android:layout_height="wrap_content" android:layout_marginTop="10dp"
-                  android:max="1100" android:progress="400"/>
-              <Switch android:id="@+id/switch_enabled" android:layout_width="match_parent"
-                  android:layout_height="wrap_content" android:text="Module Enable"
-                  android:textColor="@color/text_white" android:layout_marginTop="20dp"/>
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent"
-                  android:layout_height="60dp" android:text="SAVE AND APPLY"
-                  android:backgroundTint="@color/jahez_red" android:textColor="@color/text_white"
-                  android:layout_marginTop="30dp" android:textStyle="bold"/>
-          </LinearLayout>
-          EOF
-
-      - name: Create SettingsActivity Java
+      - name: Create Settings Java
         run: |
           cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
           package com.danish.lsposed;
-
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.os.Bundle;
           import android.widget.Button;
           import android.widget.EditText;
-          import android.widget.SeekBar;
           import android.widget.Switch;
-          import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
           import java.io.File;
@@ -172,64 +98,54 @@ jobs:
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_settings);
-
-                  final SharedPreferences p = getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-
+                  SharedPreferences p = getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                  
                   EditText etP = findViewById(R.id.et_pickup_max);
                   EditText etD = findViewById(R.id.et_drop_max);
-                  TextView tvD = findViewById(R.id.tv_delay_label);
-                  SeekBar sb   = findViewById(R.id.sb_delay);
-                  Switch sw    = findViewById(R.id.switch_enabled);
-                  Button btn   = findViewById(R.id.btn_save);
+                  Switch sw = findViewById(R.id.switch_enabled);
+                  Button btn = findViewById(R.id.btn_save);
 
                   etP.setText(String.valueOf(p.getFloat("pickup_max", 5.0f)));
                   etD.setText(String.valueOf(p.getFloat("drop_max", 10.0f)));
-                  int d = p.getInt("system_delay", 800);
-                  sb.setProgress(d - 400);
-                  tvD.setText("Delay: " + d + "ms");
                   sw.setChecked(p.getBoolean("enabled", false));
 
-                  sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                      @Override
-                      public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                          tvD.setText("Delay: " + (progress + 400) + "ms");
-                      }
-                      @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-                      @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-                  });
-
                   btn.setOnClickListener(v -> {
-                      float pVal, dVal;
-                      try { pVal = Float.parseFloat(etP.getText().toString()); } catch (Exception e) { pVal = 5.0f; }
-                      try { dVal = Float.parseFloat(etD.getText().toString()); } catch (Exception e) { dVal = 10.0f; }
-
-                      p.edit()
-                          .putFloat("pickup_max", pVal)
-                          .putFloat("drop_max", dVal)
-                          .putInt("system_delay", sb.getProgress() + 400)
-                          .putBoolean("enabled", sw.isChecked())
-                          .apply();
-
-                      // LSPosed ke liye file readable banao
+                      p.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
+                             .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
+                             .putBoolean("enabled", sw.isChecked()).apply();
+                      
                       try {
                           File sharedPrefsDir = new File(getFilesDir().getParentFile(), "shared_prefs");
                           File prefFile = new File(sharedPrefsDir, "danish_prefs.xml");
-                          if (prefFile.exists()) {
-                              prefFile.setReadable(true, false);
-                          }
-                      } catch (Exception ignored) {}
-
-                      Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
+                          if (prefFile.exists()) { prefFile.setReadable(true, false); }
+                      } catch (Exception e) {}
+                      
+                      Toast.makeText(this, "V7.1 Settings Saved!", Toast.LENGTH_SHORT).show();
                   });
               }
           }
           EOF
 
-      - name: Create MainHook Java (All Bugs Fixed)
+      - name: Create UI Layout
+        run: |
+          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:padding="20dp" android:background="#121212">
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" 
+                  android:text="Gufran V7.1 Logs" android:textColor="#FF4B3A" android:textSize="24sp" android:layout_gravity="center"/>
+              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="50dp" android:textColor="#FFFFFF" android:hint="Pickup KM"/>
+              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="50dp" android:textColor="#FFFFFF" android:hint="Drop KM"/>
+              <Switch android:id="@+id/switch_enabled" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Enable Module" android:textColor="#FFFFFF"/>
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="60dp" android:text="SAVE" android:backgroundTint="#FF4B3A"/>
+          </LinearLayout>
+          EOF
+
+      - name: Create MainHook (V7 with Deep Logs)
         run: |
           cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
           package com.danish.lsposed;
-
           import android.app.Activity;
           import android.os.Handler;
           import android.os.Looper;
@@ -250,184 +166,70 @@ jobs:
           import java.util.regex.Pattern;
 
           public class MainHook implements IXposedHookLoadPackage {
-
               private static XSharedPreferences xPrefs;
-              // FIX: isProcessing flag — ek baar scan hone ke baad dobara fire na ho
-              private boolean isProcessing = false;
-
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
                   if (!lpparam.packageName.equals("net.jahez.fleets")) return;
-
-                  XposedBridge.log("[Gufran-V9] Jahez Hooked!");
+                  
+                  XposedBridge.log("[Gufran-V7.1] Jahez Hooked Successfully!");
                   xPrefs = new XSharedPreferences("com.danish.lsposed", "danish_prefs");
-                  xPrefs.makeWorldReadable();
 
-                  // FIX: onWindowFocusChanged use karo — sirf jab NEW order popup aaye
-                  // onResume baar baar fire hota hai (back press, notification, etc.)
-                  XposedHelpers.findAndHookMethod(Activity.class, "onWindowFocusChanged",
-                      boolean.class, new XC_MethodHook() {
+                  XposedHelpers.findAndHookMethod(Activity.class, "onResume", new XC_MethodHook() {
                       @Override
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                          boolean hasFocus = (boolean) param.args[0];
-                          if (!hasFocus) return; // Focus wapas aaya tabhi check karo
-                          if (isProcessing) return;
-
                           Activity act = (Activity) param.thisObject;
-
-                          // Prefs reload karo agar change hua ho
-                          if (xPrefs.hasFileChanged()) xPrefs.reload();
+                          xPrefs.reload();
                           if (!xPrefs.getBoolean("enabled", false)) return;
 
-                          int delay = xPrefs.getInt("system_delay", 800);
-                          isProcessing = true;
-
                           new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                              try {
-                                  XposedBridge.log("[Gufran-V9] Screen scan start...");
-                                  checkScreen(act);
-                              } catch (Exception e) {
-                                  XposedBridge.log("[Gufran-V9] Error: " + e.getMessage());
-                              } finally {
-                                  isProcessing = false;
-                              }
-                          }, delay);
+                              XposedBridge.log("[Gufran-V7.1] Starting Screen Scan...");
+                              runLogic(act);
+                          }, 800);
                       }
                   });
               }
 
-              private void checkScreen(Activity act) {
-                  View root = act.getWindow().getDecorView();
+              private void runLogic(Activity act) {
+                  List<Float> kms = new ArrayList<>();
+                  scanKms(act.getWindow().getDecorView(), kms);
+                  XposedBridge.log("[Gufran-V7.1] Found KM values: " + kms.toString());
 
-                  // FIX: Pehle check karo "New Order" text hai screen pe
-                  List<String> allTexts = new ArrayList<>();
-                  collectAllTexts(root, allTexts);
-                  XposedBridge.log("[Gufran-V9] All texts: " + allTexts.toString());
-
-                  boolean hasNewOrder = false;
-                  for (String t : allTexts) {
-                      if (t.contains("New Order")) { hasNewOrder = true; break; }
-                  }
-                  if (!hasNewOrder) {
-                      XposedBridge.log("[Gufran-V9] 'New Order' nahi mila, skip");
-                      return;
-                  }
-
-                  // FIX: Distance extract karo — "x.x Km From You" / "x.x Km From Pickup"
-                  // Price (jaise 10.0) ko filter karo — sirf "Km" wale texts lo
-                  float pickupKm = -1, dropKm = -1;
-                  Pattern kmPattern = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk]m");
-
-                  // Method A: Same node mein "From You" / "From Pickup" hai
-                  for (int i = 0; i < allTexts.size(); i++) {
-                      String t = allTexts.get(i);
-
-                      if (t.contains("From You") && pickupKm < 0) {
-                          Matcher m = kmPattern.matcher(t);
-                          if (m.find()) {
-                              pickupKm = Float.parseFloat(m.group(1));
-                              XposedBridge.log("[Gufran-V9] Pickup same-node: " + pickupKm);
-                          } else {
-                              // Pichle node mein km value hogi
-                              for (int j = i - 1; j >= Math.max(0, i - 3); j--) {
-                                  Matcher pm = kmPattern.matcher(allTexts.get(j));
-                                  if (pm.find()) {
-                                      pickupKm = Float.parseFloat(pm.group(1));
-                                      XposedBridge.log("[Gufran-V9] Pickup prev-node: " + pickupKm);
-                                      break;
-                                  }
-                              }
-                          }
+                  if (kms.size() >= 2) {
+                      float p = kms.get(0), d = kms.get(1);
+                      float pMax = xPrefs.getFloat("pickup_max", 5.0f);
+                      float dMax = xPrefs.getFloat("drop_max", 10.0f);
+                      
+                      if (p <= pMax && d <= dMax) {
+                          XposedBridge.log("[Gufran-V7.1] Limit Match! Pickup: " + p + " Drop: " + d);
+                          findButton(act.getWindow().getDecorView());
+                      } else {
+                          XposedBridge.log("[Gufran-V7.1] Limit Exceeded. P:" + p + " D:" + d);
                       }
-
-                      if (t.contains("From Pickup") && dropKm < 0) {
-                          Matcher m = kmPattern.matcher(t);
-                          if (m.find()) {
-                              dropKm = Float.parseFloat(m.group(1));
-                              XposedBridge.log("[Gufran-V9] Drop same-node: " + dropKm);
-                          } else {
-                              for (int j = i - 1; j >= Math.max(0, i - 3); j--) {
-                                  Matcher pm = kmPattern.matcher(allTexts.get(j));
-                                  if (pm.find()) {
-                                      dropKm = Float.parseFloat(pm.group(1));
-                                      XposedBridge.log("[Gufran-V9] Drop prev-node: " + dropKm);
-                                      break;
-                                  }
-                              }
-                          }
-                      }
-                  }
-
-                  // Method B: Positional fallback — sirf "Km" wale values, 0-100 range
-                  if (pickupKm < 0 || dropKm < 0) {
-                      XposedBridge.log("[Gufran-V9] Keyword match fail, positional fallback");
-                      List<Float> kmVals = new ArrayList<>();
-                      for (String t : allTexts) {
-                          // FIX: Sirf "Km" wale text nodes lo (price filter ho jaayegi)
-                          if (!t.toLowerCase().contains("km")) continue;
-                          Matcher m = kmPattern.matcher(t);
-                          while (m.find()) {
-                              float v = Float.parseFloat(m.group(1));
-                              if (v > 0 && v < 100) kmVals.add(v);
-                          }
-                      }
-                      XposedBridge.log("[Gufran-V9] Km values: " + kmVals.toString());
-                      if (kmVals.size() >= 2) {
-                          pickupKm = kmVals.get(0);
-                          dropKm   = kmVals.get(1);
-                      }
-                  }
-
-                  XposedBridge.log("[Gufran-V9] Final → Pickup: " + pickupKm + " | Drop: " + dropKm);
-
-                  if (pickupKm < 0 || dropKm < 0) {
-                      XposedBridge.log("[Gufran-V9] Distance nahi mila, skip");
-                      return;
-                  }
-
-                  float pMax = xPrefs.getFloat("pickup_max", 5.0f);
-                  float dMax = xPrefs.getFloat("drop_max", 10.0f);
-
-                  if (pickupKm <= pMax && dropKm <= dMax) {
-                      XposedBridge.log("[Gufran-V9] Match! P:" + pickupKm + "<=" + pMax
-                          + " D:" + dropKm + "<=" + dMax + " → Swiping...");
-                      findAndSwipe(root);
                   } else {
-                      XposedBridge.log("[Gufran-V9] Reject → P:" + pickupKm + "/" + pMax
-                          + " D:" + dropKm + "/" + dMax);
+                      XposedBridge.log("[Gufran-V7.1] Not enough KM fields found.");
                   }
               }
 
-              // Saare texts in-order collect karo
-              private void collectAllTexts(View v, List<String> out) {
+              private void scanKms(View v, List<Float> list) {
                   if (v instanceof ViewGroup) {
-                      ViewGroup vg = (ViewGroup) v;
-                      for (int i = 0; i < vg.getChildCount(); i++) {
-                          collectAllTexts(vg.getChildAt(i), out);
-                      }
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scanKms(((ViewGroup) v).getChildAt(i), list);
                   } else if (v instanceof TextView) {
-                      CharSequence cs = ((TextView) v).getText();
-                      if (cs != null && cs.length() > 0) {
-                          out.add(cs.toString().trim());
+                      String t = ((TextView) v).getText().toString();
+                      if (t.toLowerCase().contains("km")) {
+                          Matcher m = Pattern.compile("(\\d+\\.?\\d*)").matcher(t);
+                          if (m.find()) list.add(Float.parseFloat(m.group(1)));
                       }
                   }
               }
 
-              // "Accept" button dhundo aur swipe karo
-              private void findAndSwipe(View v) {
+              private void findButton(View v) {
                   if (v instanceof ViewGroup) {
-                      ViewGroup vg = (ViewGroup) v;
-                      for (int i = 0; i < vg.getChildCount(); i++) {
-                          findAndSwipe(vg.getChildAt(i));
-                      }
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) findButton(((ViewGroup) v).getChildAt(i));
                   } else if (v instanceof TextView) {
                       String txt = ((TextView) v).getText().toString().toLowerCase();
                       if (txt.contains("accept") || txt.contains("قبول")) {
-                          XposedBridge.log("[Gufran-V9] Accept button mila: " + txt);
-                          // FIX: Parent view pe swipe karo (button container)
-                          // TextView sirf text hai, actual swipeable view uska parent hai
-                          View target = (v.getParent() instanceof View) ? (View) v.getParent() : v;
-                          doSwipe(target);
+                          XposedBridge.log("[Gufran-V7.1] Button Found: " + txt + ". Swiping...");
+                          doSwipe(v);
                       }
                   }
               }
@@ -435,35 +237,23 @@ jobs:
               private void doSwipe(View v) {
                   int[] pos = new int[2];
                   v.getLocationOnScreen(pos);
-                  int w = v.getWidth();
-                  int h = v.getHeight();
-
-                  // FIX: Width/height 0 ho to fallback
-                  if (w == 0 || h == 0) {
-                      XposedBridge.log("[Gufran-V9] View size 0, skip swipe");
-                      return;
-                  }
-
-                  float startX = pos[0] + (w * 0.15f);
-                  float endX   = pos[0] + (w * 0.85f);
-                  float y      = pos[1] + (h * 0.5f);
-
-                  long t = SystemClock.uptimeMillis();
-                  XposedBridge.log("[Gufran-V9] Swipe: " + (int)startX + " → " + (int)endX + " @ Y=" + (int)y);
-
-                  v.dispatchTouchEvent(MotionEvent.obtain(t,       t,       MotionEvent.ACTION_DOWN,  startX, y, 0));
-                  v.dispatchTouchEvent(MotionEvent.obtain(t,       t + 100, MotionEvent.ACTION_MOVE,  (startX+endX)/2, y, 0));
-                  v.dispatchTouchEvent(MotionEvent.obtain(t,       t + 200, MotionEvent.ACTION_MOVE,  endX,   y, 0));
-                  v.dispatchTouchEvent(MotionEvent.obtain(t,       t + 220, MotionEvent.ACTION_UP,    endX,   y, 0));
+                  float xStart = pos[0] + (v.getWidth() * 0.2f);
+                  float xEnd = pos[0] + (v.getWidth() * 0.8f);
+                  float y = pos[1] + (v.getHeight() / 2f);
+                  long downTime = SystemClock.uptimeMillis();
+                  v.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, xStart, y, 0));
+                  v.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 150, MotionEvent.ACTION_MOVE, xEnd, y, 0));
+                  v.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 160, MotionEvent.ACTION_UP, xEnd, y, 0));
               }
           }
           EOF
 
-      - name: Build Project
-        run: ./gradlew assembleDebug --no-daemon
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Build & Upload
+        uses: gradle/actions/setup-gradle@v3
         with:
-          name: Gufran-Slider-V9-FIXED
+          gradle-version: '8.4'
+      - run: gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Gufran-Slider-V7.1-LOGS
           path: app/build/outputs/apk/debug/*.apk
