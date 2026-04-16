@@ -13,19 +13,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Xposed API jar (reliable source)
-        run: |
-          mkdir -p app/libs
-          # Use the official Maven Central URL with proper redirect following
-          curl -L -o app/libs/api-82.jar "https://search.maven.org/remotecontent?filepath=de/robv/android/xposed/api/82/api-82.jar"
-          # Verify the jar is valid
-          if ! unzip -t app/libs/api-82.jar >/dev/null 2>&1; then
-            echo "JAR is corrupt, trying alternative source..."
-            curl -L -o app/libs/api-82.jar "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar"
-            unzip -t app/libs/api-82.jar || { echo "JAR still corrupt"; exit 1; }
-          fi
-          ls -la app/libs/
-
       - name: Prepare project structure
         run: |
           mkdir -p app/src/main/java/com/danish/lsposed
@@ -51,11 +38,21 @@ jobs:
           EOF
           cat > build.gradle << 'EOF'
           buildscript {
-              repositories { google(); mavenCentral() }
-              dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://maven.xposed.info/repository' }
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.3.2'
+              }
           }
           allprojects {
-              repositories { google(); mavenCentral() }
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://maven.xposed.info/repository' }
+              }
           }
           EOF
           cat > app/build.gradle << 'EOF'
@@ -72,7 +69,7 @@ jobs:
               }
           }
           dependencies {
-              compileOnly files('libs/api-82.jar')
+              compileOnly 'de.robv.android.xposed:api:82'
               implementation 'androidx.appcompat:appcompat:1.6.1'
           }
           EOF
@@ -97,7 +94,7 @@ jobs:
           </resources>
           EOF
 
-      - name: Create layout (default 1.5 and 3.5)
+      - name: Create layout
         run: |
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -257,20 +254,15 @@ jobs:
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
                   if (!lpparam.packageName.equals("net.jahez.fleets")) return;
-                  XposedBridge.log(TAG + " ===== HOOKED INTO JAHEZ DRIVER =====");
-
+                  XposedBridge.log(TAG + " Hooked");
                   Class<?> orderActivity = XposedHelpers.findClass("com.jahez.fleets.ui.order.OrderActivity", lpparam.classLoader);
                   XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
                       @Override
                       protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                           Activity act = (Activity) param.thisObject;
                           prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                          if (!prefs.getBoolean("enabled", false)) {
-                              XposedBridge.log(TAG + " Module disabled");
-                              return;
-                          }
+                          if (!prefs.getBoolean("enabled", false)) return;
                           int delay = prefs.getInt("system_delay", 800);
-                          XposedBridge.log(TAG + " Order screen, delay " + delay + "ms");
                           new Handler(Looper.getMainLooper()).postDelayed(() -> processOrder(act), delay);
                       }
                   });
@@ -280,37 +272,26 @@ jobs:
                   try {
                       List<Float> distances = new ArrayList<>();
                       scanKm(act.getWindow().getDecorView(), distances);
-                      if (distances.size() < 2) {
-                          XposedBridge.log(TAG + " Not enough distances");
-                          return;
-                      }
+                      if (distances.size() < 2) return;
                       float pickup = distances.get(0);
                       float drop = distances.get(1);
                       float pickupMax = prefs.getFloat("pickup_max", 1.5f);
                       float dropMax = prefs.getFloat("drop_max", 3.5f);
-                      XposedBridge.log(TAG + " Pickup: " + pickup + " Drop: " + drop + " Limits: " + pickupMax + "/" + dropMax);
                       if (pickup <= pickupMax && drop <= dropMax) {
-                          XposedBridge.log(TAG + " Accepting order");
                           performSwipeOnAccept(act.getWindow().getDecorView());
-                      } else {
-                          XposedBridge.log(TAG + " Out of range");
                       }
                   } catch (Exception e) {
-                      XposedBridge.log(TAG + " Error: " + e.getMessage());
+                      XposedBridge.log(TAG + " err: " + e.getMessage());
                   }
               }
 
               private void scanKm(View v, List<Float> out) {
-                  if (v == null) return;
                   if (v instanceof TextView) {
                       String text = ((TextView) v).getText().toString().toLowerCase();
                       if (text.contains("km")) {
                           Matcher m = Pattern.compile("(\\d+\\.?\\d*)").matcher(text);
                           if (m.find()) {
-                              try {
-                                  float val = Float.parseFloat(m.group(1));
-                                  if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
-                              } catch (Exception e) {}
+                              try { out.add(Float.parseFloat(m.group(1))); } catch(Exception e) {}
                           }
                       }
                   } else if (v instanceof ViewGroup) {
@@ -319,23 +300,20 @@ jobs:
               }
 
               private void performSwipeOnAccept(View root) {
-                  View acceptBtn = findAcceptButton(root);
-                  if (acceptBtn == null) {
-                      XposedBridge.log(TAG + " Accept button not found");
-                      return;
-                  }
+                  View btn = findAcceptButton(root);
+                  if (btn == null) return;
                   int[] loc = new int[2];
-                  acceptBtn.getLocationOnScreen(loc);
-                  int startX = loc[0] + acceptBtn.getWidth() / 5;
-                  int endX = loc[0] + acceptBtn.getWidth() * 4 / 5;
-                  int y = loc[1] + acceptBtn.getHeight() / 2;
+                  btn.getLocationOnScreen(loc);
+                  int startX = loc[0] + btn.getWidth() / 5;
+                  int endX = loc[0] + btn.getWidth() * 4 / 5;
+                  int y = loc[1] + btn.getHeight() / 2;
                   injectSwipe(startX, y, endX, y, 300);
               }
 
               private View findAcceptButton(View v) {
                   if (v instanceof TextView) {
-                      String text = ((TextView) v).getText().toString();
-                      if (text.equalsIgnoreCase("Accept") || text.equals("قبول")) return v;
+                      String t = ((TextView) v).getText().toString();
+                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")) return v;
                   }
                   if (v instanceof ViewGroup) {
                       for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
@@ -348,29 +326,24 @@ jobs:
 
               private void injectSwipe(int x1, int y1, int x2, int y2, int duration) {
                   try {
-                      Class<?> inputManagerClass = Class.forName("android.hardware.input.InputManager");
-                      Method getInstance = inputManagerClass.getMethod("getInstance");
-                      Object inputManager = getInstance.invoke(null);
-                      Method injectInputEvent = inputManagerClass.getMethod("injectInputEvent", MotionEvent.class, int.class);
-
-                      long downTime = SystemClock.uptimeMillis();
-                      MotionEvent down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x1, y1, 0);
-                      injectInputEvent.invoke(inputManager, down, 0);
+                      Class<?> imc = Class.forName("android.hardware.input.InputManager");
+                      Method get = imc.getMethod("getInstance");
+                      Object im = get.invoke(null);
+                      Method inj = imc.getMethod("injectInputEvent", MotionEvent.class, int.class);
+                      long t = SystemClock.uptimeMillis();
+                      MotionEvent down = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x1, y1, 0);
+                      inj.invoke(im, down, 0);
                       down.recycle();
-
-                      long moveTime = downTime + duration / 2;
-                      MotionEvent move = MotionEvent.obtain(downTime, moveTime, MotionEvent.ACTION_MOVE, x2, y2, 0);
-                      injectInputEvent.invoke(inputManager, move, 0);
+                      long t2 = t + duration/2;
+                      MotionEvent move = MotionEvent.obtain(t, t2, MotionEvent.ACTION_MOVE, x2, y2, 0);
+                      inj.invoke(im, move, 0);
                       move.recycle();
-
-                      long upTime = downTime + duration;
-                      MotionEvent up = MotionEvent.obtain(downTime, upTime, MotionEvent.ACTION_UP, x2, y2, 0);
-                      injectInputEvent.invoke(inputManager, up, 0);
+                      long t3 = t + duration;
+                      MotionEvent up = MotionEvent.obtain(t, t3, MotionEvent.ACTION_UP, x2, y2, 0);
+                      inj.invoke(im, up, 0);
                       up.recycle();
-
-                      XposedBridge.log(TAG + " Swipe success");
                   } catch (Exception e) {
-                      XposedBridge.log(TAG + " Swipe failed: " + e.getMessage());
+                      XposedBridge.log(TAG + " swipe fail: " + e.getMessage());
                   }
               }
           }
