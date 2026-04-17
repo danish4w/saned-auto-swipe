@@ -136,7 +136,6 @@ jobs:
                   final SeekBar sb = findViewById(R.id.sb_delay);
                   final TextView tvL = findViewById(R.id.tv_delay_label);
 
-                  // Default set to 1.5 and 3.5 if not saved
                   etP.setText(String.valueOf(p.getFloat("pickup_max", 1.5f)));
                   etD.setText(String.valueOf(p.getFloat("drop_max", 3.5f)));
                   sb.setProgress(p.getInt("system_delay", 800) - 400);
@@ -151,12 +150,9 @@ jobs:
                       p.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
                              .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
                              .putInt("system_delay", sb.getProgress() + 400).apply();
-                      
-                      // Hide keyboard and remove focus/cursor
                       etP.clearFocus(); etD.clearFocus();
                       InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
                       imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                      
                       Toast.makeText(this, "Settings Saved!", Toast.LENGTH_SHORT).show();
                   });
                   findViewById(R.id.btn_logs).setOnClickListener(v -> startActivity(new Intent(this, LogActivity.class)));
@@ -192,10 +188,11 @@ jobs:
           }
           EOF
 
-      - name: MainHook (Smart Logic)
+      - name: MainHook (Fixed with IncomingDispatchActivity)
         run: |
           cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
           package com.danish.lsposed;
+
           import android.app.Activity;
           import android.content.Intent;
           import android.os.*;
@@ -215,35 +212,122 @@ jobs:
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpp) throws Throwable {
                   if (!lpp.packageName.equals("net.jahez.fleets")) return;
                   xP = new XSharedPreferences("com.danish.lsposed", "danish_prefs");
+                  xP.makeWorldReadable();
 
-                  XposedHelpers.findAndHookMethod(Activity.class, "onResume", new XC_MethodHook() {
-                      @Override protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                  // Hook ONLY the order accept activity (IncomingDispatchActivity)
+                  Class<?> orderActivity = XposedHelpers.findClass("net.jahez.fleets.dispatch.accept.IncomingDispatchActivity", lpp.classLoader);
+                  XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
+                      @Override
+                      protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                           final Activity act = (Activity) param.thisObject;
                           xP.reload();
-                          handler.postDelayed(() -> startSmartScan(act, true), xP.getInt("system_delay", 800));
+                          if (!xP.getBoolean("enabled", false)) return;
+                          int delay = xP.getInt("system_delay", 800);
+                          handler.postDelayed(() -> scanOrderScreen(act), delay);
                       }
                   });
               }
 
-              private void startSmartScan(final Activity act, boolean isFirstTry) {
-                  List<Float> kms = new ArrayList<>();
-                  scanView(act.getWindow().getDecorView(), kms);
-                  String time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-                  
-                  if (kms.size() >= 2) {
-                      float p = kms.get(0), d = kms.get(1);
-                      float pM = xP.getFloat("pickup_max", 1.5f), dM = xP.getFloat("drop_max", 3.5f);
-                      if (p <= pM && d <= dM) {
-                          sendLog(act, "[" + time + "] MATCH ✅ ("+p+"/"+d+") Swiping...");
-                          findAndSwipe(act.getWindow().getDecorView());
-                      } else { 
-                          sendLog(act, "[" + time + "] REJECT ❌ ("+p+"/"+d+")");
+              private void scanOrderScreen(Activity act) {
+                  View root = act.getWindow().getDecorView();
+                  List<Float> distances = new ArrayList<>();
+                  findKmText(root, distances);
+                  String time = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(new Date());
+
+                  if (distances.size() >= 2) {
+                      float pickup = distances.get(0);
+                      float drop = distances.get(1);
+                      float pickupMax = xP.getFloat("pickup_max", 1.5f);
+                      float dropMax = xP.getFloat("drop_max", 3.5f);
+                      sendLog(act, time + " 📊 P=" + pickup + "km, D=" + drop + "km");
+                      if (pickup <= pickupMax && drop <= dropMax) {
+                          sendLog(act, time + " ✅ ACCEPT – swiping...");
+                          performSwipeOnAccept(root);
+                          sendLog(act, time + " ✅ Swipe done");
+                      } else {
+                          sendLog(act, time + " ❌ REJECT (out of range)");
                       }
-                  } else if (isFirstTry) {
-                      handler.postDelayed(() -> startSmartScan(act, false), 1500);
                   } else {
-                      sendLog(act, "[" + time + "] NO DATA ⚠️");
+                      sendLog(act, time + " ⏳ No distances found – check screen");
                   }
+              }
+
+              private void findKmText(View v, List<Float> out) {
+                  if (v == null) return;
+                  String text = null;
+                  if (v instanceof TextView) {
+                      text = ((TextView) v).getText().toString();
+                  } else if (v.getContentDescription() != null) {
+                      text = v.getContentDescription().toString();
+                  }
+                  if (text != null) {
+                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
+                      Matcher m = p.matcher(text);
+                      if (m.find()) {
+                          try {
+                              float val = Float.parseFloat(m.group(1).replace(",", "."));
+                              if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
+                          } catch (Exception e) {}
+                      }
+                  }
+                  if (v instanceof ViewGroup) {
+                      ViewGroup g = (ViewGroup) v;
+                      for (int i = 0; i < g.getChildCount(); i++) {
+                          findKmText(g.getChildAt(i), out);
+                      }
+                  }
+              }
+
+              private void performSwipeOnAccept(View root) {
+                  View acceptBtn = findAcceptButton(root);
+                  if (acceptBtn == null) {
+                      int sw = root.getResources().getDisplayMetrics().widthPixels;
+                      int sh = root.getResources().getDisplayMetrics().heightPixels;
+                      int startX = sw * 2 / 10;
+                      int endX = sw * 8 / 10;
+                      int y = sh * 85 / 100;
+                      injectSwipe(startX, y, endX, y);
+                      return;
+                  }
+                  int[] pos = new int[2];
+                  acceptBtn.getLocationOnScreen(pos);
+                  int w = acceptBtn.getWidth();
+                  int h = acceptBtn.getHeight();
+                  if (w == 0 || h == 0) return;
+                  int startX = pos[0] + w / 5;
+                  int endX = pos[0] + w * 4 / 5;
+                  int y = pos[1] + h / 2;
+                  injectSwipe(startX, y, endX, y);
+              }
+
+              private View findAcceptButton(View v) {
+                  if (v instanceof TextView) {
+                      String t = ((TextView) v).getText().toString();
+                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")) return v;
+                  }
+                  if (v instanceof ViewGroup) {
+                      ViewGroup g = (ViewGroup) v;
+                      for (int i = 0; i < g.getChildCount(); i++) {
+                          View found = findAcceptButton(g.getChildAt(i));
+                          if (found != null) return found;
+                      }
+                  }
+                  return null;
+              }
+
+              private void injectSwipe(int x1, int y1, int x2, int y2) {
+                  try {
+                      Class<?> imc = Class.forName("android.hardware.input.InputManager");
+                      Object im = imc.getMethod("getInstance").invoke(null);
+                      long down = SystemClock.uptimeMillis();
+                      MotionEvent evDown = MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, x1, y1, 0);
+                      MotionEvent evMove = MotionEvent.obtain(down, down + 150, MotionEvent.ACTION_MOVE, x2, y2, 0);
+                      MotionEvent evUp = MotionEvent.obtain(down, down + 300, MotionEvent.ACTION_UP, x2, y2, 0);
+                      imc.getMethod("injectInputEvent", MotionEvent.class, int.class).invoke(im, evDown, 0);
+                      imc.getMethod("injectInputEvent", MotionEvent.class, int.class).invoke(im, evMove, 0);
+                      imc.getMethod("injectInputEvent", MotionEvent.class, int.class).invoke(im, evUp, 0);
+                      evDown.recycle(); evMove.recycle(); evUp.recycle();
+                  } catch (Exception e) {}
               }
 
               private void sendLog(Activity act, String msg) {
@@ -251,35 +335,6 @@ jobs:
                   i.setPackage("com.danish.lsposed");
                   i.putExtra("log_msg", msg);
                   act.sendBroadcast(i);
-              }
-
-              private void scanView(View v, List<Float> l) {
-                  if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scanView(((ViewGroup) v).getChildAt(i), l);
-                  }
-                  CharSequence txt = (v instanceof TextView) ? ((TextView) v).getText() : v.getContentDescription();
-                  if (txt != null) {
-                      String s = txt.toString().toLowerCase();
-                      if (s.contains("km")) {
-                          Matcher m = Pattern.compile("(\\d+[.,]?\\d*)").matcher(s);
-                          while (m.find()) { try { l.add(Float.parseFloat(m.group(1).replace(",", "."))); } catch(Exception e){} }
-                      }
-                  }
-              }
-
-              private void findAndSwipe(View v) {
-                  if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) findAndSwipe(((ViewGroup) v).getChildAt(i));
-                  }
-                  String s = (v instanceof TextView) ? ((TextView) v).getText().toString().toLowerCase() : "";
-                  if (s.contains("accept") || s.contains("قبول")) {
-                      int[] pos = new int[2]; v.getLocationOnScreen(pos);
-                      float x1 = pos[0] + (v.getWidth() * 0.2f), x2 = pos[0] + (v.getWidth() * 0.8f), y = pos[1] + (v.getHeight() / 2f);
-                      long t = SystemClock.uptimeMillis();
-                      v.dispatchTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x1, y, 0));
-                      v.dispatchTouchEvent(MotionEvent.obtain(t, t+150, MotionEvent.ACTION_MOVE, x2, y, 0));
-                      v.dispatchTouchEvent(MotionEvent.obtain(t, t+160, MotionEvent.ACTION_UP, x2, y, 0));
-                  }
               }
           }
           EOF
