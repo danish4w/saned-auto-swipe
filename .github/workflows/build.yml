@@ -1,4 +1,4 @@
-name: Build Gufran V7.5.4 FinalFix
+name: Build RootAutoSwipe
 on: workflow_dispatch
 
 jobs:
@@ -6,371 +6,461 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Prepare Folders
+      - name: Build Project
         run: |
-          mkdir -p app/src/main/java/com/danish/lsposed
+          mkdir -p app/src/main/java/com/rootautoswipe
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/assets
+          mkdir -p gradle/wrapper
 
-      - name: Create Properties
-        run: |
+          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
+          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
+          curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.properties -o gradle/wrapper/gradle-wrapper.properties
+          chmod +x gradlew
+
+          echo "include ':app'" > settings.gradle
+
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
-          android.enableJetifier=true
+          android.enableJetifier=false
+          org.gradle.jvmargs=-Xmx2048m
           EOF
 
-      - name: Create Root Build Files
-        run: |
-          echo "include ':app'" > settings.gradle
           cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
               dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
           allprojects {
-              repositories { google(); mavenCentral(); maven { url 'https://api.xposed.info/' } }
+              repositories { google(); mavenCentral() }
           }
           EOF
 
-      - name: Create App Build Config
-        run: |
           cat > app/build.gradle << 'EOF'
-          apply plugin: 'com.android.application'
+          plugins { id 'com.android.application' }
           android {
-              namespace 'com.danish.lsposed'
+              namespace 'com.rootautoswipe'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.danish.lsposed'
+                  applicationId 'com.rootautoswipe'
                   minSdk 26
                   targetSdk 34
-                  versionCode 25
-                  versionName '7.5.4-Final'
+                  versionCode 1
+                  versionName '1.0'
               }
           }
           dependencies {
-              compileOnly 'de.robv.android.xposed:api:82'
               implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'com.google.android.material:material:1.9.0'
           }
           EOF
 
-      - name: Android Manifest
-        run: |
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="Gufran V7.5.4" android:theme="@style/Theme.AppCompat.NoActionBar">
-                  <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="V7.5.4 - Default 1.5/3.5 KM" />
-                  <meta-data android:name="xposedminversion" android:value="82" />
-                  <activity android:name=".SettingsActivity" android:windowSoftInputMode="stateAlwaysHidden" android:exported="true">
+              <uses-permission android:name="android.permission.READ_LOGS"/>
+              <application
+                  android:label="RootAutoSwipe"
+                  android:theme="@style/Theme.AppCompat">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
                       <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
-                  <activity android:name=".LogActivity" android:label="Live Monitor" />
+                  <activity android:name=".LogActivity" android:label="Logs" />
+                  <service android:name=".AutoSwipeService" />
               </application>
           </manifest>
           EOF
-          echo "com.danish.lsposed.MainHook" > app/src/main/assets/xposed_init
 
-      - name: UI Layouts (With Switch)
-        run: |
-          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:padding="20dp" android:background="#121212"
-              android:focusable="true" android:focusableInTouchMode="true">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gufran V7.5.4" android:textColor="#FF4B3A" android:textSize="26sp" android:textStyle="bold" android:layout_gravity="center" android:layout_marginBottom="20dp"/>
-              
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Max Pickup KM" android:textColor="#888888" android:textSize="14sp"/>
-              <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="55dp" android:textColor="#FFFFFF" android:backgroundTint="#FF4B3A" android:inputType="numberDecimal" android:layout_marginBottom="15dp"/>
-              
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Max Drop KM" android:textColor="#888888" android:textSize="14sp"/>
-              <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="55dp" android:textColor="#FFFFFF" android:backgroundTint="#FF4B3A" android:inputType="numberDecimal" android:layout_marginBottom="15dp"/>
-              
-              <TextView android:id="@+id/tv_delay_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FF4B3A" android:text="Delay: 800ms"/>
-              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="1100" android:progress="400" android:layout_marginBottom="20dp"/>
-              
-              <!-- Auto Swipe Enable Switch -->
-              <Switch android:id="@+id/switch_enabled" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Auto Swipe Enable" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
-              
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="55dp" android:text="SAVE SETTINGS" android:backgroundTint="#FF4B3A" android:layout_marginBottom="10dp"/>
-              <Button android:id="@+id/btn_logs" android:layout_width="match_parent" android:layout_height="55dp" android:text="VIEW LIVE LOGS" android:backgroundTint="#4CAF50"/>
-          </LinearLayout>
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">RootAutoSwipe</string>
+          </resources>
           EOF
+
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent">
+              <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:orientation="vertical"
+                  android:padding="20dp"
+                  android:background="#121212">
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:text="RootAutoSwipe" android:textSize="24sp" android:textColor="#FFFFFF" android:textStyle="bold"/>
+                  <TextView android:id="@+id/tv_status" android:layout_width="wrap_content"
+                      android:layout_height="wrap_content" android:text="Service Stopped" android:textSize="14sp"
+                      android:textColor="#FF5555" android:layout_marginTop="20dp"/>
+                  
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:text="Target App Package" android:textColor="#AAAAAA" android:layout_marginTop="20dp"/>
+                  <EditText android:id="@+id/et_package" android:layout_width="match_parent"
+                      android:layout_height="wrap_content" android:text="net.jahez.fleets"
+                      android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp"/>
+                  
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:text="Max Pickup (km)" android:textColor="#AAAAAA" android:layout_marginTop="10dp"/>
+                  <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent"
+                      android:layout_height="wrap_content" android:inputType="numberDecimal"
+                      android:text="1.5" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp"/>
+                  
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:text="Max Drop (km)" android:textColor="#AAAAAA" android:layout_marginTop="10dp"/>
+                  <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent"
+                      android:layout_height="wrap_content" android:inputType="numberDecimal"
+                      android:text="3.5" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp"/>
+                  
+                  <TextView android:id="@+id/tv_detect_delay_label" android:layout_width="wrap_content"
+                      android:layout_height="wrap_content" android:text="Screen Detection Delay: 800ms" android:textColor="#FF9800"
+                      android:layout_marginTop="20dp"/>
+                  <SeekBar android:id="@+id/sb_detect_delay" android:layout_width="match_parent"
+                      android:layout_height="wrap_content" android:max="1100" android:progress="400"
+                      android:thumbTint="#FF9800" android:progressTint="#FF9800"/>
+                  
+                  <TextView android:id="@+id/tv_swipe_duration_label" android:layout_width="wrap_content"
+                      android:layout_height="wrap_content" android:text="Swipe Duration: 300ms" android:textColor="#FF9800"
+                      android:layout_marginTop="10dp"/>
+                  <SeekBar android:id="@+id/sb_swipe_duration" android:layout_width="match_parent"
+                      android:layout_height="wrap_content" android:max="900" android:progress="200"
+                      android:thumbTint="#FF9800" android:progressTint="#FF9800"/>
+                  
+                  <Button android:id="@+id/btn_start" android:layout_width="match_parent"
+                      android:layout_height="50dp" android:text="START SERVICE" android:backgroundTint="#4CAF50"
+                      android:layout_marginTop="20dp"/>
+                  <Button android:id="@+id/btn_stop" android:layout_width="match_parent"
+                      android:layout_height="50dp" android:text="STOP SERVICE" android:backgroundTint="#F44336"
+                      android:layout_marginTop="10dp"/>
+                  <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
+                      android:layout_height="50dp" android:text="VIEW LOGS" android:backgroundTint="#2196F3"
+                      android:layout_marginTop="10dp"/>
+              </LinearLayout>
+          </ScrollView>
+          EOF
+
           cat > app/src/main/res/layout/activity_log.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:padding="10dp" android:background="#000000">
-              <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="LIVE MONITOR" android:textColor="#4CAF50" android:textSize="20sp" android:gravity="center" android:padding="10dp"/>
+              android:orientation="vertical" android:background="#000000" android:padding="10dp">
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:text="Logs" android:textSize="20sp" android:textColor="#4CAF50" android:gravity="center"/>
               <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-                  <TextView android:id="@+id/tv_logs" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#00FF00" android:fontFamily="monospace" android:text="Waiting..."/>
+                  <TextView android:id="@+id/tv_logs" android:layout_width="match_parent"
+                      android:layout_height="wrap_content" android:textColor="#00FF00" android:fontFamily="monospace"
+                      android:textSize="10sp" android:text="Waiting..."/>
               </ScrollView>
-              <Button android:id="@+id/btn_clear" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="CLEAR SCREEN ONLY" android:backgroundTint="#FF0000"/>
+              <Button android:id="@+id/btn_clear" android:layout_width="match_parent"
+                  android:layout_height="wrap_content" android:text="CLEAR" android:backgroundTint="#F44336"/>
           </LinearLayout>
           EOF
 
-      - name: Java Activities (With Switch Logic)
-        run: |
-          cat > app/src/main/java/com/danish/lsposed/SettingsActivity.java << 'EOF'
-          package com.danish.lsposed;
-          import android.content.*;
+          cat > app/src/main/java/com/rootautoswipe/MainActivity.java << 'EOF'
+          package com.rootautoswipe;
+
+          import android.content.Intent;
+          import android.content.SharedPreferences;
           import android.os.Bundle;
-          import android.view.inputmethod.InputMethodManager;
-          import android.widget.*;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.SeekBar;
+          import android.widget.TextView;
+          import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
 
-          public class SettingsActivity extends AppCompatActivity {
-              @Override protected void onCreate(Bundle savedInstanceState) {
+          public class MainActivity extends AppCompatActivity {
+              private EditText etPackage, etPickupMax, etDropMax;
+              private SeekBar sbDetectDelay, sbSwipeDuration;
+              private TextView tvDetectDelay, tvSwipeDuration, tvStatus;
+              private Button btnStart, btnStop, btnLogs;
+              private SharedPreferences prefs;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_settings);
-                  final SharedPreferences p = getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                  final EditText etP = findViewById(R.id.et_pickup_max);
-                  final EditText etD = findViewById(R.id.et_drop_max);
-                  final SeekBar sb = findViewById(R.id.sb_delay);
-                  final TextView tvL = findViewById(R.id.tv_delay_label);
-                  final Switch sw = findViewById(R.id.switch_enabled);
+                  setContentView(R.layout.activity_main);
+                  prefs = getSharedPreferences("ras_prefs", MODE_PRIVATE);
+                  etPackage = findViewById(R.id.et_package);
+                  etPickupMax = findViewById(R.id.et_pickup_max);
+                  etDropMax = findViewById(R.id.et_drop_max);
+                  sbDetectDelay = findViewById(R.id.sb_detect_delay);
+                  sbSwipeDuration = findViewById(R.id.sb_swipe_duration);
+                  tvDetectDelay = findViewById(R.id.tv_detect_delay_label);
+                  tvSwipeDuration = findViewById(R.id.tv_swipe_duration_label);
+                  tvStatus = findViewById(R.id.tv_status);
+                  btnStart = findViewById(R.id.btn_start);
+                  btnStop = findViewById(R.id.btn_stop);
+                  btnLogs = findViewById(R.id.btn_logs);
 
-                  etP.setText(String.valueOf(p.getFloat("pickup_max", 1.5f)));
-                  etD.setText(String.valueOf(p.getFloat("drop_max", 3.5f)));
-                  sb.setProgress(p.getInt("system_delay", 800) - 400);
-                  sw.setChecked(p.getBoolean("enabled", false));
-                  tvL.setText("Delay: " + p.getInt("system_delay", 800) + "ms");
+                  etPackage.setText(prefs.getString("target_pkg", "net.jahez.fleets"));
+                  etPickupMax.setText(String.valueOf(prefs.getFloat("pickup_max", 1.5f)));
+                  etDropMax.setText(String.valueOf(prefs.getFloat("drop_max", 3.5f)));
+                  int detectDelay = prefs.getInt("detect_delay", 800);
+                  int swipeDuration = prefs.getInt("swipe_duration", 300);
+                  sbDetectDelay.setProgress(detectDelay - 400);
+                  sbSwipeDuration.setProgress(swipeDuration - 100);
+                  tvDetectDelay.setText("Screen Detection Delay: " + detectDelay + "ms");
+                  tvSwipeDuration.setText("Swipe Duration: " + swipeDuration + "ms");
 
-                  sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                      @Override public void onProgressChanged(SeekBar s, int pr, boolean f) { tvL.setText("Delay: " + (pr + 400) + "ms"); }
+                  sbDetectDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
+                          int val = p + 400;
+                          tvDetectDelay.setText("Screen Detection Delay: " + val + "ms");
+                      }
+                      @Override public void onStartTrackingTouch(SeekBar s) {}
+                      @Override public void onStopTrackingTouch(SeekBar s) {}
+                  });
+                  sbSwipeDuration.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
+                          int val = p + 100;
+                          tvSwipeDuration.setText("Swipe Duration: " + val + "ms");
+                      }
                       @Override public void onStartTrackingTouch(SeekBar s) {}
                       @Override public void onStopTrackingTouch(SeekBar s) {}
                   });
 
-                  findViewById(R.id.btn_save).setOnClickListener(v -> {
-                      p.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
-                             .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
-                             .putInt("system_delay", sb.getProgress() + 400)
-                             .putBoolean("enabled", sw.isChecked()).apply();
-                      etP.clearFocus(); etD.clearFocus();
-                      InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                      imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                      Toast.makeText(SettingsActivity.this, "Settings Saved!", Toast.LENGTH_SHORT).show();
+                  btnStart.setOnClickListener(v -> {
+                      String pkg = etPackage.getText().toString().trim();
+                      float pickup = Float.parseFloat(etPickupMax.getText().toString());
+                      float drop = Float.parseFloat(etDropMax.getText().toString());
+                      int detectDelayMs = sbDetectDelay.getProgress() + 400;
+                      int swipeDurationMs = sbSwipeDuration.getProgress() + 100;
+                      prefs.edit().putString("target_pkg", pkg)
+                           .putFloat("pickup_max", pickup).putFloat("drop_max", drop)
+                           .putInt("detect_delay", detectDelayMs)
+                           .putInt("swipe_duration", swipeDurationMs).apply();
+                      startService(new Intent(this, AutoSwipeService.class));
+                      tvStatus.setText("Service Running");
+                      tvStatus.setTextColor(0xFF4CAF50);
+                      Toast.makeText(this, "Service started", Toast.LENGTH_SHORT).show();
                   });
-                  findViewById(R.id.btn_logs).setOnClickListener(v -> startActivity(new Intent(SettingsActivity.this, LogActivity.class)));
+
+                  btnStop.setOnClickListener(v -> {
+                      stopService(new Intent(this, AutoSwipeService.class));
+                      tvStatus.setText("Service Stopped");
+                      tvStatus.setTextColor(0xFFFF5555);
+                      Toast.makeText(this, "Service stopped", Toast.LENGTH_SHORT).show();
+                  });
+
+                  btnLogs.setOnClickListener(v -> startActivity(new Intent(this, LogActivity.class)));
               }
           }
           EOF
 
-          cat > app/src/main/java/com/danish/lsposed/LogActivity.java << 'EOF'
-          package com.danish.lsposed;
-          import android.content.*;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.widget.TextView;
-          import androidx.appcompat.app.AppCompatActivity;
-          public class LogActivity extends AppCompatActivity {
-              private TextView tvLogs;
-              private BroadcastReceiver receiver = new BroadcastReceiver() {
-                  @Override public void onReceive(Context context, Intent intent) {
-                      String msg = intent.getStringExtra("log_msg");
-                      if(tvLogs != null) tvLogs.append("\n" + msg + "\n----------");
-                  }
-              };
-              @Override protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_log);
-                  tvLogs = findViewById(R.id.tv_logs);
-                  findViewById(R.id.btn_clear).setOnClickListener(v -> tvLogs.setText("Display Cleared. Module still running..."));
-                  IntentFilter filter = new IntentFilter("GUFRAN_LOG_ACTION");
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
-                  else registerReceiver(receiver, filter);
-              }
-              @Override protected void onDestroy() { super.onDestroy(); unregisterReceiver(receiver); }
-          }
-          EOF
+          cat > app/src/main/java/com/rootautoswipe/AutoSwipeService.java << 'EOF'
+          package com.rootautoswipe;
 
-      - name: MainHook (With Exact Activity Hook + Fallback)
-        run: |
-          cat > app/src/main/java/com/danish/lsposed/MainHook.java << 'EOF'
-          package com.danish.lsposed;
-
-          import android.app.Activity;
+          import android.app.Service;
           import android.content.Intent;
-          import android.os.*;
-          import android.view.*;
-          import android.widget.TextView;
-          import de.robv.android.xposed.*;
-          import de.robv.android.xposed.callbacks.XC_LoadPackage;
-          import java.text.SimpleDateFormat;
-          import java.util.*;
-          import java.util.regex.*;
+          import android.content.SharedPreferences;
+          import android.os.Handler;
+          import android.os.IBinder;
+          import android.os.Looper;
+          import android.util.Log;
+          import java.io.BufferedReader;
+          import java.io.InputStreamReader;
+          import java.util.regex.Matcher;
+          import java.util.regex.Pattern;
 
-          public class MainHook implements IXposedHookLoadPackage {
-              private XSharedPreferences xP;
-              private Handler handler = new Handler(Looper.getMainLooper());
+          public class AutoSwipeService extends Service {
+              private Thread monitorThread;
+              private boolean running = false;
+              private SharedPreferences prefs;
+              private Handler mainHandler = new Handler(Looper.getMainLooper());
+              private String targetPackage = "net.jahez.fleets";
+              private float pickupMax = 1.5f, dropMax = 3.5f;
+              private int detectDelay = 800;
+              private int swipeDuration = 300;
+
+              private void log(String msg) {
+                  Log.d("RootAutoSwipe", msg);
+                  Intent i = new Intent("RAS_LOG_ACTION");
+                  i.setPackage("com.rootautoswipe");
+                  i.putExtra("log_msg", msg);
+                  sendBroadcast(i);
+              }
+
+              private String exec(String cmd) {
+                  try {
+                      Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+                      BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                      StringBuilder sb = new StringBuilder();
+                      String line;
+                      while ((line = br.readLine()) != null) sb.append(line).append("\n");
+                      p.waitFor();
+                      return sb.toString();
+                  } catch (Exception e) {
+                      return "";
+                  }
+              }
 
               @Override
-              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpp) throws Throwable {
-                  if (!lpp.packageName.equals("net.jahez.fleets")) return;
-                  xP = new XSharedPreferences("com.danish.lsposed", "danish_prefs");
-                  xP.makeWorldReadable();
-
-                  // Method 1: Try exact activity
-                  try {
-                      Class<?> orderActivity = XposedHelpers.findClass("net.jahez.fleets.dispatch.accept.IncomingDispatchActivity", lpp.classLoader);
-                      XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              final Activity act = (Activity) param.thisObject;
-                              xP.reload();
-                              if (!xP.getBoolean("enabled", false)) return;
-                              int delay = xP.getInt("system_delay", 800);
-                              handler.postDelayed(() -> scanOrderScreen(act), delay);
-                          }
-                      });
-                      XposedBridge.log("Gufran: Hooked IncomingDispatchActivity successfully");
-                  } catch (Throwable t) {
-                      XposedBridge.log("Gufran: Could not hook exact activity, using fallback: " + t.getMessage());
-                      // Fallback: generic activity hook
-                      XposedHelpers.findAndHookMethod(Activity.class, "onResume", new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              Activity act = (Activity) param.thisObject;
-                              String className = act.getClass().getName();
-                              if (className.contains("IncomingDispatch") || className.contains("OrderActivity")) {
-                                  xP.reload();
-                                  if (!xP.getBoolean("enabled", false)) return;
-                                  int delay = xP.getInt("system_delay", 800);
-                                  handler.postDelayed(() -> scanOrderScreen(act), delay);
-                              }
-                          }
-                      });
-                  }
+              public void onCreate() {
+                  super.onCreate();
+                  prefs = getSharedPreferences("ras_prefs", MODE_PRIVATE);
+                  targetPackage = prefs.getString("target_pkg", "net.jahez.fleets");
+                  pickupMax = prefs.getFloat("pickup_max", 1.5f);
+                  dropMax = prefs.getFloat("drop_max", 3.5f);
+                  detectDelay = prefs.getInt("detect_delay", 800);
+                  swipeDuration = prefs.getInt("swipe_duration", 300);
+                  log("Service created. Target: " + targetPackage);
               }
 
-              private void scanOrderScreen(Activity act) {
-                  View root = act.getWindow().getDecorView();
-                  List<Float> distances = new ArrayList<>();
-                  findKmText(root, distances);
-                  String time = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(new Date());
-
-                  if (distances.size() >= 2) {
-                      float pickup = distances.get(0);
-                      float drop = distances.get(1);
-                      float pickupMax = xP.getFloat("pickup_max", 1.5f);
-                      float dropMax = xP.getFloat("drop_max", 3.5f);
-                      sendLog(act, time + " 📊 P=" + pickup + "km, D=" + drop + "km");
-                      if (pickup <= pickupMax && drop <= dropMax) {
-                          sendLog(act, time + " ✅ ACCEPT – swiping...");
-                          performSwipeOnAccept(root);
-                          sendLog(act, time + " ✅ Swipe done");
-                      } else {
-                          sendLog(act, time + " ❌ REJECT (out of range)");
-                      }
-                  } else {
-                      sendLog(act, time + " ⏳ No distances found – check screen");
-                  }
-              }
-
-              private void findKmText(View v, List<Float> out) {
-                  if (v == null) return;
-                  String text = null;
-                  if (v instanceof TextView) {
-                      text = ((TextView) v).getText().toString();
-                  } else if (v.getContentDescription() != null) {
-                      text = v.getContentDescription().toString();
-                  }
-                  if (text != null) {
-                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
-                      Matcher m = p.matcher(text);
-                      if (m.find()) {
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  if (monitorThread != null && monitorThread.isAlive()) return START_STICKY;
+                  running = true;
+                  monitorThread = new Thread(() -> {
+                      log("Monitor started");
+                      while (running) {
                           try {
-                              float val = Float.parseFloat(m.group(1).replace(",", "."));
-                              if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
-                          } catch (Exception e) {}
+                              // Check if target app is in foreground
+                              String topActivity = exec("dumpsys activity top | grep ACTIVITY | head -1");
+                              if (!topActivity.contains(targetPackage)) {
+                                  Thread.sleep(1000);
+                                  continue;
+                              }
+                              // Take UI dump
+                              exec("uiautomator dump /sdcard/window_dump.xml");
+                              String dump = exec("cat /sdcard/window_dump.xml");
+                              if (dump.contains("New Order")) {
+                                  log("New Order detected! Waiting " + detectDelay + "ms...");
+                                  Thread.sleep(detectDelay);
+                                  // Get distances
+                                  float[] dist = extractDistances(dump);
+                                  if (dist[0] > 0 && dist[1] > 0) {
+                                      log("Distances: P=" + dist[0] + "km, D=" + dist[1] + "km");
+                                      if (dist[0] <= pickupMax && dist[1] <= dropMax) {
+                                          log("✅ ACCEPT – swiping...");
+                                          int[] coord = findAcceptButtonCoords(dump);
+                                          if (coord != null) {
+                                              int startX = coord[0] + (coord[2] / 5);
+                                              int endX = coord[0] + (coord[2] * 4 / 5);
+                                              int y = coord[1] + (coord[3] / 2);
+                                              exec("input swipe " + startX + " " + y + " " + endX + " " + y + " " + swipeDuration);
+                                              log("Swipe executed: (" + startX + "," + y + ") to (" + endX + "," + y + ") duration " + swipeDuration);
+                                          } else {
+                                              exec("input swipe 200 1800 900 1800 " + swipeDuration);
+                                              log("Fallback bottom swipe");
+                                          }
+                                      } else {
+                                          log("❌ REJECT (out of range)");
+                                      }
+                                  } else {
+                                      log("Could not parse distances");
+                                  }
+                              }
+                              Thread.sleep(1500);
+                          } catch (Exception e) {
+                              log("Error: " + e.getMessage());
+                          }
                       }
-                  }
-                  if (v instanceof ViewGroup) {
-                      ViewGroup g = (ViewGroup) v;
-                      for (int i = 0; i < g.getChildCount(); i++) {
-                          findKmText(g.getChildAt(i), out);
-                      }
-                  }
+                  });
+                  monitorThread.start();
+                  return START_STICKY;
               }
 
-              private void performSwipeOnAccept(View root) {
-                  View acceptBtn = findAcceptButton(root);
-                  if (acceptBtn == null) {
-                      int sw = root.getResources().getDisplayMetrics().widthPixels;
-                      int sh = root.getResources().getDisplayMetrics().heightPixels;
-                      int startX = sw * 2 / 10;
-                      int endX = sw * 8 / 10;
-                      int y = sh * 85 / 100;
-                      injectSwipe(startX, y, endX, y);
-                      return;
-                  }
-                  int[] pos = new int[2];
-                  acceptBtn.getLocationOnScreen(pos);
-                  int w = acceptBtn.getWidth();
-                  int h = acceptBtn.getHeight();
-                  if (w == 0 || h == 0) return;
-                  int startX = pos[0] + w / 5;
-                  int endX = pos[0] + w * 4 / 5;
-                  int y = pos[1] + h / 2;
-                  injectSwipe(startX, y, endX, y);
+              private float[] extractDistances(String xml) {
+                  float[] result = {-1, -1};
+                  Pattern pPickup = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]\\s*From\\s*You", Pattern.CASE_INSENSITIVE);
+                  Matcher m = pPickup.matcher(xml);
+                  if (m.find()) result[0] = Float.parseFloat(m.group(1));
+                  Pattern pDrop = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]\\s*From\\s*Pickup", Pattern.CASE_INSENSITIVE);
+                  m = pDrop.matcher(xml);
+                  if (m.find()) result[1] = Float.parseFloat(m.group(1));
+                  return result;
               }
 
-              private View findAcceptButton(View v) {
-                  if (v instanceof TextView) {
-                      String t = ((TextView) v).getText().toString();
-                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")) return v;
-                  }
-                  if (v instanceof ViewGroup) {
-                      ViewGroup g = (ViewGroup) v;
-                      for (int i = 0; i < g.getChildCount(); i++) {
-                          View found = findAcceptButton(g.getChildAt(i));
-                          if (found != null) return found;
-                      }
+              private int[] findAcceptButtonCoords(String xml) {
+                  Pattern p = Pattern.compile("bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\".*?text=\"Accept\"", Pattern.CASE_INSENSITIVE);
+                  Matcher m = p.matcher(xml);
+                  if (m.find()) {
+                      int left = Integer.parseInt(m.group(1));
+                      int top = Integer.parseInt(m.group(2));
+                      int right = Integer.parseInt(m.group(3));
+                      int bottom = Integer.parseInt(m.group(4));
+                      return new int[]{left, top, right - left, bottom - top};
                   }
                   return null;
               }
 
-              private void injectSwipe(int x1, int y1, int x2, int y2) {
-                  try {
-                      Class<?> imc = Class.forName("android.hardware.input.InputManager");
-                      Object im = imc.getMethod("getInstance").invoke(null);
-                      long down = SystemClock.uptimeMillis();
-                      MotionEvent evDown = MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, x1, y1, 0);
-                      MotionEvent evMove = MotionEvent.obtain(down, down + 150, MotionEvent.ACTION_MOVE, x2, y2, 0);
-                      MotionEvent evUp = MotionEvent.obtain(down, down + 300, MotionEvent.ACTION_UP, x2, y2, 0);
-                      imc.getMethod("injectInputEvent", MotionEvent.class, int.class).invoke(im, evDown, 0);
-                      imc.getMethod("injectInputEvent", MotionEvent.class, int.class).invoke(im, evMove, 0);
-                      imc.getMethod("injectInputEvent", MotionEvent.class, int.class).invoke(im, evUp, 0);
-                      evDown.recycle(); evMove.recycle(); evUp.recycle();
-                  } catch (Exception e) {}
+              @Override
+              public void onDestroy() {
+                  running = false;
+                  if (monitorThread != null) monitorThread.interrupt();
+                  log("Service stopped");
+                  super.onDestroy();
               }
 
-              private void sendLog(Activity act, String msg) {
-                  Intent i = new Intent("GUFRAN_LOG_ACTION");
-                  i.setPackage("com.danish.lsposed");
-                  i.putExtra("log_msg", msg);
-                  act.sendBroadcast(i);
+              @Override
+              public IBinder onBind(Intent intent) { return null; }
+          }
+          EOF
+
+          cat > app/src/main/java/com/rootautoswipe/LogActivity.java << 'EOF'
+          package com.rootautoswipe;
+
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.widget.Button;
+          import android.widget.TextView;
+          import androidx.appcompat.app.AppCompatActivity;
+
+          public class LogActivity extends AppCompatActivity {
+              private TextView tvLogs;
+              private BroadcastReceiver receiver = new BroadcastReceiver() {
+                  @Override
+                  public void onReceive(Context context, Intent intent) {
+                      String msg = intent.getStringExtra("log_msg");
+                      if (tvLogs != null) tvLogs.append("\n" + msg);
+                  }
+              };
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_log);
+                  tvLogs = findViewById(R.id.tv_logs);
+                  Button btnClear = findViewById(R.id.btn_clear);
+                  btnClear.setOnClickListener(v -> tvLogs.setText(""));
+                  IntentFilter filter = new IntentFilter("RAS_LOG_ACTION");
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
+                  } else {
+                      registerReceiver(receiver, filter);
+                  }
+              }
+
+              @Override
+              protected void onDestroy() {
+                  super.onDestroy();
+                  unregisterReceiver(receiver);
               }
           }
           EOF
 
-      - name: Build APK
-        uses: gradle/actions/setup-gradle@v3
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          gradle-version: '8.4'
-      - run: gradle assembleDebug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Gufran-V7.5.4-FinalFix
+          name: RootAutoSwipe
           path: app/build/outputs/apk/debug/*.apk
