@@ -64,13 +64,25 @@ jobs:
           dependencies {
               compileOnly 'de.robv.android.xposed:api:82'
               implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.9.0'
           }
           EOF
 
+          # ----- FIXED: Added AppCompat Theme in styles.xml -----
+          cat > app/src/main/res/values/themes.xml << 'EOF'
+          <resources>
+              <style name="Theme.DanishAuto" parent="Theme.AppCompat.DayNight.NoActionBar">
+                  <item name="colorPrimary">#1DB954</item>
+                  <item name="android:windowBackground">#121212</item>
+              </style>
+          </resources>
+          EOF
+
+          # ----- FIXED: Manifest now uses the new Theme.DanishAuto -----
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="Danish Auto" android:theme="@android:style/Theme.DeviceDefault">
+              <application android:label="Danish Auto" android:theme="@style/Theme.DanishAuto">
                   <meta-data android:name="xposedmodule" android:value="true" />
                   <meta-data android:name="xposeddescription" android:value="Auto Accept Orders" />
                   <meta-data android:name="xposedminversion" android:value="82" />
@@ -80,7 +92,7 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  <activity android:name=".PopupActivity" android:theme="@android:style/Theme.DeviceDefault.Dialog"
+                  <activity android:name=".PopupActivity" android:theme="@style/Theme.AppCompat.DayNight.Dialog"
                       android:excludeFromRecents="true" android:exported="false" />
               </application>
           </manifest>
@@ -109,7 +121,9 @@ jobs:
                                    .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
                                    .putBoolean("enabled", sw.isChecked()).apply();
                           Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
-                      } catch (Exception e) {}
+                      } catch (Exception e) {
+                          Toast.makeText(this, "Error saving settings", Toast.LENGTH_SHORT).show();
+                      }
                   });
               }
           }
@@ -211,8 +225,8 @@ jobs:
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="20dp" android:background="#121212">
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954" android:layout_gravity="center" android:layout_marginBottom="20dp"/>
-              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent" android:layout_height="55dp" android:hint="Max Pickup" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp" android:inputType="numberDecimal"/>
-              <EditText android:id="@+id/et_drop" android:layout_width="match_parent" android:layout_height="55dp" android:hint="Max Drop" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp" android:inputType="numberDecimal"/>
+              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent" android:layout_height="55dp" android:hint="Max Pickup" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp" android:inputType="numberDecimal" android:padding="10dp"/>
+              <EditText android:id="@+id/et_drop" android:layout_width="match_parent" android:layout_height="55dp" android:hint="Max Drop" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp" android:inputType="numberDecimal" android:padding="10dp"/>
               <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto Accept" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
               <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="55dp" android:text="SAVE" android:backgroundTint="#1DB954"/>
           </LinearLayout>
