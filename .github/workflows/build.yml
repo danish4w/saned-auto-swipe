@@ -21,7 +21,7 @@ jobs:
           mkdir -p app/src/main/assets
           mkdir -p gradle/wrapper
 
-          # Setup Gradle Wrapper
+          # Download Gradle Wrapper components
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.properties -o gradle/wrapper/gradle-wrapper.properties
@@ -29,7 +29,7 @@ jobs:
 
           echo "include ':app'" > settings.gradle
 
-          # ----- Gradle Configuration -----
+          # ----- FIXED Gradle Configuration (Removed '#' comments that cause errors) -----
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
@@ -64,7 +64,6 @@ jobs:
               }
           }
           dependencies {
-              # FIXED: Dependency directly from Maven repository
               compileOnly 'de.robv.android.xposed:api:82'
               implementation 'androidx.appcompat:appcompat:1.6.1'
           }
@@ -109,10 +108,12 @@ jobs:
                   etD.setText(String.valueOf(pr.getFloat("drop_max", 3.5f)));
                   sw.setChecked(pr.getBoolean("enabled", false));
                   findViewById(R.id.btn_save).setOnClickListener(v -> {
-                      pr.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
-                               .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
-                               .putBoolean("enabled", sw.isChecked()).apply();
-                      Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
+                      try {
+                          pr.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
+                                   .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
+                                   .putBoolean("enabled", sw.isChecked()).apply();
+                          Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
+                      } catch (Exception e) {}
                   });
               }
           }
@@ -185,7 +186,10 @@ jobs:
                   if (b != null) b.performClick();
               }
               private View find(View v) {
-                  if (v instanceof TextView && (((TextView) v).getText().toString().equalsIgnoreCase("Accept") || ((TextView) v).getText().toString().equals("قبول"))) return v;
+                  if (v instanceof TextView) {
+                      String t = ((TextView) v).getText().toString();
+                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")) return v;
+                  }
                   if (v instanceof ViewGroup) {
                       for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
                           View f = find(((ViewGroup) v).getChildAt(i));
@@ -195,8 +199,10 @@ jobs:
                   return null;
               }
               private void notify(Context c, float p, float d) {
-                  Intent i = new Intent(c, PopupActivity.class).putExtra("pickup", p).putExtra("drop", d).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                  c.startActivity(i);
+                  try {
+                      Intent i = new Intent(c, PopupActivity.class).putExtra("pickup", p).putExtra("drop", d).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                      c.startActivity(i);
+                  } catch (Exception e) {}
               }
           }
           EOF
