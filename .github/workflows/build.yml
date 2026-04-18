@@ -13,10 +13,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Xposed API jar
+      - name: Download Xposed API jar (Maven Central)
         run: |
           mkdir -p app/libs
           curl -L -o app/libs/api-82.jar https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar
+          # Verify it's a valid zip
+          unzip -t app/libs/api-82.jar || { echo "JAR corrupt"; exit 1; }
 
       - name: Build LSPosed Module
         run: |
