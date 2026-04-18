@@ -21,7 +21,6 @@ jobs:
           mkdir -p app/src/main/assets
           mkdir -p gradle/wrapper
 
-          # Download Gradle Wrapper components
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.properties -o gradle/wrapper/gradle-wrapper.properties
@@ -29,7 +28,6 @@ jobs:
 
           echo "include ':app'" > settings.gradle
 
-          # ----- FIXED Gradle Configuration (Removed '#' comments that cause errors) -----
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
@@ -69,7 +67,6 @@ jobs:
           }
           EOF
 
-          # ----- AndroidManifest -----
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -89,7 +86,6 @@ jobs:
           </manifest>
           EOF
 
-          # ----- Source Code -----
           cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'EOF'
           package com.danish.auto;
           import android.content.SharedPreferences;
@@ -163,7 +159,7 @@ jobs:
                           float[] dist = extractDist(act);
                           if (dist[0] > 0 && dist[0] <= prefs.getFloat("pickup_max", 1.5f) && dist[1] <= prefs.getFloat("drop_max", 3.5f)) {
                               click(act);
-                              notify(act, dist[0], dist[1]);
+                              sendNotification(act, dist[0], dist[1]);
                           }
                       }
                   });
@@ -198,7 +194,7 @@ jobs:
                   }
                   return null;
               }
-              private void notify(Context c, float p, float d) {
+              private void sendNotification(Context c, float p, float d) {
                   try {
                       Intent i = new Intent(c, PopupActivity.class).putExtra("pickup", p).putExtra("drop", d).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                       c.startActivity(i);
@@ -207,7 +203,6 @@ jobs:
           }
           EOF
 
-          # ----- Resources -----
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources><string name="app_name">Danish Auto</string></resources>
