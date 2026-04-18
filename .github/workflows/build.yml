@@ -29,10 +29,10 @@ jobs:
 
           echo "include ':app'" > settings.gradle
 
-          # ----- FIXED: Download official Xposed API jar -----
-          curl -L https://github.com/rovo89/XposedBridge/raw/master/jar/api-82.jar -o app/libs/api-82.jar
+          # ----- FIXED: Improved Download Link for Xposed API -----
+          curl -L "https://raw.githubusercontent.com/rovo89/XposedBridge/master/jar/api-82.jar" -o app/libs/api-82.jar
           
-          # Verify jar
+          # Verify jar (check if it's a real zip/jar file)
           jar tf app/libs/api-82.jar > /dev/null || { echo "JAR corrupt"; exit 1; }
 
           # ----- Gradle files -----
