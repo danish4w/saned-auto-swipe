@@ -13,17 +13,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Xposed API jar (from GitHub raw)
+      - name: Download Xposed API jar (from reliable source)
         run: |
           mkdir -p app/libs
-          curl -L -o app/libs/api-82.jar https://github.com/rovo89/XposedBridge/raw/master/api/api-82.jar
-          # Verify file size (should be > 10KB)
-          SIZE=$(stat -c%s app/libs/api-82.jar)
-          if [ $SIZE -lt 10000 ]; then
-            echo "Download failed, size $SIZE bytes"
-            exit 1
-          fi
-          echo "JAR downloaded successfully, size $SIZE bytes"
+          curl -L -o app/libs/api-82.jar https://github.com/rovo89/XposedBridge/releases/download/82/api-82.jar
+          # Verify it's a valid zip
+          jar tf app/libs/api-82.jar > /dev/null || { echo "JAR invalid"; exit 1; }
 
       - name: Build LSPosed Module
         run: |
@@ -475,7 +470,7 @@ jobs:
           EOF
 
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --refresh-dependencies
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
