@@ -19,22 +19,15 @@ jobs:
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
-          mkdir -p app/libs
           mkdir -p gradle/wrapper
 
-          # Download Gradle Wrapper
+          # Setup Gradle Wrapper
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.properties -o gradle/wrapper/gradle-wrapper.properties
           chmod +x gradlew
 
           echo "include ':app'" > settings.gradle
-
-          # ----- FIXED: Stable Maven Link for Xposed API -----
-          curl -L "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar" -o app/libs/api-82.jar
-          
-          # Verify jar
-          jar tf app/libs/api-82.jar > /dev/null || { echo "Download Failed or Corrupt"; exit 1; }
 
           # ----- Gradle Configuration -----
           cat > gradle.properties << 'EOF'
@@ -48,7 +41,13 @@ jobs:
               repositories { google(); mavenCentral() }
               dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
-          allprojects { repositories { google(); mavenCentral() } }
+          allprojects { 
+              repositories { 
+                  google()
+                  mavenCentral()
+                  maven { url 'https://api.xposed.info/' }
+              } 
+          }
           EOF
 
           cat > app/build.gradle << 'EOF'
@@ -65,7 +64,8 @@ jobs:
               }
           }
           dependencies {
-              compileOnly files('libs/api-82.jar')
+              # FIXED: Dependency directly from Maven repository
+              compileOnly 'de.robv.android.xposed:api:82'
               implementation 'androidx.appcompat:appcompat:1.6.1'
           }
           EOF
@@ -90,8 +90,7 @@ jobs:
           </manifest>
           EOF
 
-          # ----- Java Source Code -----
-          # SettingsActivity
+          # ----- Source Code -----
           cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'EOF'
           package com.danish.auto;
           import android.content.SharedPreferences;
@@ -119,7 +118,6 @@ jobs:
           }
           EOF
 
-          # PopupActivity
           cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'EOF'
           package com.danish.auto;
           import android.os.Bundle;
@@ -138,38 +136,22 @@ jobs:
           }
           EOF
 
-          # MainHook
           cat > app/src/main/java/com/danish/auto/MainHook.java << 'EOF'
           package com.danish.auto;
-
-          import android.app.Activity;
-          import android.app.Notification;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.app.PendingIntent;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.SharedPreferences;
-          import android.os.Bundle;
-          import android.view.View;
-          import android.view.ViewGroup;
+          import android.app.*;
+          import android.content.*;
+          import android.view.*;
           import android.widget.TextView;
-          import java.util.ArrayList;
-          import java.util.List;
-          import java.util.regex.Matcher;
-          import java.util.regex.Pattern;
-          import de.robv.android.xposed.XC_MethodHook;
-          import de.robv.android.xposed.XposedBridge;
-          import de.robv.android.xposed.XposedHelpers;
+          import java.util.*;
+          import java.util.regex.*;
+          import de.robv.android.xposed.*;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
-          public class MainHook implements de.robv.android.xposed.IXposedHookLoadPackage {
+          public class MainHook implements IXposedHookLoadPackage {
               private static SharedPreferences prefs;
-
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
                   if (!lpparam.packageName.equals("net.jahez.fleets")) return;
-
                   Class<?> orderActivity = XposedHelpers.findClass("net.jahez.fleets.dispatch.accept.IncomingDispatchActivity", lpparam.classLoader);
                   XposedHelpers.findAndHookMethod(orderActivity, "onResume", new XC_MethodHook() {
                       @Override
@@ -177,104 +159,69 @@ jobs:
                           Activity act = (Activity) param.thisObject;
                           if (prefs == null) prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
                           if (!prefs.getBoolean("enabled", false)) return;
-
-                          float[] distances = extractDistances(act);
-                          float pickup = distances[0], drop = distances[1];
-                          float pMax = prefs.getFloat("pickup_max", 1.5f), dMax = prefs.getFloat("drop_max", 3.5f);
-
-                          if (pickup > 0 && drop > 0 && pickup <= pMax && drop <= dMax) {
-                              clickAccept(act);
-                              showPopupAndNotification(act, pickup, drop);
+                          float[] dist = extractDist(act);
+                          if (dist[0] > 0 && dist[0] <= prefs.getFloat("pickup_max", 1.5f) && dist[1] <= prefs.getFloat("drop_max", 3.5f)) {
+                              click(act);
+                              notify(act, dist[0], dist[1]);
                           }
                       }
                   });
               }
-
-              private float[] extractDistances(Activity act) {
-                  List<Float> list = new ArrayList<>();
-                  scanView(act.getWindow().getDecorView(), list);
-                  if (list.size() >= 2) return new float[]{list.get(0), list.get(1)};
-                  return new float[]{-1, -1};
+              private float[] extractDist(Activity act) {
+                  List<Float> l = new ArrayList<>();
+                  scan(act.getWindow().getDecorView(), l);
+                  return l.size() >= 2 ? new float[]{l.get(0), l.get(1)} : new float[]{-1, -1};
               }
-
-              private void scanView(View v, List<Float> out) {
+              private void scan(View v, List<Float> out) {
                   if (v instanceof TextView) {
-                      Matcher m = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]").matcher(((TextView) v).getText().toString());
-                      if (m.find()) {
-                          try { float val = Float.parseFloat(m.group(1)); if (!out.contains(val)) out.add(val); } catch (Exception e) {}
-                      }
+                      Matcher m = Pattern.compile("(\\d+\\.?\\d*)").matcher(((TextView) v).getText().toString());
+                      while (m.find()) { try { out.add(Float.parseFloat(m.group(1))); } catch(Exception e){} }
                   } else if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scanView(((ViewGroup) v).getChildAt(i), out);
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scan(((ViewGroup) v).getChildAt(i), out);
                   }
               }
-
-              private void clickAccept(Activity act) {
-                  View btn = findBtn(act.getWindow().getDecorView());
-                  if (btn != null) btn.performClick();
+              private void click(Activity act) {
+                  View b = find(act.getWindow().getDecorView());
+                  if (b != null) b.performClick();
               }
-
-              private View findBtn(View v) {
-                  if (v instanceof TextView) {
-                      String t = ((TextView) v).getText().toString();
-                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")) return v;
-                  }
+              private View find(View v) {
+                  if (v instanceof TextView && (((TextView) v).getText().toString().equalsIgnoreCase("Accept") || ((TextView) v).getText().toString().equals("قبول"))) return v;
                   if (v instanceof ViewGroup) {
                       for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
-                          View f = findBtn(((ViewGroup) v).getChildAt(i));
+                          View f = find(((ViewGroup) v).getChildAt(i));
                           if (f != null) return f;
                       }
                   }
                   return null;
               }
-
-              private void showPopupAndNotification(Context ctx, float p, float d) {
-                  try {
-                      Intent popup = new Intent(ctx, PopupActivity.class);
-                      popup.putExtra("pickup", p).putExtra("drop", d).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                      ctx.startActivity(popup);
-                      
-                      NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-                      if (android.os.Build.VERSION.SDK_INT >= 26) {
-                          nm.createNotificationChannel(new NotificationChannel("d_ch", "Danish", NotificationManager.IMPORTANCE_HIGH));
-                      }
-                      nm.notify(1, new Notification.Builder(ctx, "d_ch")
-                          .setContentTitle("Order Accepted").setContentText("P:"+p+" D:"+d)
-                          .setSmallIcon(android.R.drawable.ic_dialog_info).setAutoCancel(true).build());
-                  } catch (Exception e) {}
+              private void notify(Context c, float p, float d) {
+                  Intent i = new Intent(c, PopupActivity.class).putExtra("pickup", p).putExtra("drop", d).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                  c.startActivity(i);
               }
           }
           EOF
 
-          # ----- Resources & Assets -----
+          # ----- Resources -----
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources><string name="app_name">Danish Auto</string></resources>
           EOF
 
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:padding="20dp" android:background="#121212">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                  android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954"
-                  android:layout_gravity="center" android:layout_marginBottom="20dp"/>
-              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
-                  android:layout_height="55dp" android:hint="Max Pickup" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp"/>
-              <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
-                  android:layout_height="55dp" android:hint="Max Drop" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp"/>
-              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content"
-                  android:layout_height="wrap_content" android:text="Auto Accept" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="55dp" android:text="SAVE"/>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="20dp" android:background="#121212">
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954" android:layout_gravity="center" android:layout_marginBottom="20dp"/>
+              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent" android:layout_height="55dp" android:hint="Max Pickup" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp" android:inputType="numberDecimal"/>
+              <EditText android:id="@+id/et_drop" android:layout_width="match_parent" android:layout_height="55dp" android:hint="Max Drop" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp" android:inputType="numberDecimal"/>
+              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto Accept" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="55dp" android:text="SAVE" android:backgroundTint="#1DB954"/>
           </LinearLayout>
           EOF
 
           cat > app/src/main/res/layout/activity_popup.xml << 'EOF'
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="wrap_content"
-              android:orientation="vertical" android:padding="20dp" android:background="#1E1E1E">
-              <TextView android:id="@+id/tv_pickup" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF"/>
-              <TextView android:id="@+id/tv_drop" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF"/>
-              <Button android:id="@+id/btn_ok" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="OK"/>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:background="#1E1E1E">
+              <TextView android:id="@+id/tv_pickup" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="18sp"/>
+              <TextView android:id="@+id/tv_drop" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="18sp" android:layout_marginBottom="15dp"/>
+              <Button android:id="@+id/btn_ok" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="OK" android:backgroundTint="#4CAF50"/>
           </LinearLayout>
           EOF
 
