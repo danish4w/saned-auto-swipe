@@ -1,4 +1,4 @@
-name: Build Danish Auto Silent
+name: Build Danish Auto Module
 on: workflow_dispatch
 
 jobs:
@@ -13,12 +13,17 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Xposed API jar (from reliable source)
+      - name: Download Xposed API jar (Maven Central with proper UA)
         run: |
           mkdir -p app/libs
-          curl -L -o app/libs/api-82.jar https://github.com/rovo89/XposedBridge/releases/download/82/api-82.jar
-          # Verify it's a valid zip
-          jar tf app/libs/api-82.jar > /dev/null || { echo "JAR invalid"; exit 1; }
+          curl -L -A "Mozilla/5.0" -o app/libs/api-82.jar "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar"
+          # Verify JAR
+          if ! jar tf app/libs/api-82.jar > /dev/null 2>&1; then
+            echo "JAR still invalid, trying fallback..."
+            curl -L -o app/libs/api-82.jar "https://jcenter.bintray.com/de/robv/android/xposed/api/82/api-82.jar"
+            jar tf app/libs/api-82.jar > /dev/null 2>&1 || { echo "Both sources failed"; exit 1; }
+          fi
+          echo "JAR is valid"
 
       - name: Build LSPosed Module
         run: |
@@ -73,147 +78,48 @@ jobs:
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application
-                  android:label="Danish Auto"
-                  android:theme="@android:style/Theme.DeviceDefault">
-                  <meta-data
-                      android:name="xposedmodule"
-                      android:value="true" />
-                  <meta-data
-                      android:name="xposeddescription"
-                      android:value="Silent Auto Accept (Notification-based)" />
-                  <meta-data
-                      android:name="xposedminversion"
-                      android:value="82" />
-                  <activity
-                      android:name=".SettingsActivity"
-                      android:exported="true">
+              <application android:label="Danish Auto" android:theme="@android:style/Theme.DeviceDefault">
+                  <meta-data android:name="xposedmodule" android:value="true" />
+                  <meta-data android:name="xposeddescription" android:value="Auto Accept (Notification-based)" />
+                  <meta-data android:name="xposedminversion" android:value="82" />
+                  <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  <activity
-                      android:name=".PopupActivity"
-                      android:theme="@android:style/Theme.DeviceDefault.Dialog"
-                      android:excludeFromRecents="true"
-                      android:exported="false" />
+                  <activity android:name=".PopupActivity" android:theme="@android:style/Theme.DeviceDefault.Dialog" android:excludeFromRecents="true" android:exported="false" />
               </application>
           </manifest>
           EOF
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">Danish Auto</string>
-          </resources>
+          <resources><string name="app_name">Danish Auto</string></resources>
           EOF
 
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:orientation="vertical"
-              android:padding="20dp"
-              android:background="#121212">
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Danish Auto"
-                  android:textSize="26sp"
-                  android:textColor="#1DB954"
-                  android:textStyle="bold"
-                  android:layout_gravity="center"
-                  android:layout_marginBottom="20dp"/>
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Pickup Max (km)"
-                  android:textColor="#AAAAAA"/>
-              <EditText
-                  android:id="@+id/et_pickup"
-                  android:layout_width="match_parent"
-                  android:layout_height="55dp"
-                  android:inputType="numberDecimal"
-                  android:text="1.5"
-                  android:textColor="#FFFFFF"
-                  android:background="#333333"
-                  android:padding="10dp"
-                  android:layout_marginBottom="15dp"/>
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Drop Max (km)"
-                  android:textColor="#AAAAAA"/>
-              <EditText
-                  android:id="@+id/et_drop"
-                  android:layout_width="match_parent"
-                  android:layout_height="55dp"
-                  android:inputType="numberDecimal"
-                  android:text="3.5"
-                  android:textColor="#FFFFFF"
-                  android:background="#333333"
-                  android:padding="10dp"
-                  android:layout_marginBottom="15dp"/>
-              <Switch
-                  android:id="@+id/switch_enabled"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Auto Accept"
-                  android:textColor="#FFFFFF"
-                  android:layout_marginBottom="20dp"/>
-              <Button
-                  android:id="@+id/btn_save"
-                  android:layout_width="match_parent"
-                  android:layout_height="55dp"
-                  android:text="SAVE"
-                  android:backgroundTint="#1DB954"/>
+          <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="20dp" android:background="#121212">
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954" android:textStyle="bold" android:layout_gravity="center" android:layout_marginBottom="20dp"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pickup Max (km)" android:textColor="#AAAAAA"/>
+              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent" android:layout_height="55dp" android:inputType="numberDecimal" android:text="1.5" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp" android:layout_marginBottom="15dp"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Drop Max (km)" android:textColor="#AAAAAA"/>
+              <EditText android:id="@+id/et_drop" android:layout_width="match_parent" android:layout_height="55dp" android:inputType="numberDecimal" android:text="3.5" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp" android:layout_marginBottom="15dp"/>
+              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto Accept" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="55dp" android:text="SAVE" android:backgroundTint="#1DB954"/>
           </LinearLayout>
           EOF
 
           cat > app/src/main/res/layout/activity_popup.xml << 'EOF'
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="wrap_content"
-              android:orientation="vertical"
-              android:padding="20dp"
-              android:background="#1E1E1E">
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="✅ Order Accepted"
-                  android:textSize="22sp"
-                  android:textColor="#4CAF50"
-                  android:textStyle="bold"
-                  android:layout_gravity="center"
-                  android:layout_marginBottom="15dp"/>
-              <TextView
-                  android:id="@+id/tv_pickup"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Pickup: -- km"
-                  android:textSize="16sp"
-                  android:textColor="#FFFFFF"/>
-              <TextView
-                  android:id="@+id/tv_drop"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="Drop: -- km"
-                  android:textSize="16sp"
-                  android:textColor="#FFFFFF"
-                  android:layout_marginBottom="20dp"/>
-              <Button
-                  android:id="@+id/btn_ok"
-                  android:layout_width="match_parent"
-                  android:layout_height="45dp"
-                  android:text="OK"
-                  android:backgroundTint="#4CAF50"/>
+          <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:background="#1E1E1E">
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✅ Order Accepted" android:textSize="22sp" android:textColor="#4CAF50" android:textStyle="bold" android:layout_gravity="center" android:layout_marginBottom="15dp"/>
+              <TextView android:id="@+id/tv_pickup" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pickup: -- km" android:textSize="16sp" android:textColor="#FFFFFF"/>
+              <TextView android:id="@+id/tv_drop" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Drop: -- km" android:textSize="16sp" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
+              <Button android:id="@+id/btn_ok" android:layout_width="match_parent" android:layout_height="45dp" android:text="OK" android:backgroundTint="#4CAF50"/>
           </LinearLayout>
           EOF
 
           cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'EOF'
           package com.danish.auto;
-
           import android.content.SharedPreferences;
           import android.os.Bundle;
           import android.widget.Button;
@@ -221,29 +127,22 @@ jobs:
           import android.widget.Switch;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
-
           public class SettingsActivity extends AppCompatActivity {
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
+              @Override protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_settings);
                   SharedPreferences prefs = getSharedPreferences("danish_prefs", MODE_PRIVATE);
-
                   EditText etPickup = findViewById(R.id.et_pickup);
                   EditText etDrop = findViewById(R.id.et_drop);
                   Switch sw = findViewById(R.id.switch_enabled);
                   Button btnSave = findViewById(R.id.btn_save);
-
                   etPickup.setText(String.valueOf(prefs.getFloat("pickup_max", 1.5f)));
                   etDrop.setText(String.valueOf(prefs.getFloat("drop_max", 3.5f)));
                   sw.setChecked(prefs.getBoolean("enabled", false));
-
                   btnSave.setOnClickListener(v -> {
-                      prefs.edit()
-                          .putFloat("pickup_max", Float.parseFloat(etPickup.getText().toString()))
-                          .putFloat("drop_max", Float.parseFloat(etDrop.getText().toString()))
-                          .putBoolean("enabled", sw.isChecked())
-                          .apply();
+                      prefs.edit().putFloat("pickup_max", Float.parseFloat(etPickup.getText().toString()))
+                           .putFloat("drop_max", Float.parseFloat(etDrop.getText().toString()))
+                           .putBoolean("enabled", sw.isChecked()).apply();
                       Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
                   });
               }
@@ -252,14 +151,11 @@ jobs:
 
           cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'EOF'
           package com.danish.auto;
-
           import android.os.Bundle;
           import android.widget.TextView;
           import androidx.appcompat.app.AppCompatActivity;
-
           public class PopupActivity extends AppCompatActivity {
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
+              @Override protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_popup);
                   float pickup = getIntent().getFloatExtra("pickup", 0);
@@ -302,7 +198,7 @@ jobs:
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
-          public class MainHook implements de.robv.android.xposed.IXposedHookLoadPackage {
+          public class MainHook implements IXposedHookLoadPackage {
               private static final String TAG = "DanishAuto";
               private static SharedPreferences prefs;
               private static float pendingPickup = -1;
@@ -470,10 +366,10 @@ jobs:
           EOF
 
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --refresh-dependencies
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Danish-Auto-Silent
+          name: Danish-Auto-Module
           path: app/build/outputs/apk/debug/*.apk
