@@ -1,4 +1,4 @@
-name: Build RootAutoSwipe-Dev
+name: Build RootAutoSwipe
 on: workflow_dispatch
 
 jobs:
@@ -27,17 +27,16 @@ jobs:
 
           echo "include ':app'" > settings.gradle
 
-          # ── Green Icon (embedded base64) ──────────────
           mkdir -p app/src/main/res/mipmap-mdpi
-          echo "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAChElEQVR4nO2aTWgTURDHfxuTNETSJkqxraWWVuoXPQgViiK2iIIoqFAPXtRDweClxyJ+UNGTguBJbz16rJAGFVtUBEFSRS0KSoWEGEWruFFCa9omHl7TJrHJJeNuVvYP4c2bWWbmv/vmZWd3Ncoge4tsObtR0IJoJW0rKasl8WKsRKRAUa2JFyOfiCMnWCV5KMzVUe5AK8AB1jr7OeRytvwV0Kx49vNh+StgEzAbNgGz4RTzdLrEZpaZg3QSvr2AWBje3lQ6IcgRyCF6B1KJ5fmqGvC1QVMPNO+HLf0wug9mvoiEkycweQM+PfpbX7cRDo3Dmk7ovgoPT4qEM64GklPw6pqSWw6IuTW2iJMf1Oj0irk0lkBgsxq/T4q5NI5AYBtsPwuZeYicF3MrX8SdA9DWtzzXnKqAG3eD/g7GjkNiXCycPIHWI6Vt08/h82PRcPIEQr2F26jDBev3Qs8wbDoFqThELoqF+/c1kJmD+D14OqDmW4Oi7o0r4lgYsgvgqQffBjG3xhGYT8GvqJJr28XcGvxH9l6NdR1iLo0lMD2hxnU7xVwaSyAWVmPrYfCsFXFpP5UwGzYBs2ETMBs2AbNheQJy/UDfS4iFwNsEr6/DjzeLulFlj4VUP/BsENI/oeOEen5UYXcmRyCtQ+QCuP3QOwz3jy7q8vrfmgC0HISp29CwC56cqTis/BJK6+CqVbLbD11D6re6GRJj0LgHXD74rav+oEI4taDw/ZCnHma+Kjmtw8RQoX1hFtqPQXSk4lBaEE1uCbn9sOMyeBsgci5Pd0XJHx+ohj5+F7ouwUi3SNilF8ZWuyvNvey2/Da6RKDcBxXVhvxc/6+PPYpRLUTKrY4/kSCq2Wr0dXEAAAAASUVORK5CYII=" | base64 -d > app/src/main/res/mipmap-mdpi/ic_launcher.png
+          echo "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAADCklEQVR4nO2aXUhTYRjHf2dbfttiJ8dmokJozs/E1Ci7KfoCCSOCQgyEIhCsi6CLQCgwBEOCLkWsMKurtBK0rgvyiygVBbXMSmfq2MiPCW52IRvO5i7m25mz/WGw8747/+f5nfc8Z3vfdxI+VNxSsuKrXym1nW2VNurz2rFVEl8vbyAeDVs18fVaC6JyvQmW5MEzV5WvDwaDVBBcV98lV85BPwJSMF79tQr6EQgBBFohgEBLI8rodUmL1/Zlp4OF5XlGrV/onuqh/WsHy06HqLDiAFz6MNnJ7KLFfbxDrcEQZSBrdya5+v2cSDpO1fvbWJesQuIJB3g12kbfTP9f7cZoI3eL7pC8M4nyzEvc730gJJ5iNTA5P8mL4VYA8vR5wnwVLeLJeTMA4ZowYZ6KAiTEJADwzTYuzFMxgMTYRM6nnsOx4qBpsFmYr/AiPrO3mMPxh9zHapUKY7SRDDmdH3M/uddTx6fpz8LiCQc4aCzcsG/UOkr/zIDQeMIBbr2r8niMalRqcuKyuZ57jWOJR5lenKF58JmweP+8BpadDnqnPlLf1wDA6eRTQv0VK+Iecy/OFSfa8J3oo+KE+SoGYHfYmVr4BYAh2iDMV9HvgYm5CQD2xMQL81QUYNg6AoBJlybMU1GAHnMvAIXGAmLDYoV4hlYlAq0QQKAVAgi0QgCB1v8NkCGnU3ukBkla3bKqKap299UUVVNoKKDMVErjyXrKTKUUGgrQR+mpzK2gNO0ilbkV6KP0mwLY1IRmny6Vp0PPyZQzvK4FdZq76DR3kS6b3PPgm/k3aOh7iMVuQReh43JWObXddX7n4DeAWlKTsiuFSHUkGpXGK4A3acO1WOyrK3cWuwVtuNbfFABQ+dpE9qWcuGxaR17SPLQ6PZQkCbWk9nh5k23JhhwhAyBHyNiWbH6mvrrd6vcI5BsO0NDXCMD47+9kyZm0j73havYVJEmiY+yt1/MeDzyh1HSBWbsFOULHo4Emf1MA1mx0B9uvUteds30eo/7WQiC0Ntft9WeP9doqIL7ujj8SPeZ9YtLBsgAAAABJRU5ErkJggg==" | base64 -d > app/src/main/res/mipmap-mdpi/ic_launcher.png
           mkdir -p app/src/main/res/mipmap-hdpi
-          echo "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAD4ElEQVR4nO2cW2wMURiAv5leslJUW4q4bohLL4iQSgjigRCp25vECxF1CeJFPEgIEbx4kbg8eiKuEZd6ERKXNFhStxDaCtLQWq1Stb2sh9PN2d2uOW1iz+x0z5c0+c+ZSf5/vv5ndnZmshZ9IHyScF/2T1WsCqxe76vaob9I+RcqWbbTxv4uB9THmNBeOohJRKJu6tFB6SoHEh+7rdoh3Yh34HgOMkQJMt0jiXZhx08YBBEnZokpMIIUWGZ5OWM6SIERpMAIUmAEKTCCFBhBCjK1Z9zUi6uKrg7oaIXfX+D7K6i/C+/OQmt98uuLQ/91UG8EJaKzDZ4ehsABCHf935oc0N9B0Xy4Bp9uxU1aYGeDLx9GzIUR88DKgAwfzNoHA8fC3Q3aSnRX0NcqeHHceZ/cibD4MuSXiPGU9VBzAT7eTH59eOEk3fwOKsuhq13OTd2oLX3qCwJoqYWPlXJcWKYttTcEATS/lfGAYdrSekdQZ0jGHb+0pfWOoLxiGTcEtKX1hqDBE2DsUjl+dUJb6tQXVDAdlt0AO0uMX58WH/OacPc6qLAMSrb1nLcyIHsIjJwHIxcIOR2t8GQ/PDuqtURvfNVoDMD1JdDW+P/rUZD6Swxg6ExYdEYuM424u8Qe7YXAwcTb8kugaDMUbxHjMUuh7Ag83KWvPlK5g4Iv4N5WeHZYzhVvBl+B1jJSV1CEwCEINYk4wwf+1VrTp76g9haovyfHBTO0pk99QQANj2ScV6Q1tTcE/Xgv40HjtKb2hqCWOhnnjBYXkprwhqDgSxnbWVqXmTcEhZqg5YMcD5+jLbU3BIF49BNh/Eptab0jqO6KjMcsgfxSLWnN+0EKvNNBLmEEKTCCFBhBCowgBUaQAiNIgRGkwAhSYAQpMIIUGEEK9D0XyxkNa2vhy30Ih8HOhOpjUHspdluEtiA0PoGsgVC1R84PnQnzT8Gl2VrK1vvgMNQMVxeK2FcAy2+LpxbfX8duizBksng/MVqQfzW8P6erYheXWNs38VR1msOT0qY3EO6E3Elyzr8Kas4nv75u3D0HBatFlzhRexHGrxBxXpHotOjbr0nGXUF2FnT+EXF2LpTfkX+lO8R8zUXwrxSxf43W5QWQaVW4eFdx2Cz4Vi3iROcggOBzyM6DAYVCVGW5tvKsCiz33u7IGQUzdsPtdep9665A6U5o/wm/Pie7shj0CoosIwAsuL8dGh6Lj/mYbd1cWwxdIfHK3aoqeLBTa7ndVQrMzftYIj90YsdPGGJdmK8aCmIEmS7q6aBHB6WzpETH7igjXU7cTk3heA5Kh25SHWOfBPSXjurLP/4v+YsCgDHnl5kAAAAASUVORK5CYII=" | base64 -d > app/src/main/res/mipmap-hdpi/ic_launcher.png
+          echo "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAFJElEQVR4nO2cW2wUVRiAv5nZXcpuL5allS30ioDUqoGCpVyjSLCICbcYQwzBS3wxkUggYDQmRGMkkpgQiffw4A3KcokgQV+8IJUIlBDQ0i3lGkq3UFpLt3S2HeoDYdrtLnva0J3u0vM9nTnz5/znfPufye7MZBX6wcLdi7r6Ex+v7Fu8R+lrrDDwfpFyN0Sy1Ggn73c5IF5jRHtDQUwkIlVTWAUNVTkQee2qKGCo0dtB1GuQpIcgWT3d9HSh9u6Q3OaOE7nFBEhBAhS5vaIjK0iAFCRAChIgBQmQggRIQQJsVifcu2i3MMboMtANneb2/7h04xInr/3DwcsHud7eZMEMQ7FcUF/QFA2nzYkz2UlWsocSzxOsKHwRb81OtlWX09Vl3Ve3QRV0pP4olQ3HQ/oUFGyqjWRHMoUjJlLonoiqqDg0O8sffoGM4RlsPv6JZXMcVEHVTT72nd0fNcbj8vB2yXpyU3MAmJc7l0N1FRzzV1oxxfi/SF8JXOG9wx/Qecsw++bnzbMsf9wLAvC3+als6K6YCenjLcudEIIALrfWme1UR5pleRNGUOetTrOtG+2W5U0YQTmp2Wa7tvmsZXkTQpDHNYrizGLzeP+5A5bljssvij3JT8tj3dS12FQNgAPnf+FQXYVl+QdV0IT08SwsWBDWryoqLruLQvdEitxF2FQN3dD54fR2dtaIf6oMJIMqaOqoKUwdNUUYV9t8lncrNtASbLFgVqEkxDVo7AMFrC5eZW4zKxnUCvq26nu2V++IeC43NYcF+c+wIL8MgOIHJ7PykRV8dXKrlVOM3wq60HKRT098gde3y+wryysjxZFi6TziVtAdyn1eAh0BAByanelZ0yzNH/eCbnbe5N/GKvO4IC3f0vxxLwjA11xjtrNTsqNEDjwJIag+UG+2M50ZluZOCEH+tgaz7U4aiapYN+2EEHSx5ZLZtqkaORZus4QQFOgI0NB21TyeMELeMAvjVOMpsz3NU2JZ3oQRdLjub7M9OXMSeam5luSV7wcJSJgKGiykIAFSkAApSIAUJEAKEiAFCZCCBEhBAqQgAVKQAClIQEyfi2U6M/n86S1sr97BtupyAEYOd7P5yY9Zvn+FGdez741Jr+NxebCrdh5KH0tV42kAjjVUmo+Alo5bzJwxswkaQVRVxevbRUXdXzFZQ0wFzR4zk3Kfl9KsElOQiM3HtwDd0t76852Q82X583k84zHW/rEe3dBxJ7l5f8YGrt28hq+pJtKQ90RMt1ipZxp7a39C7wzicXkGZMxl45bw9amt6IYOQGN7I+W+HSwdt2RAxu9NzASNTs6iSW+itaOVQ3UVzMgqvecxk7Qk0pPSQ+5RA9Q2nzPfgh1oYrbFZo2ZSU5KNpvmbMSu2jFuGXhrdt01vgvxfbu7xSjK7bOxQO3PH330h+meUt78bQ1rfl/Hql9Xo6kqmc4MdEPHrtpRevzpg0NzEDSCwjF1Q+d6+/WwailIK+BCy8UBX8O+xXti84ApLzWXQGeAQEeb2Xe0vpLpWaXcCLZS3+antMcz9rk5T3Hi6sk+je317eblopUM04YB4E5y8/z4ZVGr816IyRabNXpm2JvwR/xHeaXoJfac+ZGNRz7itUdf5bmxz2JTbPjb/Hx24ss+jX3g/M8k211smvMhuhFEUzS+qfqOmqYzsVhKd53Lm/eh3Ln0qL07JKEu5E8NASGCZBWFOwiroKEsKdLao8oYKhfuaEUR9Ro0FKpJtMZ+CbhfKqo/H/z/nbSQe5ZPntoAAAAASUVORK5CYII=" | base64 -d > app/src/main/res/mipmap-hdpi/ic_launcher.png
           mkdir -p app/src/main/res/mipmap-xhdpi
-          echo "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAFjklEQVR4nO2dW2wUVRjHf7tdaLFtSkEEoQilLRYx0RdBYogCMRiFGCqN2cRgoiY2xgdfjdHEByMaiT4aEqKg1RKjRIkIChgTIwEkNDQoZXsDLALl0gu9UNpdH46b7uzuTGe3s/2mh/N72ZzLbP7z/ed8Z2Z2zmyACRD7lNhEtteFQB2BrLfNdAMTdGcyNcN1ZxP4zHBrRNBNJxP8zHEbM0eXTOC9wWk02I4AE3zvcIplWgNM8L3HLqYpBpjg5450sXU1CRtyh8UAc/TnnuQYB+0aDLkjMdYmBQkTBHP0SxCPuRkBwhgDhAmY9COLGQHCGAOEMQYIYwwQxhggjDFAGGOAMCFpAWl5NZNLkxhER2F0CIZ7YOAiXDsFl49A+x64dT1nMr3AnxdiGRngQPQ2nN0Fx9+GgX+9+U6P0TsFBadB9ctQ2wTz10irSYs/U1AyFw5A0yc2jQHIy4fpxVBYBvMeg7L1EEzYtYLZ8PQ++H41dP05GYpdMzUM6P8HLux3379oITy+A8qeHKvLK4B1X8HuZRAb9V5jluiZgm5egJ82wKXfrfUlVVBRK6PJBj0NAIgOwx9vpNYv2jjpUpzQ1wCArhPQ22qtm7NCRosNehsAcL3JWp4xR0aHDfobMNxjLYfuktFhg/4GhIqs5aFrMjps0N+A0mpr+VqjiAw79DagpApKH7DWte+R0WKD3gaseB/LEoi+doh8ISYnHXoaEAzBqm2w5LmxupEBOBiGkUE5XWmYGrcixiOQp85uihbCvath+esw68Gx9sEr8MtmuHJUTqMNd8bt6GNvweBlb77TY/QYAWmJwdE34dQ2aSGO6DkHABCAVR/Bms8h4N/dnBojwPH3gP/JnwnzVsPSLTAt4eJr6Ytw8zwcfyeXCrNmaswBZ3bAb6+427Z4MTxzAEqWjtVFR6ChCvo6vFLoGf4dm9nS1wH7n1W3o+MEQ7D8NTFJTuhnAED3GYjUW+sWb5LRMg56GgDQ+o21XFIJBf66FQ06G3D5SGrdzPsnX8c46GvAcLe6Ak6k6D4RKU7oawCo089EChfI6HBAbwP6zlnLxYtFZDihtwG9LdaymQMmmRunreXZD8nocEBvA642WssFd6tfyXyE3gbcOA23bljrFq6X0WKD3gbEonDxV2td1QsyWmzQ2wCAlgZr+Z6VvhoF/rwbegeh/wjwOcYAYYwBwhgDhDEGCGMMEMYYIIwxQBhjgDDGAGGMAcIYA4QxBghjDBDGGCCMMUAYY4AwxgBh/LNCZtEGeGovjN4CYuqlSj2tcO4HOLkVRvpt+ibR9LF6HGXtLtg5Vz0jmkj+LNhyCQ6Foe3bHO6QO/xjQJyvK9UbsgJB9QP6yq1QXgN716audIz3TSY0Q5lTvgmaP7O2VdTC7T7o2Ju7fcgA/6agWFQ9Yv7jeggVwqMfuN92ZBDav4OK51PbKsPqSYnEFTSC+NeAOKNDao1YeU1mqx0j9bBgnXoaLk7hArWQ7+xO73Vmif9SUDp6IzCtWOXvoatj9eGW1L71i1Sq6jys+pbXwN/bVVtlGLqb4cqxydHtglCgbgo8GxTMV5/REWu93RwAahJvbVBpKNEAHx39gTo/r2BOpHQZ9F9MPaMZj8iXMP8JmDFXLVud/bCq8xH+T0HTZ0L1S/DX9sy37ToBPRFYslm9K67zIPR3ei5xIgRhYv+JnjMCeero3XgYetvg5HvZfU+kXqWhyjA0+yv9gB9HQLgF4lNSbxu07obGD9XZUNq+SZzfBz/XjJVb6uGRd2G4Dzr89bYsSPpHbd9PxpqQmHGCdg2G3JAc46lxFqQxKQaYUZA70sU27QgwJniPXUxtU5AxwTucYukqyObsKDvcHMSuJmEzGjLHbcwyDqwZDc5kerBO6Mg2ZigmkiH+A7i+dB8p/X4sAAAAAElFTkSuQmCC" | base64 -d > app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          echo "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" | base64 -d > app/src/main/res/mipmap-xhdpi/ic_launcher.png
           mkdir -p app/src/main/res/mipmap-xxhdpi
-          echo "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" | base64 -d > app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          echo "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" | base64 -d > app/src/main/res/mipmap-xxhdpi/ic_launcher.png
           mkdir -p app/src/main/res/mipmap-xxxhdpi
-          echo "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" | base64 -d > app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          echo "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" | base64 -d > app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
@@ -56,10 +55,10 @@ jobs:
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.rootautoswipedev'
+              namespace 'com.rootautoswipe'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.rootautoswipedev'
+                  applicationId 'com.rootautoswipe'
                   minSdk 26
                   targetSdk 34
                   versionCode 1
@@ -104,7 +103,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">RAS Dev</string>
+              <string name="app_name">RootAutoSwipe</string>
           </resources>
           EOF
 
@@ -115,11 +114,12 @@ jobs:
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                   android:orientation="vertical" android:padding="20dp" android:background="#121212">
                   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="RAS Dev" android:textSize="24sp" android:textColor="#FF9800" android:textStyle="bold"/>
+                      android:text="🟢 RootAutoSwipe" android:textSize="24sp"
+                      android:textColor="#4CAF50" android:textStyle="bold"/>
                   <TextView android:id="@+id/tv_status" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Service Stopped" android:textSize="14sp" android:textColor="#FF5555" android:layout_marginTop="20dp"/>
+                      android:text="Service Stopped" android:textSize="14sp" android:textColor="#FF5555" android:layout_marginTop="16dp"/>
                   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Target App Package" android:textColor="#AAAAAA" android:layout_marginTop="20dp"/>
+                      android:text="Target Package" android:textColor="#AAAAAA" android:layout_marginTop="16dp"/>
                   <EditText android:id="@+id/et_package" android:layout_width="match_parent" android:layout_height="wrap_content"
                       android:text="net.jahez.fleets" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp"/>
                   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -130,16 +130,12 @@ jobs:
                       android:text="Max Drop (km)" android:textColor="#AAAAAA" android:layout_marginTop="10dp"/>
                   <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="wrap_content"
                       android:inputType="numberDecimal" android:text="3.5" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp"/>
-                  <TextView android:id="@+id/tv_detect_delay_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Delay: 800ms" android:textColor="#FF9800" android:layout_marginTop="20dp"/>
-                  <SeekBar android:id="@+id/sb_detect_delay" android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:max="1100" android:progress="400" android:thumbTint="#FF9800" android:progressTint="#FF9800"/>
                   <TextView android:id="@+id/tv_swipe_duration_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Swipe: 300ms" android:textColor="#FF9800" android:layout_marginTop="10dp"/>
+                      android:text="Swipe Duration: 300ms" android:textColor="#4CAF50" android:layout_marginTop="16dp"/>
                   <SeekBar android:id="@+id/sb_swipe_duration" android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:max="900" android:progress="200" android:thumbTint="#FF9800" android:progressTint="#FF9800"/>
+                      android:max="900" android:progress="200" android:thumbTint="#4CAF50" android:progressTint="#4CAF50"/>
                   <Button android:id="@+id/btn_start" android:layout_width="match_parent" android:layout_height="50dp"
-                      android:text="START" android:backgroundTint="#FF9800" android:layout_marginTop="20dp"/>
+                      android:text="START" android:backgroundTint="#4CAF50" android:layout_marginTop="20dp"/>
                   <Button android:id="@+id/btn_stop" android:layout_width="match_parent" android:layout_height="50dp"
                       android:text="STOP" android:backgroundTint="#F44336" android:layout_marginTop="10dp"/>
                   <Button android:id="@+id/btn_logs" android:layout_width="match_parent" android:layout_height="50dp"
@@ -154,7 +150,7 @@ jobs:
               android:layout_width="match_parent" android:layout_height="match_parent"
               android:orientation="vertical" android:background="#000000" android:padding="10dp">
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:text="Logs" android:textSize="20sp" android:textColor="#FF9800" android:gravity="center"/>
+                  android:text="Logs" android:textSize="20sp" android:textColor="#4CAF50" android:gravity="center"/>
               <ScrollView android:id="@+id/log_scroll" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
                   <TextView android:id="@+id/tv_logs" android:layout_width="match_parent" android:layout_height="wrap_content"
                       android:textColor="#00FF00" android:fontFamily="monospace" android:textSize="10sp" android:text="Waiting..."/>
@@ -170,19 +166,19 @@ jobs:
               android:layout_width="300dp" android:layout_height="wrap_content"
               android:orientation="vertical" android:background="#1E1E1E" android:padding="24dp">
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:text="Order Accepted!" android:textSize="22sp" android:textColor="#FF9800"
+                  android:text="Order Accepted!" android:textSize="22sp" android:textColor="#4CAF50"
                   android:textStyle="bold" android:gravity="center"/>
               <TextView android:id="@+id/tv_pickup" android:layout_width="match_parent" android:layout_height="wrap_content"
                   android:text="Pickup: -- km" android:textSize="16sp" android:textColor="#FFFFFF" android:layout_marginTop="16dp"/>
               <TextView android:id="@+id/tv_drop" android:layout_width="match_parent" android:layout_height="wrap_content"
                   android:text="Drop: -- km" android:textSize="16sp" android:textColor="#FFFFFF" android:layout_marginTop="8dp"/>
               <Button android:id="@+id/btn_ok" android:layout_width="match_parent" android:layout_height="45dp"
-                  android:text="OK" android:backgroundTint="#FF9800" android:layout_marginTop="20dp"/>
+                  android:text="OK" android:backgroundTint="#4CAF50" android:layout_marginTop="20dp"/>
           </LinearLayout>
           EOF
 
           cat > app/src/main/java/com/rootautoswipe/PopupActivity.java << 'EOF'
-          package com.rootautoswipedev;
+          package com.rootautoswipe;
           import android.os.Bundle; import android.os.Handler;
           import android.widget.TextView; import androidx.appcompat.app.AppCompatActivity;
           public class PopupActivity extends AppCompatActivity {
@@ -192,48 +188,52 @@ jobs:
                   ((TextView)findViewById(R.id.tv_pickup)).setText("Pickup: "+pk+" km");
                   ((TextView)findViewById(R.id.tv_drop)).setText("Drop:   "+dr+" km");
                   findViewById(R.id.btn_ok).setOnClickListener(v->finish());
-                  new Handler().postDelayed(this::finish,5000);
+                  new Handler().postDelayed(this::finish, 5000);
               }
           }
           EOF
 
           cat > app/src/main/java/com/rootautoswipe/MainActivity.java << 'EOF'
-          package com.rootautoswipedev;
+          package com.rootautoswipe;
           import android.content.Intent; import android.content.SharedPreferences;
           import android.os.Build; import android.os.Bundle; import android.widget.*;
           import androidx.appcompat.app.AppCompatActivity;
           public class MainActivity extends AppCompatActivity {
-              private EditText etPkg,etPk,etDr; private SeekBar sbDet,sbSw;
-              private TextView tvDet,tvSw,tvSt; private SharedPreferences pr;
+              private EditText etPkg, etPk, etDr;
+              private SeekBar sbSw;
+              private TextView tvSw, tvSt;
+              private SharedPreferences pr;
               @Override protected void onCreate(Bundle s) {
                   super.onCreate(s); setContentView(R.layout.activity_main);
-                  pr=getSharedPreferences("ras_prefs",MODE_PRIVATE);
-                  etPkg=findViewById(R.id.et_package); etPk=findViewById(R.id.et_pickup_max);
-                  etDr=findViewById(R.id.et_drop_max); sbDet=findViewById(R.id.sb_detect_delay);
-                  sbSw=findViewById(R.id.sb_swipe_duration); tvDet=findViewById(R.id.tv_detect_delay_label);
-                  tvSw=findViewById(R.id.tv_swipe_duration_label); tvSt=findViewById(R.id.tv_status);
+                  pr = getSharedPreferences("ras_prefs", MODE_PRIVATE);
+                  etPkg = findViewById(R.id.et_package);
+                  etPk  = findViewById(R.id.et_pickup_max);
+                  etDr  = findViewById(R.id.et_drop_max);
+                  sbSw  = findViewById(R.id.sb_swipe_duration);
+                  tvSw  = findViewById(R.id.tv_swipe_duration_label);
+                  tvSt  = findViewById(R.id.tv_status);
                   etPkg.setText(pr.getString("target_pkg","net.jahez.fleets"));
                   etPk.setText(String.valueOf(pr.getFloat("pickup_max",1.5f)));
                   etDr.setText(String.valueOf(pr.getFloat("drop_max",3.5f)));
-                  int dd=pr.getInt("detect_delay",800),sd=pr.getInt("swipe_duration",300);
-                  sbDet.setProgress(dd-400); sbSw.setProgress(sd-100);
-                  tvDet.setText("Delay: "+dd+"ms"); tvSw.setText("Swipe: "+sd+"ms");
-                  sbDet.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
-                      @Override public void onProgressChanged(SeekBar s,int p,boolean u){tvDet.setText("Delay: "+(p+400)+"ms");}
-                      @Override public void onStartTrackingTouch(SeekBar s){} @Override public void onStopTrackingTouch(SeekBar s){}
-                  });
+                  int sd = pr.getInt("swipe_duration",300);
+                  sbSw.setProgress(sd-100);
+                  tvSw.setText("Swipe Duration: "+sd+"ms");
                   sbSw.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
-                      @Override public void onProgressChanged(SeekBar s,int p,boolean u){tvSw.setText("Swipe: "+(p+100)+"ms");}
-                      @Override public void onStartTrackingTouch(SeekBar s){} @Override public void onStopTrackingTouch(SeekBar s){}
+                      @Override public void onProgressChanged(SeekBar s,int p,boolean u){tvSw.setText("Swipe Duration: "+(p+100)+"ms");}
+                      @Override public void onStartTrackingTouch(SeekBar s){}
+                      @Override public void onStopTrackingTouch(SeekBar s){}
                   });
                   findViewById(R.id.btn_start).setOnClickListener(v->{
-                      float pk,dr; try{pk=Float.parseFloat(etPk.getText().toString());}catch(Exception e){pk=1.5f;}
+                      float pk,dr;
+                      try{pk=Float.parseFloat(etPk.getText().toString());}catch(Exception e){pk=1.5f;}
                       try{dr=Float.parseFloat(etDr.getText().toString());}catch(Exception e){dr=3.5f;}
-                      pr.edit().putString("target_pkg",etPkg.getText().toString().trim())
-                          .putFloat("pickup_max",pk).putFloat("drop_max",dr)
-                          .putInt("detect_delay",sbDet.getProgress()+400)
-                          .putInt("swipe_duration",sbSw.getProgress()+100).apply();
-                      Intent svc=new Intent(this,AutoSwipeService.class);
+                      pr.edit()
+                          .putString("target_pkg", etPkg.getText().toString().trim())
+                          .putFloat("pickup_max",  pk)
+                          .putFloat("drop_max",    dr)
+                          .putInt("swipe_duration", sbSw.getProgress()+100)
+                          .apply();
+                      Intent svc = new Intent(this, AutoSwipeService.class);
                       if(Build.VERSION.SDK_INT>=26) startForegroundService(svc); else startService(svc);
                       tvSt.setText("Running"); tvSt.setTextColor(0xFF4CAF50);
                       Toast.makeText(this,"Started",Toast.LENGTH_SHORT).show();
@@ -249,99 +249,234 @@ jobs:
           EOF
 
           cat > app/src/main/java/com/rootautoswipe/AutoSwipeService.java << 'EOF'
-          package com.rootautoswipedev;
+          package com.rootautoswipe;
           import android.app.*; import android.content.*; import android.os.*;
           import android.util.Log; import java.io.*; import java.util.*; import java.util.regex.*;
           public class AutoSwipeService extends Service {
-              static final String TAG="RAS",CH="ras_ch",CHA="ras_alert";
-              static final int NID=2001,AID=2002;
-              Thread th; boolean run=false; SharedPreferences pr; NotificationManager nm;
-              String pkg="net.jahez.fleets"; float pkMax=1.5f,drMax=3.5f; int det=800,sw=300;
-              void log(String m){Log.d(TAG,m);Intent i=new Intent("RAS_LOG_ACTION");i.setPackage("com.rootautoswipedev");i.putExtra("log_msg",m);sendBroadcast(i);}
-              String exec(String c){try{Process p=Runtime.getRuntime().exec(new String[]{"su","-c",c});
-                  BufferedReader b=new BufferedReader(new InputStreamReader(p.getInputStream()));
-                  StringBuilder sb=new StringBuilder();String l;while((l=b.readLine())!=null)sb.append(l).append("\n");
-                  p.waitFor();return sb.toString().trim();}catch(Exception e){log("ex:"+e.getMessage());return"";}}
+              static final String TAG="RAS", CH="com.rootautoswipe_ch", CHA="com.rootautoswipe_alert";
+              static final int NID=2001, AID=2002;
+              Thread th; boolean run=false;
+              SharedPreferences pr; NotificationManager nm;
+              String pkg="net.jahez.fleets";
+              float pkMax=1.5f, drMax=3.5f;
+              int sw=300;
+
+              void log(String m){
+                  Log.d(TAG,m);
+                  Intent i=new Intent("RAS_LOG_ACTION");
+                  i.setPackage("com.rootautoswipe");
+                  i.putExtra("log_msg",m);
+                  sendBroadcast(i);
+              }
+
+              String exec(String c){
+                  try{
+                      Process p=Runtime.getRuntime().exec(new String[]{"su","-c",c});
+                      BufferedReader b=new BufferedReader(new InputStreamReader(p.getInputStream()));
+                      StringBuilder sb=new StringBuilder(); String l;
+                      while((l=b.readLine())!=null) sb.append(l).append("\n");
+                      p.waitFor(); return sb.toString().trim();
+                  }catch(Exception e){log("ex:"+e.getMessage()); return"";}
+              }
+
               void startFgNotif(){
                   nm=getSystemService(NotificationManager.class);
                   if(Build.VERSION.SDK_INT>=26){
-                      nm.createNotificationChannel(new NotificationChannel(CH,"RAS Svc",NotificationManager.IMPORTANCE_LOW));
+                      nm.createNotificationChannel(new NotificationChannel(CH,"RootAutoSwipe Svc",NotificationManager.IMPORTANCE_LOW));
                       NotificationChannel ac=new NotificationChannel(CHA,"Order Alert",NotificationManager.IMPORTANCE_HIGH);
-                      ac.enableVibration(true);nm.createNotificationChannel(ac);}
-                  Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CH):new Notification.Builder(this);
-                  startForeground(NID,b.setContentTitle("RAS Dev").setContentText("Monitoring [/dev/stdout]...").setSmallIcon(android.R.drawable.ic_menu_compass).setOngoing(true).build());}
-              void alert(float pk,float dr){
-                  try{Vibrator v=(Vibrator)getSystemService(VIBRATOR_SERVICE);
-                      if(v!=null&&v.hasVibrator()){if(Build.VERSION.SDK_INT>=26)v.vibrate(VibrationEffect.createWaveform(new long[]{0,300,150,300},-1));else v.vibrate(new long[]{0,300,150,300},-1);}}catch(Exception e){}
-                  try{Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHA):new Notification.Builder(this);
-                      nm.notify(AID,b.setContentTitle("Order Accepted!").setContentText("Pickup:"+pk+"km | Drop:"+dr+"km").setSmallIcon(android.R.drawable.ic_dialog_info).setAutoCancel(true).build());}catch(Exception e){}
-                  try{Intent i=new Intent(this,PopupActivity.class);i.putExtra("pickup",pk);i.putExtra("drop",dr);
-                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);startActivity(i);}catch(Exception e){}}
-              @Override public void onCreate(){super.onCreate();pr=getSharedPreferences("ras_prefs",MODE_PRIVATE);}
-              @Override public int onStartCommand(Intent i,int f,int id){
+                      ac.enableVibration(true); nm.createNotificationChannel(ac);
+                  }
+                  Notification.Builder b=Build.VERSION.SDK_INT>=26
+                      ?new Notification.Builder(this,CH):new Notification.Builder(this);
+                  startForeground(NID, b
+                      .setContentTitle("RootAutoSwipe")
+                      .setContentText("Monitoring orders...")
+                      .setSmallIcon(android.R.drawable.ic_menu_compass)
+                      .setOngoing(true).build());
+                  log("Service started");
+              }
+
+              void alert(float pk, float dr){
+                  try{
+                      Vibrator v=(Vibrator)getSystemService(VIBRATOR_SERVICE);
+                      if(v!=null&&v.hasVibrator()){
+                          if(Build.VERSION.SDK_INT>=26) v.vibrate(VibrationEffect.createWaveform(new long[]{0,300,150,300},-1));
+                          else v.vibrate(new long[]{0,300,150,300},-1);
+                      }
+                  }catch(Exception e){}
+                  try{
+                      Notification.Builder b=Build.VERSION.SDK_INT>=26
+                          ?new Notification.Builder(this,CHA):new Notification.Builder(this);
+                      nm.notify(AID, b
+                          .setContentTitle("Order Accepted!")
+                          .setContentText("Pickup:"+pk+"km | Drop:"+dr+"km")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setAutoCancel(true).build());
+                  }catch(Exception e){}
+                  try{
+                      Intent i=new Intent(this,PopupActivity.class);
+                      i.putExtra("pickup",pk); i.putExtra("drop",dr);
+                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                      startActivity(i);
+                  }catch(Exception e){}
+              }
+
+              @Override public void onCreate(){
+                  super.onCreate();
+                  pr=getSharedPreferences("ras_prefs",MODE_PRIVATE);
+              }
+
+              @Override public int onStartCommand(Intent i, int f, int id){
                   startFgNotif();
-                  pkg=pr.getString("target_pkg","net.jahez.fleets");pkMax=pr.getFloat("pickup_max",1.5f);
-                  drMax=pr.getFloat("drop_max",3.5f);det=pr.getInt("detect_delay",800);sw=pr.getInt("swipe_duration",300);
-                  if(th!=null&&th.isAlive())return START_STICKY;
-                  run=true;th=new Thread(()-)->{
-                      log("Thread started [DEV stdout]");
-                      while(run){try{
-                          String top=Build.VERSION.SDK_INT>=29?exec("dumpsys activity top | grep ACTIVITY | tail -1"):exec("dumpsys activity top | grep ACTIVITY | head -1");
-                          if(!top.contains(pkg)){Thread.sleep(1000);continue;}
-                          String dump=exec("uiautomator dump /data/local/tmp/ras.xml 2>/dev/null && cat /data/local/tmp/ras.xml");
-                          if(dump.isEmpty()){Thread.sleep(500);continue;}
-                          if(!dump.contains("New Order")){Thread.sleep(800);continue;}
-                          log("New Order! wait "+det+"ms");Thread.sleep(det);
-                          dump=exec("uiautomator dump /data/local/tmp/ras.xml 2>/dev/null && cat /data/local/tmp/ras.xml");
-                          float[]d=dist(dump);log("P:"+d[0]+" D:"+d[1]);
-                          if(d[0]<0||d[1]<0){Thread.sleep(1500);continue;}
-                          if(d[0]<=pkMax&&d[1]<=drMax){
-                              int[]c=acc(dump);
-                              if(c!=null)exec("input swipe "+(c[0]+c[2]/5)+" "+(c[1]+c[3]/2)+" "+(c[0]+c[2]*4/5)+" "+(c[1]+c[3]/2)+" "+sw);
-                              else{String sz=exec("wm size");int W=1080,H=1920;Matcher m=Pattern.compile("(\\d+)x(\\d+)").matcher(sz);
-                                  if(m.find()){W=Integer.parseInt(m.group(1));H=Integer.parseInt(m.group(2));}
-                                  exec("input swipe "+(int)(W*.15)+" "+(int)(H*.85)+" "+(int)(W*.85)+" "+(int)(H*.85)+" "+sw);}
-                              alert(d[0],d[1]);Thread.sleep(3000);
-                          }else log("REJECT P:"+d[0]+" D:"+d[1]);
-                          Thread.sleep(1000);
-                      }catch(InterruptedException e){break;}catch(Exception e){log("E:"+e.getMessage());}}
-                      log("Thread stopped");});
-                  th.start();return START_STICKY;}
+                  pkg = pr.getString("target_pkg","net.jahez.fleets");
+                  pkMax= pr.getFloat("pickup_max",1.5f);
+                  drMax= pr.getFloat("drop_max",3.5f);
+                  sw   = pr.getInt("swipe_duration",300);
+                  log("Pkg:"+pkg+" P:"+pkMax+" D:"+drMax+" Sw:"+sw);
+
+                  if(th!=null&&th.isAlive()) return START_STICKY;
+                  run=true;
+                  th=new Thread(()->) {
+                      log("Monitor [FILE DUMP] — FAST MODE (1 dump per order)");
+                      while(run){
+                          try{
+                              // ── 1. App foreground check ──────────────────
+                              String top = Build.VERSION.SDK_INT>=29
+                                  ? exec("dumpsys activity top | grep ACTIVITY | tail -1")
+                                  : exec("dumpsys activity top | grep ACTIVITY | head -1");
+                              if(!top.contains(pkg)){ Thread.sleep(800); continue; }
+
+                              // ── 2. EK dump lo ───────────────────────────
+                              // File dump
+                          String dump = exec("uiautomator dump /data/local/tmp/ras.xml 2>/dev/null && cat /data/local/tmp/ras.xml");
+
+                              if(dump.isEmpty()){ Thread.sleep(300); continue; }
+
+                              // ── 3. New Order check ──────────────────────
+                              if(!dump.contains("New Order")){ Thread.sleep(500); continue; }
+
+                              log("New Order! Parsing same dump...");
+
+                              // ── 4. USHI DUMP SE distances nikalo ────────
+                              float[]d = dist(dump);
+                              log("P:"+d[0]+" D:"+d[1]);
+
+                              if(d[0]<0||d[1]<0){
+                                  log("Parse fail — retry next cycle");
+                                  Thread.sleep(300); continue;
+                              }
+
+                              // ── 5. Decision ─────────────────────────────
+                              if(d[0]<=pkMax && d[1]<=drMax){
+                                  log("ACCEPT P:"+d[0]+" D:"+d[1]);
+                                  int[]c = acc(dump);
+                                  if(c!=null){
+                                      exec("input swipe "+(c[0]+c[2]/5)+" "+(c[1]+c[3]/2)
+                                          +" "+(c[0]+c[2]*4/5)+" "+(c[1]+c[3]/2)+" "+sw);
+                                  }else{
+                                      String sz=exec("wm size"); int W=1080,H=1920;
+                                      Matcher m=Pattern.compile("(\\d+)x(\\d+)").matcher(sz);
+                                      if(m.find()){W=Integer.parseInt(m.group(1));H=Integer.parseInt(m.group(2));}
+                                      exec("input swipe "+(int)(W*.15)+" "+(int)(H*.85)
+                                          +" "+(int)(W*.85)+" "+(int)(H*.85)+" "+sw);
+                                      log("Fallback swipe");
+                                  }
+                                  alert(d[0],d[1]);
+                                  Thread.sleep(3000); // order complete hone ka wait
+
+                              }else{
+                                  log("REJECT P:"+d[0]+"/"+pkMax+" D:"+d[1]+"/"+drMax);
+                              }
+
+                              Thread.sleep(500);
+
+                          }catch(InterruptedException e){break;}
+                          catch(Exception e){log("E:"+e.getMessage());}
+                      }
+                      log("Monitor stopped");
+                  });
+                  th.start(); return START_STICKY;
+              }
+
               float[]dist(String x){
                   float[]r={-1,-1};
-                  Matcher m=Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk]m\\s+From\\s+You",Pattern.CASE_INSENSITIVE).matcher(x);if(m.find())r[0]=Float.parseFloat(m.group(1));
-                  m=Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk]m\\s+From\\s+Pickup",Pattern.CASE_INSENSITIVE).matcher(x);if(m.find())r[1]=Float.parseFloat(m.group(1));
-                  if(r[0]<0||r[1]<0){String[]ln=x.split("node ");Pattern kp=Pattern.compile("text=\"(\\d+\\.?\\d*)\\s*[Kk]m\"");
-                      for(int i=0;i<ln.length-1;i++){Matcher km=kp.matcher(ln[i]);if(km.find()){float v=Float.parseFloat(km.group(1));
-                          StringBuilder nx=new StringBuilder();for(int j=i+1;j<Math.min(i+4,ln.length);j++)nx.append(ln[j]);
-                          String s=nx.toString().toLowerCase();if(s.contains("from you")&&r[0]<0)r[0]=v;else if(s.contains("from pickup")&&r[1]<0)r[1]=v;}}}
-                  if(r[0]<0||r[1]<0){Matcher ma=Pattern.compile("text=\"(\\d+\\.?\\d*)\\s*[Kk]m[^\"]*\"",Pattern.CASE_INSENSITIVE).matcher(x);
-                      List<Float>vs=new ArrayList<>();while(ma.find()){float v=Float.parseFloat(ma.group(1));if(v>0&&v<100)vs.add(v);}
-                      if(vs.size()>=2){if(r[0]<0)r[0]=vs.get(0);if(r[1]<0)r[1]=vs.get(1);}}
-                  return r;}
-              int[]acc(String x){Matcher m=Pattern.compile("bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"[^/]*?text=\"(?:Accept|ACCEPT|قبول)\"|text=\"(?:Accept|ACCEPT|قبول)\"[^/]*?bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"",Pattern.CASE_INSENSITIVE|Pattern.DOTALL).matcher(x);
-                  if(m.find()){int l,t,ri,b;if(m.group(1)!=null){l=Integer.parseInt(m.group(1));t=Integer.parseInt(m.group(2));ri=Integer.parseInt(m.group(3));b=Integer.parseInt(m.group(4));}else{l=Integer.parseInt(m.group(5));t=Integer.parseInt(m.group(6));ri=Integer.parseInt(m.group(7));b=Integer.parseInt(m.group(8));}return new int[]{l,t,ri-l,b-t};}return null;}
-              @Override public void onDestroy(){run=false;if(th!=null)th.interrupt();stopForeground(true);super.onDestroy();}
+                  Matcher m=Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk]m\\s+From\\s+You",Pattern.CASE_INSENSITIVE).matcher(x);
+                  if(m.find()) r[0]=Float.parseFloat(m.group(1));
+                  m=Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk]m\\s+From\\s+Pickup",Pattern.CASE_INSENSITIVE).matcher(x);
+                  if(m.find()) r[1]=Float.parseFloat(m.group(1));
+                  if(r[0]<0||r[1]<0){
+                      String[]ln=x.split("node ");
+                      Pattern kp=Pattern.compile("text=\"(\\d+\\.?\\d*)\\s*[Kk]m\"");
+                      for(int i=0;i<ln.length-1;i++){
+                          Matcher km=kp.matcher(ln[i]);
+                          if(km.find()){
+                              float v=Float.parseFloat(km.group(1));
+                              StringBuilder nx=new StringBuilder();
+                              for(int j=i+1;j<Math.min(i+4,ln.length);j++) nx.append(ln[j]);
+                              String s=nx.toString().toLowerCase();
+                              if(s.contains("from you")&&r[0]<0) r[0]=v;
+                              else if(s.contains("from pickup")&&r[1]<0) r[1]=v;
+                          }
+                      }
+                  }
+                  if(r[0]<0||r[1]<0){
+                      Matcher ma=Pattern.compile("text=\"(\\d+\\.?\\d*)\\s*[Kk]m[^\"]*\"",Pattern.CASE_INSENSITIVE).matcher(x);
+                      List<Float>vs=new ArrayList<>();
+                      while(ma.find()){float v=Float.parseFloat(ma.group(1));if(v>0&&v<100)vs.add(v);}
+                      log("km vals:"+vs);
+                      if(vs.size()>=2){if(r[0]<0)r[0]=vs.get(0);if(r[1]<0)r[1]=vs.get(1);}
+                  }
+                  return r;
+              }
+
+              int[]acc(String x){
+                  Matcher m=Pattern.compile(
+                      "bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"[^/]*?text=\"(?:Accept|ACCEPT|قبول)\"|"+
+                      "text=\"(?:Accept|ACCEPT|قبول)\"[^/]*?bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"",
+                      Pattern.CASE_INSENSITIVE|Pattern.DOTALL).matcher(x);
+                  if(m.find()){
+                      int l,t,ri,b;
+                      if(m.group(1)!=null){l=Integer.parseInt(m.group(1));t=Integer.parseInt(m.group(2));ri=Integer.parseInt(m.group(3));b=Integer.parseInt(m.group(4));}
+                      else{l=Integer.parseInt(m.group(5));t=Integer.parseInt(m.group(6));ri=Integer.parseInt(m.group(7));b=Integer.parseInt(m.group(8));}
+                      log("Accept:["+l+","+t+"]["+ri+","+b+"]");
+                      return new int[]{l,t,ri-l,b-t};
+                  }
+                  log("Accept btn not found");
+                  return null;
+              }
+
+              @Override public void onDestroy(){
+                  run=false; if(th!=null)th.interrupt();
+                  stopForeground(true); super.onDestroy();
+              }
               @Override public IBinder onBind(Intent i){return null;}
           }
           EOF
 
           cat > app/src/main/java/com/rootautoswipe/LogActivity.java << 'EOF'
-          package com.rootautoswipedev;
+          package com.rootautoswipe;
           import android.content.*; import android.os.*; import android.widget.*;
           import androidx.appcompat.app.AppCompatActivity;
           public class LogActivity extends AppCompatActivity {
               private TextView tv; private ScrollView sv;
               private final BroadcastReceiver rc=new BroadcastReceiver(){
-                  @Override public void onReceive(Context c,Intent i){String m=i.getStringExtra("log_msg");if(m==null||tv==null)return;tv.append("\n"+m);if(sv!=null)sv.post(()->sv.fullScroll(ScrollView.FOCUS_DOWN));}};
-              @Override protected void onCreate(Bundle s){super.onCreate(s);setContentView(R.layout.activity_log);
-                  tv=findViewById(R.id.tv_logs);sv=findViewById(R.id.log_scroll);
+                  @Override public void onReceive(Context c,Intent i){
+                      String m=i.getStringExtra("log_msg");
+                      if(m==null||tv==null) return;
+                      tv.append("\n"+m);
+                      if(sv!=null) sv.post(()->sv.fullScroll(ScrollView.FOCUS_DOWN));
+                  }
+              };
+              @Override protected void onCreate(Bundle s){
+                  super.onCreate(s); setContentView(R.layout.activity_log);
+                  tv=findViewById(R.id.tv_logs); sv=findViewById(R.id.log_scroll);
                   ((Button)findViewById(R.id.btn_clear)).setOnClickListener(v->tv.setText("Cleared"));
                   IntentFilter f=new IntentFilter("RAS_LOG_ACTION");
-                  if(Build.VERSION.SDK_INT>=33)registerReceiver(rc,f,Context.RECEIVER_NOT_EXPORTED);
-                  else if(Build.VERSION.SDK_INT>=26)registerReceiver(rc,f,Context.RECEIVER_EXPORTED);
-                  else registerReceiver(rc,f);}
-              @Override protected void onDestroy(){super.onDestroy();unregisterReceiver(rc);}
+                  if(Build.VERSION.SDK_INT>=33) registerReceiver(rc,f,Context.RECEIVER_NOT_EXPORTED);
+                  else if(Build.VERSION.SDK_INT>=26) registerReceiver(rc,f,Context.RECEIVER_EXPORTED);
+                  else registerReceiver(rc,f);
+              }
+              @Override protected void onDestroy(){super.onDestroy(); unregisterReceiver(rc);}
           }
           EOF
 
@@ -351,5 +486,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: RootAutoSwipe-Dev
+          name: RootAutoSwipe
           path: app/build/outputs/apk/debug/*.apk
