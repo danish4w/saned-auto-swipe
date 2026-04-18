@@ -17,7 +17,7 @@ jobs:
         run: |
           mkdir -p app/libs
           echo "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GgEAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvUEsBAhQAFAAICAgAj7CSXDDKDeXzAAAA1QEAADMAAAAAAAAAAAAAAAAATwEAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvSVhwb3NlZEhvb2tMb2FkUGFja2FnZS5jbGFzc1BLAQIUABQACAgIAI+wklwP7jIrvQEAAH4DAAA6AAAAAAAAAAAAAAAAAKMCAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hDX01ldGhvZEhvb2skTWV0aG9kSG9va1BhcmFtLmNsYXNzUEsBAhQAFAAICAgAj7CSXNhAD6Y4AQAANwIAACoAAAAAAAAAAAAAAAAAyAQAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvWENfTWV0aG9kSG9vay5jbGFzc1BLAQIUABQACAgIAI+wkly3edyB7AAAAGQBAAApAAAAAAAAAAAAAAAAAFgGAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hwb3NlZEJyaWRnZS5jbGFzc1BLAQIUABQACAgIAI+wklzGqSC0lQEAAEwEAAAqAAAAAAAAAAAAAAAAAJsHAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hwb3NlZEhlbHBlcnMuY2xhc3NQSwECCgAKAAAIAACPsJJcAAAAAAAAAAAAAAAAIQAAAAAAAAAAAAAAAACICQAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9jYWxsYmFja3MvUEsBAhQAFAAICAgAj7CSXBdMNk06AQAA9QEAAEYAAAAAAAAAAAAAAAAAxwkAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvY2FsbGJhY2tzL1hDX0xvYWRQYWNrYWdlJExvYWRQYWNrYWdlUGFyYW0uY2xhc3NQSwECFAAUAAgICACPsJJcGXESw+wAAABjAQAANQAAAAAAAAAAAAAAAAB1CwAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9jYWxsYmFja3MvWENfTG9hZFBhY2thZ2UuY2xhc3NQSwUGAAAAAA4ADgBdBAAAxAwAAAAA" | base64 -d > app/libs/api-82.jar
-          echo "JAR size: $(ls -lh app/libs/api-82.jar)"
+          echo "JAR OK: $(ls -lh app/libs/api-82.jar)"
 
       - name: Build LSPosed Module
         run: |
@@ -78,7 +78,7 @@ jobs:
               <uses-permission android:name="android.permission.VIBRATE"/>
               <application android:label="Danish Auto" android:theme="@android:style/Theme.DeviceDefault">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Auto Accept Orders - Ultra Fast Hook" />
+                  <meta-data android:name="xposeddescription" android:value="Auto Accept Orders - Ultra Fast" />
                   <meta-data android:name="xposedminversion" android:value="82" />
                   <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter>
@@ -109,7 +109,7 @@ jobs:
                       android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954"
                       android:textStyle="bold" android:gravity="center" android:layout_marginBottom="8dp"/>
                   <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:text="LSPosed Hook — Ultra Fast" android:textSize="12sp"
+                      android:text="LSPosed Hook Mode" android:textSize="12sp"
                       android:textColor="#888888" android:gravity="center" android:layout_marginBottom="24dp"/>
                   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                       android:text="Pickup Max (km)" android:textColor="#AAAAAA"/>
@@ -214,170 +214,183 @@ jobs:
           }
           GEOF
 
-          cat > app/src/main/java/com/danish/auto/MainHook.java << 'GEOF'
-          package com.danish.auto;
-          import android.app.Activity;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.app.PendingIntent;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.SharedPreferences;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.os.VibrationEffect;
-          import android.os.Vibrator;
-          import android.view.View;
-          import android.view.ViewGroup;
-          import android.widget.TextView;
-          import java.lang.reflect.Method;
-          import java.util.ArrayList;
-          import java.util.List;
-          import java.util.regex.Matcher;
-          import java.util.regex.Pattern;
-          import de.robv.android.xposed.IXposedHookLoadPackage;
-          import de.robv.android.xposed.XC_MethodHook;
-          import de.robv.android.xposed.XposedBridge;
-          import de.robv.android.xposed.XposedHelpers;
-          import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
-          public class MainHook implements IXposedHookLoadPackage {
-              static final String TAG = "DanishAuto";
-              static SharedPreferences prefs;
+          python3 -c "
+import sys
+code = open('/dev/stdin').read()
+with open('app/src/main/java/com/danish/auto/MainHook.java', 'w') as f:
+    f.write(code)
+print('MainHook.java written!')
+" << 'PYEOF'
+package com.danish.auto;
+import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XposedBridge;
+import de.robv.android.xposed.XposedHelpers;
+import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
-              @Override
-              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) throws Throwable {
-                  if (!lp.packageName.equals("net.jahez.fleets")) return;
-                  XposedBridge.log(TAG + ": Hooked Jahez Fleets");
-                  hookActivity(lp, "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity");
-                  hookActivity(lp, "net.jahez.fleets.ui.dispatch.IncomingOrderActivity");
-                  hookActivity(lp, "net.jahez.fleets.accept.AcceptOrderActivity");
-              }
+public class MainHook implements IXposedHookLoadPackage {
+    static final String TAG = "DanishAuto";
+    static SharedPreferences prefs;
 
-              void hookActivity(XC_LoadPackage.LoadPackageParam lp, String cls) {
-                  try {
-                      XposedHelpers.findAndHookMethod(cls, lp.classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              Activity act = (Activity) param.thisObject;
-                              if (prefs == null) prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                              if (!prefs.getBoolean("enabled", false)) return;
+    @Override
+    public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) throws Throwable {
+        if (!lp.packageName.equals("net.jahez.fleets")) return;
+        XposedBridge.log(TAG + ": Hooked Jahez Fleets");
+        hookActivity(lp, "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity");
+        hookActivity(lp, "net.jahez.fleets.ui.dispatch.IncomingOrderActivity");
+        hookActivity(lp, "net.jahez.fleets.accept.AcceptOrderActivity");
+    }
 
-                              float[] ui = getDistances(act);
-                              float pk = ui[0], dr = ui[1];
-                              float pkMax = prefs.getFloat("pickup_max", 1.5f);
-                              float drMax = prefs.getFloat("drop_max", 3.5f);
-                              XposedBridge.log(TAG + ": P=" + pk + " D=" + dr + " Max=" + pkMax + "/" + drMax);
+    void hookActivity(XC_LoadPackage.LoadPackageParam lp, String cls) {
+        try {
+            XposedHelpers.findAndHookMethod(cls, lp.classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    Activity act = (Activity) param.thisObject;
+                    if (prefs == null) prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                    if (!prefs.getBoolean("enabled", false)) return;
 
-                              if (pk > 0 && dr > 0 && pk <= pkMax && dr <= drMax) {
-                                  XposedBridge.log(TAG + ": ACCEPT");
-                                  if (!callAccept(act)) clickAccept(act);
-                                  alert(act, pk, dr);
-                              } else {
-                                  XposedBridge.log(TAG + ": REJECT P=" + pk + "/" + pkMax + " D=" + dr + "/" + drMax);
-                              }
-                          }
-                      });
-                      XposedBridge.log(TAG + ": Hooked " + cls);
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + ": Skip " + cls + " - " + e.getMessage());
-                  }
-              }
+                    float[] ui = getDistances(act);
+                    float pk = ui[0], dr = ui[1];
+                    float pkMax = prefs.getFloat("pickup_max", 1.5f);
+                    float drMax = prefs.getFloat("drop_max", 3.5f);
+                    XposedBridge.log(TAG + ": P=" + pk + " D=" + dr + " Max=" + pkMax + "/" + drMax);
 
-              boolean callAccept(Activity act) {
-                  for (Method m : act.getClass().getDeclaredMethods()) {
-                      String n = m.getName().toLowerCase();
-                      if ((n.contains("accept") || n.contains("confirm")) && !n.contains("reject")) {
-                          try {
-                              m.setAccessible(true);
-                              if (m.getParameterTypes().length == 0) {
-                                  m.invoke(act);
-                                  XposedBridge.log(TAG + ": Called " + m.getName());
-                                  return true;
-                              }
-                          } catch (Exception ignored) {}
-                      }
-                  }
-                  return false;
-              }
+                    if (pk > 0 && dr > 0 && pk <= pkMax && dr <= drMax) {
+                        XposedBridge.log(TAG + ": ACCEPT");
+                        if (!callAccept(act)) clickAccept(act);
+                        alert(act, pk, dr);
+                    } else {
+                        XposedBridge.log(TAG + ": REJECT P=" + pk + "/" + pkMax + " D=" + dr + "/" + drMax);
+                    }
+                }
+            });
+            XposedBridge.log(TAG + ": Hooked " + cls);
+        } catch (Exception e) {
+            XposedBridge.log(TAG + ": Skip " + cls + " - " + e.getMessage());
+        }
+    }
 
-              void clickAccept(Activity act) {
-                  View btn = findBtn(act.getWindow().getDecorView());
-                  if (btn != null) { btn.performClick(); XposedBridge.log(TAG + ": Clicked btn"); }
-                  else XposedBridge.log(TAG + ": Btn not found");
-              }
+    boolean callAccept(Activity act) {
+        for (Method m : act.getClass().getDeclaredMethods()) {
+            String n = m.getName().toLowerCase();
+            if ((n.contains("accept") || n.contains("confirm")) && !n.contains("reject")) {
+                try {
+                    m.setAccessible(true);
+                    if (m.getParameterTypes().length == 0) {
+                        m.invoke(act);
+                        XposedBridge.log(TAG + ": Called " + m.getName());
+                        return true;
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        return false;
+    }
 
-              View findBtn(View v) {
-                  if (v instanceof TextView) {
-                      String t = ((TextView) v).getText().toString().trim();
-                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول") || t.equalsIgnoreCase("Confirm")) return v;
-                  }
-                  if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup)v).getChildCount(); i++) {
-                          View f = findBtn(((ViewGroup)v).getChildAt(i));
-                          if (f != null) return f;
-                      }
-                  }
-                  return null;
-              }
+    void clickAccept(Activity act) {
+        View btn = findBtn(act.getWindow().getDecorView());
+        if (btn != null) { btn.performClick(); XposedBridge.log(TAG + ": Clicked btn"); }
+        else XposedBridge.log(TAG + ": Btn not found");
+    }
 
-              float[] getDistances(Activity act) {
-                  List<Float> list = new ArrayList<>();
-                  scanViews(act.getWindow().getDecorView(), list);
-                  XposedBridge.log(TAG + ": km values: " + list);
-                  if (list.size() >= 2) return new float[]{list.get(0), list.get(1)};
-                  return new float[]{-1, -1};
-              }
+    View findBtn(View v) {
+        if (v instanceof TextView) {
+            String t = ((TextView) v).getText().toString().trim();
+            if (t.equalsIgnoreCase("Accept") || t.equals("\u0642\u0628\u0648\u0644") || t.equalsIgnoreCase("Confirm")) return v;
+        }
+        if (v instanceof ViewGroup) {
+            for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
+                View f = findBtn(((ViewGroup) v).getChildAt(i));
+                if (f != null) return f;
+            }
+        }
+        return null;
+    }
 
-              void scanViews(View v, List<Float> out) {
-                  if (v instanceof TextView) {
-                      String t = ((TextView)v).getText().toString();
-                      Matcher m = Pattern.compile("(\d+\.?\d*)\s*[Kk][Mm]").matcher(t);
-                      while (m.find()) {
-                          try {
-                              float val = Float.parseFloat(m.group(1));
-                              if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
-                          } catch (Exception ignored) {}
-                      }
-                  }
-                  if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup)v).getChildCount(); i++)
-                          scanViews(((ViewGroup)v).getChildAt(i), out);
-                  }
-              }
+    float[] getDistances(Activity act) {
+        List<Float> list = new ArrayList<>();
+        scanViews(act.getWindow().getDecorView(), list);
+        XposedBridge.log(TAG + ": km values: " + list);
+        if (list.size() >= 2) return new float[]{list.get(0), list.get(1)};
+        return new float[]{-1, -1};
+    }
 
-              void alert(Context ctx, float pk, float dr) {
-                  try {
-                      Vibrator vib = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
-                      if (vib != null && vib.hasVibrator()) {
-                          if (Build.VERSION.SDK_INT >= 26)
-                              vib.vibrate(VibrationEffect.createWaveform(new long[]{0,300,150,300}, -1));
-                          else vib.vibrate(new long[]{0,300,150,300}, -1);
-                      }
-                  } catch (Exception ignored) {}
-                  try {
-                      NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-                      if (Build.VERSION.SDK_INT >= 26)
-                          nm.createNotificationChannel(new NotificationChannel("danish_ch", "Danish Auto", NotificationManager.IMPORTANCE_HIGH));
-                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, new Intent(ctx, SettingsActivity.class),
-                          PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                      android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26
-                          ? new android.app.Notification.Builder(ctx, "danish_ch")
-                          : new android.app.Notification.Builder(ctx);
-                      nm.notify(1001, b.setContentTitle("Order Accepted!")
-                          .setContentText("Pickup:" + pk + "km | Drop:" + dr + "km")
-                          .setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setContentIntent(pi).setAutoCancel(true).build());
-                  } catch (Exception ignored) {}
-                  try {
-                      Intent i = new Intent(ctx, PopupActivity.class);
-                      i.putExtra("pickup", pk); i.putExtra("drop", dr);
-                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                      ctx.startActivity(i);
-                  } catch (Exception ignored) {}
-              }
-          }
-          GEOF
+    void scanViews(View v, List<Float> out) {
+        if (v instanceof TextView) {
+            String t = ((TextView) v).getText().toString();
+            Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
+            Matcher m = p.matcher(t);
+            while (m.find()) {
+                try {
+                    float val = Float.parseFloat(m.group(1));
+                    if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
+                } catch (Exception ignored) {}
+            }
+        }
+        if (v instanceof ViewGroup) {
+            for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++)
+                scanViews(((ViewGroup) v).getChildAt(i), out);
+        }
+    }
+
+    void alert(Context ctx, float pk, float dr) {
+        try {
+            Vibrator vib = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
+            if (vib != null && vib.hasVibrator()) {
+                if (Build.VERSION.SDK_INT >= 26)
+                    vib.vibrate(VibrationEffect.createWaveform(new long[]{0, 300, 150, 300}, -1));
+                else
+                    vib.vibrate(new long[]{0, 300, 150, 300}, -1);
+            }
+        } catch (Exception ignored) {}
+        try {
+            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (Build.VERSION.SDK_INT >= 26)
+                nm.createNotificationChannel(new NotificationChannel("danish_ch", "Danish Auto", NotificationManager.IMPORTANCE_HIGH));
+            PendingIntent pi = PendingIntent.getActivity(ctx, 0, new Intent(ctx, SettingsActivity.class),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26
+                ? new android.app.Notification.Builder(ctx, "danish_ch")
+                : new android.app.Notification.Builder(ctx);
+            nm.notify(1001, b
+                .setContentTitle("Order Accepted!")
+                .setContentText("Pickup:" + pk + "km | Drop:" + dr + "km")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .build());
+        } catch (Exception ignored) {}
+        try {
+            Intent i = new Intent(ctx, PopupActivity.class);
+            i.putExtra("pickup", pk);
+            i.putExtra("drop", dr);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            ctx.startActivity(i);
+        } catch (Exception ignored) {}
+    }
+}
+PYEOF
 
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
