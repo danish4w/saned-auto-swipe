@@ -13,13 +13,27 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Cache Xposed API jar
+        id: cache-xposed
+        uses: actions/cache@v3
+        with:
+          path: app/libs/api-82.jar
+          key: xposed-api-82-v2
+
+      - name: Download Xposed API jar
+        if: steps.cache-xposed.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p app/libs
+          curl -L -A "Mozilla/5.0" -o app/libs/api-82.jar "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar" || \
+          curl -L -A "Mozilla/5.0" -o app/libs/api-82.jar "https://jcenter.bintray.com/de/robv/android/xposed/api/82/api-82.jar"
+          jar tf app/libs/api-82.jar > /dev/null || { echo "JAR still invalid"; exit 1; }
+
       - name: Build LSPosed Module
         run: |
           mkdir -p app/src/main/java/com/danish/auto
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
-          mkdir -p app/libs
           mkdir -p gradle/wrapper
 
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
@@ -29,30 +43,21 @@ jobs:
 
           echo "include ':app'" > settings.gradle
 
-          # ---- FIX: Download Xposed API jar directly (no base64) ----
-          curl -L -o app/libs/api-82.jar "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar"
-          # Verify JAR
-          jar tf app/libs/api-82.jar > /dev/null || { echo "JAR corrupt"; exit 1; }
-
-          # ---- Your original base64 for MainHook (keep as is, assuming it's correct) ----
-          echo "cGFja2FnZSBjb20uZGFuaXNoLmF1dG87CmltcG9ydCBhbmRyb2lkLmFwcC5BY3Rpdml0eTsKaW1wb3J0IGFuZHJvaWQuYXBwLk5vdGlmaWNhdGlvbkNoYW5uZWw7CmltcG9ydCBhbmRyb2lkLmFwcC5Ob3RpZmljYXRpb25NYW5hZ2VyOwppbXBvcnQgYW5kcm9pZC5hcHAuUGVuZGluZ0ludGVudDsKaW1wb3J0IGFuZHJvaWQuY29udGVudC5Db250ZXh0OwppbXBvcnQgYW5kcm9pZC5jb250ZW50LkludGVudDsKaW1wb3J0IGFuZHJvaWQuY29udGVudC5TaGFyZWRQcmVmZXJlbmNlczsKaW1wb3J0IGFuZHJvaWQub3MuQnVpbGQ7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQub3MuVmlicmF0aW9uRWZmZWN0OwppbXBvcnQgYW5kcm9pZC5vcy5WaWJyYXRvcjsKaW1wb3J0IGFuZHJvaWQudmlldy5WaWV3OwppbXBvcnQgYW5kcm9pZC52aWV3LlZpZXdHcm91cDsKaW1wb3J0IGFuZHJvaWQud2lkZ2V0LlRleHRWaWV3OwppbXBvcnQgamF2YS5sYW5nLnJlZmxlY3QuTWV0aG9kOwppbXBvcnQgamF2YS51dGlsLkFycmF5TGlzdDsKaW1wb3J0IGphdmEudXRpbC5MaXN0OwppbXBvcnQgamF2YS51dGlsLnJlZ2V4Lk1hdGNoZXI7CmltcG9ydCBqYXZhLnV0aWwucmVnZXguUGF0dGVybjsKaW1wb3J0IGRlLnJvYnYuYW5kcm9pZC54cG9zZWQuSVhwb3NlZEhvb2tMb2FkUGFja2FnZTsKaW1wb3J0IGRlLnJvYnYuYW5kcm9pZC54cG9zZWQuWENfTWV0aG9kSG9vazsKaW1wb3J0IGRlLnJvYnYuYW5kcm9pZC54cG9zZWQuWHBvc2VkQnJpZGdlOwppbXBvcnQgZGUucm9idi5hbmRyb2lkLnhwb3NlZC5YcG9zZWRIZWxwZXJzOwppbXBvcnQgZGUucm9idi5hbmRyb2lkLnhwb3NlZC5jYWxsYmFja3MuWENfTG9hZFBhY2thZ2U7CgpwdWJsaWMgY2xhc3MgTWFpbkhvb2sgaW1wbGVtZW50cyBJWHBvc2VkSG9va0xvYWRQYWNrYWdlIHsKICAgIHN0YXRpYyBmaW5hbCBTdHJpbmcgVEFHID0gIkRhbmlzaEF1dG8iOwogICAgc3RhdGljIFNoYXJlZFByZWZlcmVuY2VzIHByZWZzOwoKICAgIEBPdmVycmlkZQogICAgcHVibGljIHZvaWQgaGFuZGxlTG9hZFBhY2thZ2UoWENfTG9hZFBhY2thZ2UuTG9hZFBhY2thZ2VQYXJhbSBscCkgdGhyb3dzIFRocm93YWJsZSB7CiAgICAgICAgaWYgKCFscC5wYWNrYWdlTmFtZS5lcXVhbHMoIm5ldC5qYWhlei5mbGVldHMiKSkgcmV0dXJuOwogICAgICAgIFhwb3NlZEJyaWRnZS5sb2coVEFHICsgIjogSG9va2VkIEphaGV6IEZsZWV0cyIpOwogICAgICAgIGhvb2tBY3Rpdml0eShscCwgIm5ldC5qYWhlei5mbGVldHMuZGlzcGF0Y2guYWNjZXB0LkluY29taW5nRGlzcGF0Y2hBY3Rpdml0eSIpOwogICAgICAgIGhvb2tBY3Rpdml0eShscCwgIm5ldC5qYWhlei5mbGVldHMudWkuZGlzcGF0Y2guSW5jb21pbmdPcmRlckFjdGl2aXR5Iik7CiAgICAgICAgaG9va0FjdGl2aXR5KGxwLCAibmV0LmphaGV6LmZsZWV0cy5hY2NlcHQuQWNjZXB0T3JkZXJBY3Rpdml0eSIpOwogICAgfQoKICAgIHZvaWQgaG9va0FjdGl2aXR5KFhDX0xvYWRQYWNrYWdlLkxvYWRQYWNrYWdlUGFyYW0gbHAsIFN0cmluZyBjbHMpIHsKICAgICAgICB0cnkgewogICAgICAgICAgICBYcG9zZWRIZWxwZXJzLmZpbmRBbmRIb29rTWV0aG9kKGNscywgbHAuY2xhc3NMb2FkZXIsICJvbkNyZWF0ZSIsIEJ1bmRsZS5jbGFzcywgbmV3IFhDX01ldGhvZEhvb2soKSB7CiAgICAgICAgICAgICAgICBAT3ZlcnJpZGUKICAgICAgICAgICAgICAgIHByb3RlY3RlZCB2b2lkIGFmdGVySG9va2VkTWV0aG9kKE1ldGhvZEhvb2tQYXJhbSBwYXJhbSkgdGhyb3dzIFRocm93YWJsZSB7CiAgICAgICAgICAgICAgICAgICAgQWN0aXZpdHkgYWN0ID0gKEFjdGl2aXR5KSBwYXJhbS50aGlzT2JqZWN0OwogICAgICAgICAgICAgICAgICAgIGlmIChwcmVmcyA9PSBudWxsKSBwcmVmcyA9IGFjdC5nZXRTaGFyZWRQcmVmZXJlbmNlcygiZGFuaXNoX3ByZWZzIiwgQ29udGV4dC5NT0RFX1BSSVZBVEUpOwogICAgICAgICAgICAgICAgICAgIGlmICghcHJlZnMuZ2V0Qm9vbGVhbigiZW5hYmxlZCIsIGZhbHNlKSkgcmV0dXJuOwoKICAgICAgICAgICAgICAgICAgICBmbG9hdFtdIHVpID0gZ2V0RGlzdGFuY2VzKGFjdCk7CiAgICAgICAgICAgICAgICAgICAgZmxvYXQgcGsgPSB1aVswXSwgZHIgPSB1aVsxXTsKICAgICAgICAgICAgICAgICAgICBmbG9hdCBwa01heCA9IHByZWZzLmdldEZsb2F0KCJwaWNrdXBfbWF4IiwgMS41Zik7CiAgICAgICAgICAgICAgICAgICAgZmxvYXQgZHJNYXggPSBwcmVmcy5nZXRGbG9hdCgiZHJvcF9tYXgiLCAzLjVmKTsKICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IFA9IiArIHBrICsgIiBEPSIgKyBkciArICIgTWF4PSIgKyBwa01heCArICIvIiArIGRyTWF4KTsKCiAgICAgICAgICAgICAgICAgICAgaWYgKHBrID4gMCAmJiBkciA+IDAgJiYgcGsgPD0gcGtNYXggJiYgZHIgPD0gZHJNYXgpIHsKICAgICAgICAgICAgICAgICAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBBQ0NFUFQiKTsKICAgICAgICAgICAgICAgICAgICAgICAgaWYgKCFjYWxsQWNjZXB0KGFjdCkpIGNsaWNrQWNjZXB0KGFjdCk7CiAgICAgICAgICAgICAgICAgICAgICAgIGFsZXJ0KGFjdCwgcGssIGRyKTsKICAgICAgICAgICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IFJFSkVDVCBQPSIgKyBwayArICIvIiArIHBrTWF4ICsgIiBEPSIgKyBkciArICIvIiArIGRyTWF4KTsKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0pOwogICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IEhvb2tlZCAiICsgY2xzKTsKICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gZSkgewogICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IFNraXAgIiArIGNscyArICIgLSAiICsgZS5nZXRNZXNzYWdlKCkpOwogICAgICAgIH0KICAgIH0KCiAgICBib29sZWFuIGNhbGxBY2NlcHQoQWN0aXZpdHkgYWN0KSB7CiAgICAgICAgZm9yIChNZXRob2QgbSA6IGFjdC5nZXRDbGFzcygpLmdldERlY2xhcmVkTWV0aG9kcygpKSB7CiAgICAgICAgICAgIFN0cmluZyBuID0gbS5nZXROYW1lKCkudG9Mb3dlckNhc2UoKTsKICAgICAgICAgICAgaWYgKChuLmNvbnRhaW5zKCJhY2NlcHQiKSB8fCBuLmNvbnRhaW5zKCJjb25maXJtIikpICYmICFuLmNvbnRhaW5zKCJyZWplY3QiKSkgewogICAgICAgICAgICAgICAgdHJ5IHsKICAgICAgICAgICAgICAgICAgICBtLnNldEFjY2Vzc2libGUodHJ1ZSk7CiAgICAgICAgICAgICAgICAgICAgaWYgKG0uZ2V0UGFyYW1ldGVyVHlwZXMoKS5sZW5ndGggPT0gMCkgewogICAgICAgICAgICAgICAgICAgICAgICBtLmludm9rZShhY3QpOwogICAgICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IENhbGxlZCAiICsgbS5nZXROYW1lKCkpOwogICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gdHJ1ZTsKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gaWdub3JlZCkge30KICAgICAgICAgICAgfQogICAgICAgIH0KICAgICAgICByZXR1cm4gZmFsc2U7CiAgICB9CgogICAgdm9pZCBjbGlja0FjY2VwdChBY3Rpdml0eSBhY3QpIHsKICAgICAgICBWaWV3IGJ0biA9IGZpbmRCdG4oYWN0LmdldFdpbmRvdygpLmdldERlY29yVmlldygpKTsKICAgICAgICBpZiAoYnRuICE9IG51bGwpIHsgYnRuLnBlcmZvcm1DbGljaygpOyBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IENsaWNrZWQgYnRuIik7IH0KICAgICAgICBlbHNlIFhwb3NlZEJyaWRnZS5sb2coVEFHICsgIjogQnRuIG5vdCBmb3VuZCIpOwogICAgfQoKICAgIFZpZXcgZmluZEJ0bihWaWV3IHYpIHsKICAgICAgICBpZiAodiBpbnN0YW5jZW9mIFRleHRWaWV3KSB7CiAgICAgICAgICAgIFN0cmluZyB0ID0gKChUZXh0VmlldykgdikuZ2V0VGV4dCgpLnRvU3RyaW5nKCkudHJpbSgpOwogICAgICAgICAgICBpZiAodC5lcXVhbHNJZ25vcmVDYXNlKCJBY2NlcHQiKSB8fCB0LmVxdWFscygiXHUwNjQyXHUwNjI4XHUwNjQ4XHUwNjQ0IikgfHwgdC5lcXVhbHNJZ25vcmVDYXNlKCJDb25maXJtIikpIHJldHVybiB2OwogICAgICAgIH0KICAgICAgICBpZiAodiBpbnN0YW5jZW9mIFZpZXdHcm91cCkgewogICAgICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8ICgoVmlld0dyb3VwKSB2KS5nZXRDaGlsZENvdW50KCk7IGkrKykgewogICAgICAgICAgICAgICAgVmlldyBmID0gZmluZEJ0bigoKFZpZXdHcm91cCkgdikuZ2V0Q2hpbGRBdChpKSk7CiAgICAgICAgICAgICAgICBpZiAoZiAhPSBudWxsKSByZXR1cm4gZjsKICAgICAgICAgICAgfQogICAgICAgIH0KICAgICAgICByZXR1cm4gbnVsbDsKICAgIH0KCiAgICBmbG9hdFtdIGdldERpc3RhbmNlcyhBY3Rpdml0eSBhY3QpIHsKICAgICAgICBMaXN0PEZsb2F0PiBsaXN0ID0gbmV3IEFycmF5TGlzdDw+KCk7CiAgICAgICAgc2NhblZpZXdzKGFjdC5nZXRXaW5kb3coKS5nZXREZWNvclZpZXcoKSwgbGlzdCk7CiAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBrbSB2YWx1ZXM6ICIgKyBsaXN0KTsKICAgICAgICBpZiAobGlzdC5zaXplKCkgPj0gMikgcmV0dXJuIG5ldyBmbG9hdFtde2xpc3QuZ2V0KDApLCBsaXN0LmdldCgxKX07CiAgICAgICAgcmV0dXJuIG5ldyBmbG9hdFtdey0xLCAtMX07CiAgICB9CgogICAgdm9pZCBzY2FuVmlld3MoVmlldyB2LCBMaXN0PEZsb2F0PiBvdXQpIHsKICAgICAgICBpZiAodiBpbnN0YW5jZW9mIFRleHRWaWV3KSB7CiAgICAgICAgICAgIFN0cmluZyB0ID0gKChUZXh0VmlldykgdikuZ2V0VGV4dCgpLnRvU3RyaW5nKCk7CiAgICAgICAgICAgIFBhdHRlcm4gcCA9IFBhdHRlcm4uY29tcGlsZSgiKFxcZCtcXC4/XFxkKilcXHMqW0trXVtNbV0iKTsKICAgICAgICAgICAgTWF0Y2hlciBtID0gcC5tYXRjaGVyKHQpOwogICAgICAgICAgICB3aGlsZSAobS5maW5kKCkpIHsKICAgICAgICAgICAgICAgIHRyeSB7CiAgICAgICAgICAgICAgICAgICAgZmxvYXQgdmFsID0gRmxvYXQucGFyc2VGbG9hdChtLmdyb3VwKDEpKTsKICAgICAgICAgICAgICAgICAgICBpZiAodmFsID4gMCAmJiB2YWwgPCAxMDAgJiYgIW91dC5jb250YWlucyh2YWwpKSBvdXQuYWRkKHZhbCk7CiAgICAgICAgICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gaWdub3JlZCkge30KICAgICAgICAgICAgfQogICAgICAgIH0KICAgICAgICBpZiAodiBpbnN0YW5jZW9mIFZpZXdHcm91cCkgewogICAgICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8ICgoVmlld0dyb3VwKSB2KS5nZXRDaGlsZENvdW50KCk7IGkrKykKICAgICAgICAgICAgICAgIHNjYW5WaWV3cygoKFZpZXdHcm91cCkgdikuZ2V0Q2hpbGRBdChpKSwgb3V0KTsKICAgICAgICB9CiAgICB9CgogICAgdm9pZCBhbGVydChDb250ZXh0IGN0eCwgZmxvYXQgcGssIGZsb2F0IGRyKSB7CiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgVmlicmF0b3IgdmliID0gKFZpYnJhdG9yKSBjdHguZ2V0U3lzdGVtU2VydmljZShDb250ZXh0LlZJQlJBVE9SX1NFUlZJQ0UpOwogICAgICAgICAgICBpZiAodmliICE9IG51bGwgJiYgdmliLmhhc1ZpYnJhdG9yKCkpIHsKICAgICAgICAgICAgICAgIGlmIChCdWlsZC5WRVJTSU9OLlNES19JTlQgPj0gMjYpCiAgICAgICAgICAgICAgICAgICAgdmliLnZpYnJhdGUoVmlicmF0aW9uRWZmZWN0LmNyZWF0ZVdhdmVmb3JtKG5ldyBsb25nW117MCwgMzAwLCAxNTAsIDMwMH0sIC0xKSk7CiAgICAgICAgICAgICAgICBlbHNlCiAgICAgICAgICAgICAgICAgICAgdmliLnZpYnJhdGUobmV3IGxvbmdbXXswLCAzMDAsIDE1MCwgMzAwfSwgLTEpOwogICAgICAgICAgICB9CiAgICAgICAgfSBjYXRjaCAoRXhjZXB0aW9uIGlnbm9yZWQpIHt9CiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgTm90aWZpY2F0aW9uTWFuYWdlciBubSA9IChOb3RpZmljYXRpb25NYW5hZ2VyKSBjdHguZ2V0U3lzdGVtU2VydmljZShDb250ZXh0Lk5PVElGSUNBVElPTl9TRVJWSUNFKTsKICAgICAgICAgICAgaWYgKEJ1aWxkLlZFUlNJT04uU0RLX0lOVCA+PSAyNikKICAgICAgICAgICAgICAgIG5tLmNyZWF0ZU5vdGlmaWNhdGlvbkNoYW5uZWwobmV3IE5vdGlmaWNhdGlvbkNoYW5uZWwoImRhbmlzaF9jaCIsICJEYW5pc2ggQXV0byIsIE5vdGlmaWNhdGlvbk1hbmFnZXIuSU1QT1JUQU5DRV9ISUdIKSk7CiAgICAgICAgICAgIFBlbmRpbmdJbnRlbnQgcGkgPSBQZW5kaW5nSW50ZW50LmdldEFjdGl2aXR5KGN0eCwgMCwgbmV3IEludGVudChjdHgsIFNldHRpbmdzQWN0aXZpdHkuY2xhc3MpLAogICAgICAgICAgICAgICAgUGVuZGluZ0ludGVudC5GTEFHX1VQREFURV9DVVJSRU5UIHwgUGVuZGluZ0ludGVudC5GTEFHX0lNTVVUQUJMRSk7CiAgICAgICAgICAgIGFuZHJvaWQuYXBwLk5vdGlmaWNhdGlvbi5CdWlsZGVyIGIgPSBCdWlsZC5WRVJTSU9OLlNES19JTlQgPj0gMjYKICAgICAgICAgICAgICAgID8gbmV3IGFuZHJvaWQuYXBwLk5vdGlmaWNhdGlvbi5CdWlsZGVyKGN0eCwgImRhbmlzaF9jaCIpCiAgICAgICAgICAgICAgICA6IG5ldyBhbmRyb2lkLmFwcC5Ob3RpZmljYXRpb24uQnVpbGRlcihjdHgpOwogICAgICAgICAgICBubS5ub3RpZnkoMTAwMSwgYgogICAgICAgICAgICAgICAgLnNldENvbnRlbnRUaXRsZSgiT3JkZXIgQWNjZXB0ZWQhIikKICAgICAgICAgICAgICAgIC5zZXRDb250ZW50VGV4dCgiUGlja3VwOiIgKyBwayArICJrbSB8IERyb3A6IiArIGRyICsgImttIikKICAgICAgICAgICAgICAgIC5zZXRTbWFsbEljb24oYW5kcm9pZC5SLmRyYXdhYmxlLmljX2RpYWxvZ19pbmZvKQogICAgICAgICAgICAgICAgLnNldENvbnRlbnRJbnRlbnQocGkpCiAgICAgICAgICAgICAgICAuc2V0QXV0b0NhbmNlbCh0cnVlKQogICAgICAgICAgICAgICAgLmJ1aWxkKCkpOwogICAgICAgIH0gY2F0Y2ggKEV4Y2VwdGlvbiBpZ25vcmVkKSB7fQogICAgICAgIHRyeSB7CiAgICAgICAgICAgIEludGVudCBpID0gbmV3IEludGVudChjdHgsIFBvcHVwQWN0aXZpdHkuY2xhc3MpOwogICAgICAgICAgICBpLnB1dEV4dHJhKCJwaWNrdXAiLCBwayk7CiAgICAgICAgICAgIGkucHV0RXh0cmEoImRyb3AiLCBkcik7CiAgICAgICAgICAgIGkuYWRkRmxhZ3MoSW50ZW50LkZMQUdfQUNUSVZJVFlfTkVXX1RBU0sgfCBJbnRlbnQuRkxBR19BQ1RJVklUWV9DTEVBUl9UT1ApOwogICAgICAgICAgICBjdHguc3RhcnRBY3Rpdml0eShpKTsKICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gaWdub3JlZCkge30KICAgIH0KfQo=" | base64 -d > app/src/main/java/com/danish/auto/MainHook.java
-
-          # ---- Your remaining original code continues ----
-          cat > gradle.properties << 'GEOF'
+          cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
           org.gradle.jvmargs=-Xmx2048m
-          GEOF
+          EOF
 
-          cat > build.gradle << 'GEOF'
+          cat > build.gradle << 'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
               dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
           allprojects { repositories { google(); mavenCentral() } }
-          GEOF
+          EOF
 
-          cat > app/build.gradle << 'GEOF'
+          cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
               namespace 'com.danish.auto'
@@ -64,22 +69,16 @@ jobs:
                   versionCode 1
                   versionName '1.0'
               }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
           }
           dependencies {
               compileOnly files('libs/api-82.jar')
               implementation 'androidx.appcompat:appcompat:1.6.1'
           }
-          GEOF
+          EOF
 
-          cat > app/src/main/AndroidManifest.xml << 'GEOF'
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-              <uses-permission android:name="android.permission.VIBRATE"/>
               <application android:label="Danish Auto" android:theme="@android:style/Theme.DeviceDefault">
                   <meta-data android:name="xposedmodule" android:value="true" />
                   <meta-data android:name="xposeddescription" android:value="Auto Accept Orders" />
@@ -90,62 +89,50 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  <activity android:name=".PopupActivity"
-                      android:theme="@android:style/Theme.DeviceDefault.Dialog"
-                      android:excludeFromRecents="true"
-                      android:exported="false" />
+                  <activity android:name=".PopupActivity" android:theme="@android:style/Theme.DeviceDefault.Dialog"
+                      android:excludeFromRecents="true" android:exported="false" />
               </application>
           </manifest>
-          GEOF
+          EOF
 
-          cat > app/src/main/res/values/strings.xml << 'GEOF'
+          cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources><string name="app_name">Danish Auto</string></resources>
-          GEOF
+          EOF
 
-          cat > app/src/main/res/layout/activity_settings.xml << 'GEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent">
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:orientation="vertical" android:padding="20dp" android:background="#121212">
-                  <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954"
-                      android:textStyle="bold" android:gravity="center" android:layout_marginBottom="8dp"/>
-                  <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:text="LSPosed Hook Mode" android:textSize="12sp"
-                      android:textColor="#888888" android:gravity="center" android:layout_marginBottom="24dp"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Pickup Max (km)" android:textColor="#AAAAAA"/>
-                  <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
-                      android:layout_height="55dp" android:inputType="numberDecimal"
-                      android:text="1.5" android:textColor="#FFFFFF" android:background="#333333"
-                      android:padding="10dp" android:layout_marginBottom="15dp"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Drop Max (km)" android:textColor="#AAAAAA"/>
-                  <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
-                      android:layout_height="55dp" android:inputType="numberDecimal"
-                      android:text="3.5" android:textColor="#FFFFFF" android:background="#333333"
-                      android:padding="10dp" android:layout_marginBottom="20dp"/>
-                  <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content"
-                      android:layout_height="wrap_content" android:text="Auto Accept ON/OFF"
-                      android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
-                  <Button android:id="@+id/btn_save" android:layout_width="match_parent"
-                      android:layout_height="55dp" android:text="SAVE" android:backgroundTint="#1DB954"/>
-                  <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
-                      android:layout_height="wrap_content" android:text="Status: Check LSPosed logs"
-                      android:textColor="#888888" android:gravity="center" android:layout_marginTop="20dp"/>
-              </LinearLayout>
-          </ScrollView>
-          GEOF
+          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:padding="20dp" android:background="#121212">
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                  android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954"
+                  android:textStyle="bold" android:layout_gravity="center" android:layout_marginBottom="20dp"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                  android:text="Pickup Max (km)" android:textColor="#AAAAAA"/>
+              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
+                  android:layout_height="55dp" android:inputType="numberDecimal"
+                  android:text="1.5" android:textColor="#FFFFFF" android:background="#333333"
+                  android:padding="10dp" android:layout_marginBottom="15dp"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                  android:text="Drop Max (km)" android:textColor="#AAAAAA"/>
+              <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
+                  android:layout_height="55dp" android:inputType="numberDecimal"
+                  android:text="3.5" android:textColor="#FFFFFF" android:background="#333333"
+                  android:padding="10dp" android:layout_marginBottom="15dp"/>
+              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:text="Auto Accept"
+                  android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent"
+                  android:layout_height="55dp" android:text="SAVE" android:backgroundTint="#1DB954"/>
+          </LinearLayout>
+          EOF
 
-          cat > app/src/main/res/layout/activity_popup.xml << 'GEOF'
-          <?xml version="1.0" encoding="utf-8"?>
+          cat > app/src/main/res/layout/activity_popup.xml << 'EOF'
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="wrap_content"
               android:orientation="vertical" android:padding="24dp" android:background="#1E1E1E">
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:text="Order Accepted!" android:textSize="22sp" android:textColor="#4CAF50"
+                  android:text="✅ Order Accepted" android:textSize="22sp" android:textColor="#4CAF50"
                   android:textStyle="bold" android:gravity="center" android:layout_marginBottom="16dp"/>
               <TextView android:id="@+id/tv_pickup" android:layout_width="wrap_content"
                   android:layout_height="wrap_content" android:text="Pickup: -- km"
@@ -156,13 +143,13 @@ jobs:
               <Button android:id="@+id/btn_ok" android:layout_width="match_parent"
                   android:layout_height="45dp" android:text="OK" android:backgroundTint="#4CAF50"/>
           </LinearLayout>
-          GEOF
+          EOF
 
-          cat > app/src/main/assets/xposed_init << 'GEOF'
+          cat > app/src/main/assets/xposed_init << 'EOF'
           com.danish.auto.MainHook
-          GEOF
+          EOF
 
-          cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'GEOF'
+          cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'EOF'
           package com.danish.auto;
           import android.content.SharedPreferences;
           import android.os.Bundle;
@@ -175,33 +162,23 @@ jobs:
                   SharedPreferences pr = getSharedPreferences("danish_prefs", MODE_PRIVATE);
                   EditText etP = findViewById(R.id.et_pickup);
                   EditText etD = findViewById(R.id.et_drop);
-                  Switch sw    = findViewById(R.id.switch_enabled);
-                  TextView tvS = findViewById(R.id.tv_status);
+                  Switch sw = findViewById(R.id.switch_enabled);
                   etP.setText(String.valueOf(pr.getFloat("pickup_max", 1.5f)));
                   etD.setText(String.valueOf(pr.getFloat("drop_max", 3.5f)));
                   sw.setChecked(pr.getBoolean("enabled", false));
-                  tvS.setText(sw.isChecked() ? "Status: Active" : "Status: Disabled");
                   findViewById(R.id.btn_save).setOnClickListener(v -> {
-                      try {
-                          pr.edit()
-                              .putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
-                              .putFloat("drop_max",   Float.parseFloat(etD.getText().toString()))
-                              .putBoolean("enabled",  sw.isChecked())
-                              .apply();
-                          tvS.setText(sw.isChecked() ? "Status: Active" : "Status: Disabled");
-                          Toast.makeText(this, "Saved! Restart Jahez.", Toast.LENGTH_LONG).show();
-                      } catch (Exception e) {
-                          Toast.makeText(this, "Invalid values!", Toast.LENGTH_SHORT).show();
-                      }
+                      pr.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
+                           .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
+                           .putBoolean("enabled", sw.isChecked()).apply();
+                      Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
                   });
               }
           }
-          GEOF
+          EOF
 
-          cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'GEOF'
+          cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'EOF'
           package com.danish.auto;
           import android.os.Bundle;
-          import android.os.Handler;
           import android.widget.TextView;
           import androidx.appcompat.app.AppCompatActivity;
           public class PopupActivity extends AppCompatActivity {
@@ -211,12 +188,143 @@ jobs:
                   float pk = getIntent().getFloatExtra("pickup", 0);
                   float dr = getIntent().getFloatExtra("drop", 0);
                   ((TextView) findViewById(R.id.tv_pickup)).setText("Pickup: " + pk + " km");
-                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop:   " + dr + " km");
+                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop: " + dr + " km");
                   findViewById(R.id.btn_ok).setOnClickListener(v -> finish());
-                  new Handler().postDelayed(this::finish, 5000);
               }
           }
-          GEOF
+          EOF
+
+          cat > app/src/main/java/com/danish/auto/MainHook.java << 'EOF'
+          package com.danish.auto;
+
+          import android.app.Activity;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.TextView;
+
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.regex.Matcher;
+          import java.util.regex.Pattern;
+
+          import de.robv.android.xposed.XC_MethodHook;
+          import de.robv.android.xposed.XposedBridge;
+          import de.robv.android.xposed.XposedHelpers;
+          import de.robv.android.xposed.callbacks.XC_LoadPackage;
+
+          public class MainHook implements de.robv.android.xposed.IXposedHookLoadPackage {
+              private static final String TAG = "DanishAuto";
+              private static SharedPreferences prefs;
+
+              @Override
+              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
+                  if (!lpparam.packageName.equals("net.jahez.fleets")) return;
+                  XposedBridge.log(TAG + " Hooked");
+
+                  Class<?> orderActivity = XposedHelpers.findClass("net.jahez.fleets.dispatch.accept.IncomingDispatchActivity", lpparam.classLoader);
+                  XposedHelpers.findAndHookMethod(orderActivity, "onResume", new XC_MethodHook() {
+                      @Override
+                      protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                          Activity act = (Activity) param.thisObject;
+                          if (prefs == null) prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                          if (!prefs.getBoolean("enabled", false)) return;
+
+                          float[] distances = extractDistances(act);
+                          float pickup = distances[0], drop = distances[1];
+                          float pickupMax = prefs.getFloat("pickup_max", 1.5f);
+                          float dropMax = prefs.getFloat("drop_max", 3.5f);
+                          XposedBridge.log(TAG + " P=" + pickup + " D=" + drop + " Max=" + pickupMax + "/" + dropMax);
+
+                          if (pickup > 0 && drop > 0 && pickup <= pickupMax && drop <= dropMax) {
+                              XposedBridge.log(TAG + " ACCEPT");
+                              clickAccept(act);
+                              showPopupAndNotification(act, pickup, drop);
+                          }
+                      }
+                  });
+              }
+
+              private float[] extractDistances(Activity act) {
+                  List<Float> list = new ArrayList<>();
+                  scanView(act.getWindow().getDecorView(), list);
+                  if (list.size() >= 2) return new float[]{list.get(0), list.get(1)};
+                  return new float[]{-1, -1};
+              }
+
+              private void scanView(View v, List<Float> out) {
+                  if (v instanceof TextView) {
+                      String text = ((TextView) v).getText().toString();
+                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
+                      Matcher m = p.matcher(text);
+                      if (m.find()) {
+                          try {
+                              float val = Float.parseFloat(m.group(1).replace(",", "."));
+                              if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
+                          } catch (Exception e) {}
+                      }
+                  } else if (v instanceof ViewGroup) {
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++)
+                          scanView(((ViewGroup) v).getChildAt(i), out);
+                  }
+              }
+
+              private void clickAccept(Activity act) {
+                  View btn = findButton(act.getWindow().getDecorView());
+                  if (btn != null) btn.performClick();
+              }
+
+              private View findButton(View v) {
+                  if (v instanceof TextView) {
+                      String t = ((TextView) v).getText().toString();
+                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")) return v;
+                  }
+                  if (v instanceof ViewGroup) {
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
+                          View found = findButton(((ViewGroup) v).getChildAt(i));
+                          if (found != null) return found;
+                      }
+                  }
+                  return null;
+              }
+
+              private void showPopupAndNotification(Context ctx, float p, float d) {
+                  try {
+                      Intent popup = new Intent(ctx, PopupActivity.class);
+                      popup.putExtra("pickup", p);
+                      popup.putExtra("drop", d);
+                      popup.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                      ctx.startActivity(popup);
+                  } catch (Exception e) {}
+
+                  try {
+                      NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+                      if (android.os.Build.VERSION.SDK_INT >= 26) {
+                          NotificationChannel ch = new NotificationChannel("danish_ch", "Danish Auto", NotificationManager.IMPORTANCE_HIGH);
+                          nm.createNotificationChannel(ch);
+                      }
+                      Intent main = new Intent(ctx, SettingsActivity.class);
+                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, main, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                      Notification.Builder builder = android.os.Build.VERSION.SDK_INT >= 26
+                              ? new Notification.Builder(ctx, "danish_ch")
+                              : new Notification.Builder(ctx);
+                      builder.setContentTitle("Order Accepted")
+                             .setContentText("Pickup:" + p + "km Drop:" + d + "km")
+                             .setSmallIcon(android.R.drawable.ic_dialog_info)
+                             .setContentIntent(pi)
+                             .setAutoCancel(true);
+                      nm.notify(1001, builder.build());
+                  } catch (Exception e) {}
+              }
+          }
+          EOF
 
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
