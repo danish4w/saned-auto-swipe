@@ -13,108 +13,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Xposed API jar
+      - name: Prepare Xposed API JAR
         run: |
           mkdir -p app/libs
-
-          # Method 1: Maven Central
-          curl -L --retry 3 -o app/libs/api-82.jar \
-            "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar" \
-            2>/dev/null
-
-          # Validate
-          if java -jar /dev/null 2>/dev/null || jar tf app/libs/api-82.jar > /dev/null 2>&1; then
-            echo "Method 1 OK"
-          else
-            echo "Method 1 failed, trying Method 2..."
-
-            # Method 2: GitHub LSPosed release jar (most reliable)
-            curl -L --retry 3 -o app/libs/api-82.jar \
-              "https://github.com/LSPosed/LSPosed/releases/download/v1.9.2/LSPosed-v1.9.2-7024-zygisk-release.zip" \
-              2>/dev/null || true
-
-            # Method 3: Build stub jar ourselves
-            echo "Building stub XposedBridge jar..."
-            mkdir -p /tmp/xposed_stub/de/robv/android/xposed
-            mkdir -p /tmp/xposed_stub/de/robv/android/xposed/callbacks
-
-            cat > /tmp/XposedBridge.java << 'JEOF'
-            package de.robv.android.xposed;
-            public class XposedBridge {
-                public static void log(String text) {}
-                public static void log(Throwable t) {}
-                public static Object invokeOriginalMethod(java.lang.reflect.Member method, Object thisObject, Object[] args) throws Throwable { return null; }
-                public static void hookMethod(java.lang.reflect.Member hookMethod, XC_MethodHook callback) {}
-            }
-            JEOF
-
-            cat > /tmp/XC_MethodHook.java << 'JEOF'
-            package de.robv.android.xposed;
-            public abstract class XC_MethodHook {
-                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {}
-                protected void afterHookedMethod(MethodHookParam param) throws Throwable {}
-                public class MethodHookParam {
-                    public java.lang.reflect.Member method;
-                    public Object thisObject;
-                    public Object[] args;
-                    public Object getResult() { return null; }
-                    public void setResult(Object result) {}
-                    public Throwable getThrowable() { return null; }
-                }
-            }
-            JEOF
-
-            cat > /tmp/XposedHelpers.java << 'JEOF'
-            package de.robv.android.xposed;
-            public class XposedHelpers {
-                public static Class<?> findClass(String className, ClassLoader classLoader) { return null; }
-                public static void findAndHookMethod(Class<?> clazz, String methodName, Object... parameterTypesAndCallback) {}
-                public static void findAndHookMethod(String className, ClassLoader classLoader, String methodName, Object... parameterTypesAndCallback) {}
-                public static Object callMethod(Object obj, String methodName, Object... args) { return null; }
-                public static Object getObjectField(Object obj, String fieldName) { return null; }
-                public static void setObjectField(Object obj, String fieldName, Object value) {}
-            }
-            JEOF
-
-            cat > /tmp/IXposedHookLoadPackage.java << 'JEOF'
-            package de.robv.android.xposed;
-            import de.robv.android.xposed.callbacks.XC_LoadPackage;
-            public interface IXposedHookLoadPackage {
-                void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable;
-            }
-            JEOF
-
-            cat > /tmp/XC_LoadPackage.java << 'JEOF'
-            package de.robv.android.xposed.callbacks;
-            public class XC_LoadPackage {
-                public static class LoadPackageParam {
-                    public String packageName;
-                    public ClassLoader classLoader;
-                    public String processName;
-                    public android.content.pm.ApplicationInfo appInfo;
-                    public boolean isFirstApplication;
-                }
-            }
-            JEOF
-
-            # Compile stubs
-            mkdir -p /tmp/xposed_out
-            javac -source 8 -target 8 \
-              /tmp/XposedBridge.java \
-              /tmp/XC_MethodHook.java \
-              /tmp/XposedHelpers.java \
-              /tmp/IXposedHookLoadPackage.java \
-              /tmp/XC_LoadPackage.java \
-              -d /tmp/xposed_out 2>/dev/null || true
-
-            # Package into jar
-            cd /tmp/xposed_out && jar cf /tmp/api-82.jar . && cd -
-            cp /tmp/api-82.jar app/libs/api-82.jar
-            echo "Stub jar created!"
-          fi
-
-          ls -lh app/libs/api-82.jar
-          echo "JAR ready"
+          echo "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GgEAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvUEsBAhQAFAAICAgAj7CSXDDKDeXzAAAA1QEAADMAAAAAAAAAAAAAAAAATwEAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvSVhwb3NlZEhvb2tMb2FkUGFja2FnZS5jbGFzc1BLAQIUABQACAgIAI+wklwP7jIrvQEAAH4DAAA6AAAAAAAAAAAAAAAAAKMCAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hDX01ldGhvZEhvb2skTWV0aG9kSG9va1BhcmFtLmNsYXNzUEsBAhQAFAAICAgAj7CSXNhAD6Y4AQAANwIAACoAAAAAAAAAAAAAAAAAyAQAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvWENfTWV0aG9kSG9vay5jbGFzc1BLAQIUABQACAgIAI+wkly3edyB7AAAAGQBAAApAAAAAAAAAAAAAAAAAFgGAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hwb3NlZEJyaWRnZS5jbGFzc1BLAQIUABQACAgIAI+wklzGqSC0lQEAAEwEAAAqAAAAAAAAAAAAAAAAAJsHAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hwb3NlZEhlbHBlcnMuY2xhc3NQSwECCgAKAAAIAACPsJJcAAAAAAAAAAAAAAAAIQAAAAAAAAAAAAAAAACICQAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9jYWxsYmFja3MvUEsBAhQAFAAICAgAj7CSXBdMNk06AQAA9QEAAEYAAAAAAAAAAAAAAAAAxwkAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvY2FsbGJhY2tzL1hDX0xvYWRQYWNrYWdlJExvYWRQYWNrYWdlUGFyYW0uY2xhc3NQSwECFAAUAAgICACPsJJcGXESw+wAAABjAQAANQAAAAAAAAAAAAAAAAB1CwAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9jYWxsYmFja3MvWENfTG9hZFBhY2thZ2UuY2xhc3NQSwUGAAAAAA4ADgBdBAAAxAwAAAAA" | base64 -d > app/libs/api-82.jar
+          echo "JAR size: $(ls -lh app/libs/api-82.jar)"
 
       - name: Build LSPosed Module
         run: |
@@ -131,23 +34,21 @@ jobs:
 
           echo "include ':app'" > settings.gradle
 
-          cat > gradle.properties << 'EOF'
+          cat > gradle.properties << 'GEOF'
           android.useAndroidX=true
           android.enableJetifier=true
           org.gradle.jvmargs=-Xmx2048m
-          EOF
+          GEOF
 
-          cat > build.gradle << 'EOF'
+          cat > build.gradle << 'GEOF'
           buildscript {
               repositories { google(); mavenCentral() }
               dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
-          allprojects {
-              repositories { google(); mavenCentral() }
-          }
-          EOF
+          allprojects { repositories { google(); mavenCentral() } }
+          GEOF
 
-          cat > app/build.gradle << 'EOF'
+          cat > app/build.gradle << 'GEOF'
           plugins { id 'com.android.application' }
           android {
               namespace 'com.danish.auto'
@@ -168,16 +69,16 @@ jobs:
               compileOnly files('libs/api-82.jar')
               implementation 'androidx.appcompat:appcompat:1.6.1'
           }
-          EOF
+          GEOF
 
-          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          cat > app/src/main/AndroidManifest.xml << 'GEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <uses-permission android:name="android.permission.VIBRATE"/>
               <application android:label="Danish Auto" android:theme="@android:style/Theme.DeviceDefault">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Auto Accept Orders - Fast Hook" />
+                  <meta-data android:name="xposeddescription" android:value="Auto Accept Orders - Ultra Fast Hook" />
                   <meta-data android:name="xposedminversion" android:value="82" />
                   <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter>
@@ -191,16 +92,14 @@ jobs:
                       android:exported="false" />
               </application>
           </manifest>
-          EOF
+          GEOF
 
-          cat > app/src/main/res/values/strings.xml << 'EOF'
+          cat > app/src/main/res/values/strings.xml << 'GEOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">Danish Auto</string>
-          </resources>
-          EOF
+          <resources><string name="app_name">Danish Auto</string></resources>
+          GEOF
 
-          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
+          cat > app/src/main/res/layout/activity_settings.xml << 'GEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="match_parent">
@@ -210,7 +109,7 @@ jobs:
                       android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954"
                       android:textStyle="bold" android:gravity="center" android:layout_marginBottom="8dp"/>
                   <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:text="LSPosed Hook Mode — Ultra Fast" android:textSize="12sp"
+                      android:text="LSPosed Hook — Ultra Fast" android:textSize="12sp"
                       android:textColor="#888888" android:gravity="center" android:layout_marginBottom="24dp"/>
                   <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                       android:text="Pickup Max (km)" android:textColor="#AAAAAA"/>
@@ -228,22 +127,21 @@ jobs:
                       android:layout_height="wrap_content" android:text="Auto Accept ON/OFF"
                       android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
                   <Button android:id="@+id/btn_save" android:layout_width="match_parent"
-                      android:layout_height="55dp" android:text="SAVE SETTINGS"
-                      android:backgroundTint="#1DB954"/>
+                      android:layout_height="55dp" android:text="SAVE" android:backgroundTint="#1DB954"/>
                   <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                       android:layout_height="wrap_content" android:text="Status: Check LSPosed logs"
                       android:textColor="#888888" android:gravity="center" android:layout_marginTop="20dp"/>
               </LinearLayout>
           </ScrollView>
-          EOF
+          GEOF
 
-          cat > app/src/main/res/layout/activity_popup.xml << 'EOF'
+          cat > app/src/main/res/layout/activity_popup.xml << 'GEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent" android:layout_height="wrap_content"
               android:orientation="vertical" android:padding="24dp" android:background="#1E1E1E">
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:text="✅ Order Accepted!" android:textSize="22sp" android:textColor="#4CAF50"
+                  android:text="Order Accepted!" android:textSize="22sp" android:textColor="#4CAF50"
                   android:textStyle="bold" android:gravity="center" android:layout_marginBottom="16dp"/>
               <TextView android:id="@+id/tv_pickup" android:layout_width="wrap_content"
                   android:layout_height="wrap_content" android:text="Pickup: -- km"
@@ -254,78 +152,70 @@ jobs:
               <Button android:id="@+id/btn_ok" android:layout_width="match_parent"
                   android:layout_height="45dp" android:text="OK" android:backgroundTint="#4CAF50"/>
           </LinearLayout>
-          EOF
+          GEOF
 
-          cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'EOF'
+          cat > app/src/main/assets/xposed_init << 'GEOF'
+          com.danish.auto.MainHook
+          GEOF
+
+          cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'GEOF'
           package com.danish.auto;
           import android.content.SharedPreferences;
           import android.os.Bundle;
-          import android.widget.Button;
-          import android.widget.EditText;
-          import android.widget.Switch;
-          import android.widget.TextView;
-          import android.widget.Toast;
+          import android.widget.*;
           import androidx.appcompat.app.AppCompatActivity;
           public class SettingsActivity extends AppCompatActivity {
-              @Override protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
+              @Override protected void onCreate(Bundle s) {
+                  super.onCreate(s);
                   setContentView(R.layout.activity_settings);
-                  SharedPreferences prefs = getSharedPreferences("danish_prefs", MODE_PRIVATE);
-                  EditText etPickup = findViewById(R.id.et_pickup);
-                  EditText etDrop   = findViewById(R.id.et_drop);
-                  Switch sw         = findViewById(R.id.switch_enabled);
-                  Button btnSave    = findViewById(R.id.btn_save);
-                  TextView tvStatus = findViewById(R.id.tv_status);
-                  etPickup.setText(String.valueOf(prefs.getFloat("pickup_max", 1.5f)));
-                  etDrop.setText(String.valueOf(prefs.getFloat("drop_max", 3.5f)));
-                  sw.setChecked(prefs.getBoolean("enabled", false));
-                  tvStatus.setText(sw.isChecked() ? "Status: ✅ Active" : "Status: ❌ Disabled");
-                  btnSave.setOnClickListener(v -> {
+                  SharedPreferences pr = getSharedPreferences("danish_prefs", MODE_PRIVATE);
+                  EditText etP = findViewById(R.id.et_pickup);
+                  EditText etD = findViewById(R.id.et_drop);
+                  Switch sw    = findViewById(R.id.switch_enabled);
+                  TextView tvS = findViewById(R.id.tv_status);
+                  etP.setText(String.valueOf(pr.getFloat("pickup_max", 1.5f)));
+                  etD.setText(String.valueOf(pr.getFloat("drop_max", 3.5f)));
+                  sw.setChecked(pr.getBoolean("enabled", false));
+                  tvS.setText(sw.isChecked() ? "Status: Active" : "Status: Disabled");
+                  findViewById(R.id.btn_save).setOnClickListener(v -> {
                       try {
-                          float pk = Float.parseFloat(etPickup.getText().toString());
-                          float dr = Float.parseFloat(etDrop.getText().toString());
-                          prefs.edit()
-                              .putFloat("pickup_max", pk)
-                              .putFloat("drop_max", dr)
-                              .putBoolean("enabled", sw.isChecked())
+                          pr.edit()
+                              .putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
+                              .putFloat("drop_max",   Float.parseFloat(etD.getText().toString()))
+                              .putBoolean("enabled",  sw.isChecked())
                               .apply();
-                          tvStatus.setText(sw.isChecked() ? "Status: ✅ Active" : "Status: ❌ Disabled");
-                          Toast.makeText(this, "Saved! Restart Jahez to apply.", Toast.LENGTH_LONG).show();
+                          tvS.setText(sw.isChecked() ? "Status: Active" : "Status: Disabled");
+                          Toast.makeText(this, "Saved! Restart Jahez.", Toast.LENGTH_LONG).show();
                       } catch (Exception e) {
                           Toast.makeText(this, "Invalid values!", Toast.LENGTH_SHORT).show();
                       }
                   });
               }
           }
-          EOF
+          GEOF
 
-          cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'EOF'
+          cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'GEOF'
           package com.danish.auto;
           import android.os.Bundle;
           import android.os.Handler;
           import android.widget.TextView;
           import androidx.appcompat.app.AppCompatActivity;
           public class PopupActivity extends AppCompatActivity {
-              @Override protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
+              @Override protected void onCreate(Bundle s) {
+                  super.onCreate(s);
                   setContentView(R.layout.activity_popup);
-                  float pickup = getIntent().getFloatExtra("pickup", 0);
-                  float drop   = getIntent().getFloatExtra("drop", 0);
-                  ((TextView) findViewById(R.id.tv_pickup)).setText("Pickup: " + pickup + " km");
-                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop: "   + drop   + " km");
+                  float pk = getIntent().getFloatExtra("pickup", 0);
+                  float dr = getIntent().getFloatExtra("drop", 0);
+                  ((TextView) findViewById(R.id.tv_pickup)).setText("Pickup: " + pk + " km");
+                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop:   " + dr + " km");
                   findViewById(R.id.btn_ok).setOnClickListener(v -> finish());
                   new Handler().postDelayed(this::finish, 5000);
               }
           }
-          EOF
+          GEOF
 
-          cat > app/src/main/assets/xposed_init << 'EOF'
-          com.danish.auto.MainHook
-          EOF
-
-          cat > app/src/main/java/com/danish/auto/MainHook.java << 'EOF'
+          cat > app/src/main/java/com/danish/auto/MainHook.java << 'GEOF'
           package com.danish.auto;
-
           import android.app.Activity;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
@@ -340,13 +230,11 @@ jobs:
           import android.view.View;
           import android.view.ViewGroup;
           import android.widget.TextView;
-
           import java.lang.reflect.Method;
           import java.util.ArrayList;
           import java.util.List;
           import java.util.regex.Matcher;
           import java.util.regex.Pattern;
-
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XposedBridge;
@@ -354,141 +242,97 @@ jobs:
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
           public class MainHook implements IXposedHookLoadPackage {
-
-              private static final String TAG = "DanishAuto";
-              private static SharedPreferences prefs;
+              static final String TAG = "DanishAuto";
+              static SharedPreferences prefs;
 
               @Override
-              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-                  if (!lpparam.packageName.equals("net.jahez.fleets")) return;
-                  XposedBridge.log(TAG + ": Hooked into Jahez Fleets");
-
-                  // ── Hook 1: IncomingDispatchActivity ─────────────────────────────
-                  // Yeh activity tab khulti hai jab new order aata hai
-                  hookOrderActivity(lpparam, "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity");
-
-                  // ── Hook 2: Alternative class names (agar pehla na mile) ─────────
-                  hookOrderActivity(lpparam, "net.jahez.fleets.ui.dispatch.IncomingOrderActivity");
-                  hookOrderActivity(lpparam, "net.jahez.fleets.accept.AcceptOrderActivity");
+              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) throws Throwable {
+                  if (!lp.packageName.equals("net.jahez.fleets")) return;
+                  XposedBridge.log(TAG + ": Hooked Jahez Fleets");
+                  hookActivity(lp, "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity");
+                  hookActivity(lp, "net.jahez.fleets.ui.dispatch.IncomingOrderActivity");
+                  hookActivity(lp, "net.jahez.fleets.accept.AcceptOrderActivity");
               }
 
-              private void hookOrderActivity(XC_LoadPackage.LoadPackageParam lpparam, String className) {
+              void hookActivity(XC_LoadPackage.LoadPackageParam lp, String cls) {
                   try {
-                      Class<?> cls = XposedHelpers.findClass(className, lpparam.classLoader);
-                      XposedHelpers.findAndHookMethod(cls, "onCreate", Bundle.class, new XC_MethodHook() {
+                      XposedHelpers.findAndHookMethod(cls, lp.classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
                           @Override
                           protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                               Activity act = (Activity) param.thisObject;
-                              if (prefs == null)
-                                  prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                              if (prefs == null) prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                              if (!prefs.getBoolean("enabled", false)) return;
 
-                              if (!prefs.getBoolean("enabled", false)) {
-                                  XposedBridge.log(TAG + ": Disabled, skipping");
-                                  return;
-                              }
-
-                              // ── Distances from UI ────────────────────────
-                              float[] ui = extractDistancesFromUI(act);
-                              float pickup = ui[0];
-                              float drop   = ui[1];
-
+                              float[] ui = getDistances(act);
+                              float pk = ui[0], dr = ui[1];
                               float pkMax = prefs.getFloat("pickup_max", 1.5f);
-                              float drMax = prefs.getFloat("drop_max",   3.5f);
+                              float drMax = prefs.getFloat("drop_max", 3.5f);
+                              XposedBridge.log(TAG + ": P=" + pk + " D=" + dr + " Max=" + pkMax + "/" + drMax);
 
-                              XposedBridge.log(TAG + ": P=" + pickup + " D=" + drop
-                                  + " Limits=" + pkMax + "/" + drMax);
-
-                              if (pickup > 0 && drop > 0 && pickup <= pkMax && drop <= drMax) {
-                                  XposedBridge.log(TAG + ": ✅ ACCEPT");
-
-                                  // ── Try 1: Call accept method directly ───
-                                  boolean done = callAcceptMethod(act);
-
-                                  // ── Try 2: Click accept button ───────────
-                                  if (!done) simulateAcceptClick(act);
-
-                                  // ── Alert: notification + vibrate + popup ─
-                                  showAlert(act, pickup, drop);
-
+                              if (pk > 0 && dr > 0 && pk <= pkMax && dr <= drMax) {
+                                  XposedBridge.log(TAG + ": ACCEPT");
+                                  if (!callAccept(act)) clickAccept(act);
+                                  alert(act, pk, dr);
                               } else {
-                                  XposedBridge.log(TAG + ": ❌ REJECT P=" + pickup + "/" + pkMax
-                                      + " D=" + drop + "/" + drMax);
+                                  XposedBridge.log(TAG + ": REJECT P=" + pk + "/" + pkMax + " D=" + dr + "/" + drMax);
                               }
                           }
                       });
-                      XposedBridge.log(TAG + ": Hooked " + className);
+                      XposedBridge.log(TAG + ": Hooked " + cls);
                   } catch (Exception e) {
-                      XposedBridge.log(TAG + ": Skip " + className + " — " + e.getMessage());
+                      XposedBridge.log(TAG + ": Skip " + cls + " - " + e.getMessage());
                   }
               }
 
-              // ── Call accept() method via reflection ───────────────────────────────
-              private boolean callAcceptMethod(Activity act) {
-                  String[] keywords = {"accept", "confirm", "approve"};
+              boolean callAccept(Activity act) {
                   for (Method m : act.getClass().getDeclaredMethods()) {
-                      String name = m.getName().toLowerCase();
-                      for (String kw : keywords) {
-                          if (name.contains(kw) && !name.contains("reject") && !name.contains("decline")) {
-                              try {
-                                  m.setAccessible(true);
-                                  if (m.getParameterCount() == 0) {
-                                      m.invoke(act);
-                                      XposedBridge.log(TAG + ": Called " + m.getName());
-                                      return true;
-                                  }
-                              } catch (Exception e) {
-                                  XposedBridge.log(TAG + ": Method error: " + e.getMessage());
+                      String n = m.getName().toLowerCase();
+                      if ((n.contains("accept") || n.contains("confirm")) && !n.contains("reject")) {
+                          try {
+                              m.setAccessible(true);
+                              if (m.getParameterTypes().length == 0) {
+                                  m.invoke(act);
+                                  XposedBridge.log(TAG + ": Called " + m.getName());
+                                  return true;
                               }
-                          }
+                          } catch (Exception ignored) {}
                       }
                   }
                   return false;
               }
 
-              // ── Simulate Accept button click ──────────────────────────────────────
-              private void simulateAcceptClick(Activity act) {
-                  View root = act.getWindow().getDecorView();
-                  View btn = findAcceptButton(root);
-                  if (btn != null) {
-                      btn.performClick();
-                      XposedBridge.log(TAG + ": Clicked accept button");
-                  } else {
-                      XposedBridge.log(TAG + ": Accept button not found");
-                  }
+              void clickAccept(Activity act) {
+                  View btn = findBtn(act.getWindow().getDecorView());
+                  if (btn != null) { btn.performClick(); XposedBridge.log(TAG + ": Clicked btn"); }
+                  else XposedBridge.log(TAG + ": Btn not found");
               }
 
-              private View findAcceptButton(View v) {
+              View findBtn(View v) {
                   if (v instanceof TextView) {
                       String t = ((TextView) v).getText().toString().trim();
-                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")
-                          || t.equalsIgnoreCase("ACCEPT") || t.equalsIgnoreCase("Confirm")) {
-                          return v;
-                      }
+                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول") || t.equalsIgnoreCase("Confirm")) return v;
                   }
                   if (v instanceof ViewGroup) {
-                      ViewGroup vg = (ViewGroup) v;
-                      for (int i = 0; i < vg.getChildCount(); i++) {
-                          View found = findAcceptButton(vg.getChildAt(i));
-                          if (found != null) return found;
+                      for (int i = 0; i < ((ViewGroup)v).getChildCount(); i++) {
+                          View f = findBtn(((ViewGroup)v).getChildAt(i));
+                          if (f != null) return f;
                       }
                   }
                   return null;
               }
 
-              // ── Extract distances from UI TextViews ───────────────────────────────
-              private float[] extractDistancesFromUI(Activity act) {
+              float[] getDistances(Activity act) {
                   List<Float> list = new ArrayList<>();
-                  collectKmNumbers(act.getWindow().getDecorView(), list);
-                  XposedBridge.log(TAG + ": km values found: " + list.toString());
+                  scanViews(act.getWindow().getDecorView(), list);
+                  XposedBridge.log(TAG + ": km values: " + list);
                   if (list.size() >= 2) return new float[]{list.get(0), list.get(1)};
-                  if (list.size() == 1) return new float[]{list.get(0), -1};
                   return new float[]{-1, -1};
               }
 
-              private void collectKmNumbers(View v, List<Float> out) {
+              void scanViews(View v, List<Float> out) {
                   if (v instanceof TextView) {
-                      String text = ((TextView) v).getText().toString();
-                      Matcher m = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]").matcher(text);
+                      String t = ((TextView)v).getText().toString();
+                      Matcher m = Pattern.compile("(\d+\.?\d*)\s*[Kk][Mm]").matcher(t);
                       while (m.find()) {
                           try {
                               float val = Float.parseFloat(m.group(1));
@@ -497,63 +341,43 @@ jobs:
                       }
                   }
                   if (v instanceof ViewGroup) {
-                      ViewGroup vg = (ViewGroup) v;
-                      for (int i = 0; i < vg.getChildCount(); i++)
-                          collectKmNumbers(vg.getChildAt(i), out);
+                      for (int i = 0; i < ((ViewGroup)v).getChildCount(); i++)
+                          scanViews(((ViewGroup)v).getChildAt(i), out);
                   }
               }
 
-              // ── Alert: Notification + Vibration + Popup ───────────────────────────
-              private void showAlert(Context ctx, float p, float d) {
-                  // Vibration
+              void alert(Context ctx, float pk, float dr) {
                   try {
                       Vibrator vib = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
                       if (vib != null && vib.hasVibrator()) {
                           if (Build.VERSION.SDK_INT >= 26)
-                              vib.vibrate(VibrationEffect.createWaveform(new long[]{0, 300, 150, 300}, -1));
-                          else
-                              vib.vibrate(new long[]{0, 300, 150, 300}, -1);
+                              vib.vibrate(VibrationEffect.createWaveform(new long[]{0,300,150,300}, -1));
+                          else vib.vibrate(new long[]{0,300,150,300}, -1);
                       }
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + ": Vib error: " + e.getMessage());
-                  }
-
-                  // Notification
+                  } catch (Exception ignored) {}
                   try {
                       NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-                      if (Build.VERSION.SDK_INT >= 26) {
-                          nm.createNotificationChannel(new NotificationChannel(
-                              "danish_ch", "Danish Auto", NotificationManager.IMPORTANCE_HIGH));
-                      }
-                      Intent main = new Intent(ctx, SettingsActivity.class);
-                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, main,
+                      if (Build.VERSION.SDK_INT >= 26)
+                          nm.createNotificationChannel(new NotificationChannel("danish_ch", "Danish Auto", NotificationManager.IMPORTANCE_HIGH));
+                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, new Intent(ctx, SettingsActivity.class),
                           PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                      android.app.Notification.Builder builder = Build.VERSION.SDK_INT >= 26
+                      android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26
                           ? new android.app.Notification.Builder(ctx, "danish_ch")
                           : new android.app.Notification.Builder(ctx);
-                      builder.setContentTitle("✅ Order Accepted!")
-                             .setContentText("Pickup: " + p + "km | Drop: " + d + "km")
-                             .setSmallIcon(android.R.drawable.ic_dialog_info)
-                             .setContentIntent(pi)
-                             .setAutoCancel(true);
-                      nm.notify(1001, builder.build());
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + ": Notif error: " + e.getMessage());
-                  }
-
-                  // Popup
+                      nm.notify(1001, b.setContentTitle("Order Accepted!")
+                          .setContentText("Pickup:" + pk + "km | Drop:" + dr + "km")
+                          .setSmallIcon(android.R.drawable.ic_dialog_info)
+                          .setContentIntent(pi).setAutoCancel(true).build());
+                  } catch (Exception ignored) {}
                   try {
-                      Intent popup = new Intent(ctx, PopupActivity.class);
-                      popup.putExtra("pickup", p);
-                      popup.putExtra("drop",   d);
-                      popup.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                      ctx.startActivity(popup);
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + ": Popup error: " + e.getMessage());
-                  }
+                      Intent i = new Intent(ctx, PopupActivity.class);
+                      i.putExtra("pickup", pk); i.putExtra("drop", dr);
+                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                      ctx.startActivity(i);
+                  } catch (Exception ignored) {}
               }
           }
-          EOF
+          GEOF
 
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
