@@ -1,4 +1,4 @@
-name: Build RootAutoSwipe-Dev
+name: Build Danish Auto Silent
 on: workflow_dispatch
 
 jobs:
@@ -13,11 +13,22 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build Project
+      - name: Download Xposed API jar
         run: |
-          mkdir -p app/src/main/java/com/rootautoswipedev
+          mkdir -p app/libs
+          curl -L -o app/libs/api-82.jar https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar
+
+      - name: Build LSPosed Module
+        run: |
+          mkdir -p app/src/main/java/com/danish/auto
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/mipmap-mdpi
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p app/src/main/res/mipmap-xhdpi
+          mkdir -p app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          mkdir -p app/src/main/assets
           mkdir -p gradle/wrapper
 
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
@@ -27,20 +38,9 @@ jobs:
 
           echo "include ':app'" > settings.gradle
 
-          mkdir -p app/src/main/res/mipmap-mdpi
-          echo "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAChElEQVR4nO2aTWgTURDHfxuTNETSJkqxraWWVuoXPQgViiK2iIIoqFAPXtRDweClxyJ+UNGTguBJbz16rJAGFVtUBEFSRS0KSoWEGEWruFFCa9omHl7TJrHJJeNuVvYP4c2bWWbmv/vmZWd3Ncoge4tsObtR0IJoJW0rKasl8WKsRKRAUa2JFyOfiCMnWCV5KMzVUe5AK8AB1jr7OeRytvwV0Kx49vNh+StgEzAbNgGz4RTzdLrEZpaZg3QSvr2AWBje3lQ6IcgRyCF6B1KJ5fmqGvC1QVMPNO+HLf0wug9mvoiEkycweQM+PfpbX7cRDo3Dmk7ovgoPT4qEM64GklPw6pqSWw6IuTW2iJMf1Oj0irk0lkBgsxq/T4q5NI5AYBtsPwuZeYicF3MrX8SdA9DWtzzXnKqAG3eD/g7GjkNiXCycPIHWI6Vt08/h82PRcPIEQr2F26jDBev3Qs8wbDoFqThELoqF+/c1kJmD+D14OqDmW4Oi7o0r4lgYsgvgqQffBjG3xhGYT8GvqJJr28XcGvxH9l6NdR1iLo0lMD2hxnU7xVwaSyAWVmPrYfCsFXFpP5UwGzYBs2ETMBs2AbNheQJy/UDfS4iFwNsEr6/DjzeLulFlj4VUP/BsENI/oeOEen5UYXcmRyCtQ+QCuP3QOwz3jy7q8vrfmgC0HISp29CwC56cqTis/BJK6+CqVbLbD11D6re6GRJj0LgHXD74rav+oEI4taDw/ZCnHma+Kjmtw8RQoX1hFtqPQXSk4lBaEE1uCbn9sOMyeBsgci5Pd0XJHx+ohj5+F7ouwUi3SNilF8ZWuyvNvey2/Da6RKDcBxXVhvxc/6+PPYpRLUTKrY4/kSCq2Wr0dXEAAAAASUVORK5CYII=" | base64 -d > app/src/main/res/mipmap-mdpi/ic_launcher.png
-          mkdir -p app/src/main/res/mipmap-hdpi
-          echo "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAD4ElEQVR4nO2cW2wMURiAv5leslJUW4q4bohLL4iQSgjigRCp25vECxF1CeJFPEgIEbx4kbg8eiKuEZd6ERKXNFhStxDaCtLQWq1Stb2sh9PN2d2uOW1iz+x0z5c0+c+ZSf5/vv5ndnZmshZ9IHyScF/2T1WsCqxe76vaob9I+RcqWbbTxv4uB9THmNBeOohJRKJu6tFB6SoHEh+7rdoh3Yh34HgOMkQJMt0jiXZhx08YBBEnZokpMIIUWGZ5OWM6SIERpMAIUmAEKTCCFBhBCjK1Z9zUi6uKrg7oaIXfX+D7K6i/C+/OQmt98uuLQ/91UG8EJaKzDZ4ehsABCHf935oc0N9B0Xy4Bp9uxU1aYGeDLx9GzIUR88DKgAwfzNoHA8fC3Q3aSnRX0NcqeHHceZ/cibD4MuSXiPGU9VBzAT7eTH59eOEk3fwOKsuhq13OTd2oLX3qCwJoqYWPlXJcWKYttTcEATS/lfGAYdrSekdQZ0jGHb+0pfWOoLxiGTcEtKX1hqDBE2DsUjl+dUJb6tQXVDAdlt0AO0uMX58WH/OacPc6qLAMSrb1nLcyIHsIjJwHIxcIOR2t8GQ/PDuqtURvfNVoDMD1JdDW+P/rUZD6Swxg6ExYdEYuM424u8Qe7YXAwcTb8kugaDMUbxHjMUuh7Ag83KWvPlK5g4Iv4N5WeHZYzhVvBl+B1jJSV1CEwCEINYk4wwf+1VrTp76g9haovyfHBTO0pk99QQANj2ScV6Q1tTcE/Xgv40HjtKb2hqCWOhnnjBYXkprwhqDgSxnbWVqXmTcEhZqg5YMcD5+jLbU3BIF49BNh/Eptab0jqO6KjMcsgfxSLWnN+0EKvNNBLmEEKTCCFBhBCowgBUaQAiNIgRGkwAhSYAQpMIIUGEEK9D0XyxkNa2vhy30Ih8HOhOpjUHspdluEtiA0PoGsgVC1R84PnQnzT8Gl2VrK1vvgMNQMVxeK2FcAy2+LpxbfX8duizBksng/MVqQfzW8P6erYheXWNs38VR1msOT0qY3EO6E3Elyzr8Kas4nv75u3D0HBatFlzhRexHGrxBxXpHotOjbr0nGXUF2FnT+EXF2LpTfkX+lO8R8zUXwrxSxf43W5QWQaVW4eFdx2Cz4Vi3iROcggOBzyM6DAYVCVGW5tvKsCiz33u7IGQUzdsPtdep9665A6U5o/wm/Pie7shj0CoosIwAsuL8dGh6Lj/mYbd1cWwxdIfHK3aoqeLBTa7ndVQrMzftYIj90YsdPGGJdmK8aCmIEmS7q6aBHB6WzpETH7igjXU7cTk3heA5Kh25SHWOfBPSXjurLP/4v+YsCgDHnl5kAAAAASUVORK5CYII=" | base64 -d > app/src/main/res/mipmap-hdpi/ic_launcher.png
-          mkdir -p app/src/main/res/mipmap-xhdpi
-          echo "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAFjklEQVR4nO2dW2wUVRjHf7tdaLFtSkEEoQilLRYx0RdBYogCMRiFGCqN2cRgoiY2xgdfjdHEByMaiT4aEqKg1RKjRIkIChgTIwEkNDQoZXsDLALl0gu9UNpdH46b7uzuTGe3s/2mh/N72ZzLbP7z/ed8Z2Z2zmyACRD7lNhEtteFQB2BrLfNdAMTdGcyNcN1ZxP4zHBrRNBNJxP8zHEbM0eXTOC9wWk02I4AE3zvcIplWgNM8L3HLqYpBpjg5450sXU1CRtyh8UAc/TnnuQYB+0aDLkjMdYmBQkTBHP0SxCPuRkBwhgDhAmY9COLGQHCGAOEMQYIYwwQxhggjDFAGGOAMCFpAWl5NZNLkxhER2F0CIZ7YOAiXDsFl49A+x64dT1nMr3AnxdiGRngQPQ2nN0Fx9+GgX+9+U6P0TsFBadB9ctQ2wTz10irSYs/U1AyFw5A0yc2jQHIy4fpxVBYBvMeg7L1EEzYtYLZ8PQ++H41dP05GYpdMzUM6P8HLux3379oITy+A8qeHKvLK4B1X8HuZRAb9V5jluiZgm5egJ82wKXfrfUlVVBRK6PJBj0NAIgOwx9vpNYv2jjpUpzQ1wCArhPQ22qtm7NCRosNehsAcL3JWp4xR0aHDfobMNxjLYfuktFhg/4GhIqs5aFrMjps0N+A0mpr+VqjiAw79DagpApKH7DWte+R0WKD3gaseB/LEoi+doh8ISYnHXoaEAzBqm2w5LmxupEBOBiGkUE5XWmYGrcixiOQp85uihbCvath+esw68Gx9sEr8MtmuHJUTqMNd8bt6GNvweBlb77TY/QYAWmJwdE34dQ2aSGO6DkHABCAVR/Bms8h4N/dnBojwPH3gP/JnwnzVsPSLTAt4eJr6Ytw8zwcfyeXCrNmaswBZ3bAb6+427Z4MTxzAEqWjtVFR6ChCvo6vFLoGf4dm9nS1wH7n1W3o+MEQ7D8NTFJTuhnAED3GYjUW+sWb5LRMg56GgDQ+o21XFIJBf66FQ06G3D5SGrdzPsnX8c46GvAcLe6Ak6k6D4RKU7oawCo089EChfI6HBAbwP6zlnLxYtFZDihtwG9LdaymQMmmRunreXZD8nocEBvA642WssFd6tfyXyE3gbcOA23bljrFq6X0WKD3gbEonDxV2td1QsyWmzQ2wCAlgZr+Z6VvhoF/rwbegeh/wjwOcYAYYwBwhgDhDEGCGMMEMYYIIwxQBhjgDDGAGGMAcIYA4QxBghjDBDGGCCMMUAYY4AwxgBh/LNCZtEGeGovjN4CYuqlSj2tcO4HOLkVRvpt+ibR9LF6HGXtLtg5Vz0jmkj+LNhyCQ6Foe3bHO6QO/xjQJyvK9UbsgJB9QP6yq1QXgN716audIz3TSY0Q5lTvgmaP7O2VdTC7T7o2Ju7fcgA/6agWFQ9Yv7jeggVwqMfuN92ZBDav4OK51PbKsPqSYnEFTSC+NeAOKNDao1YeU1mqx0j9bBgnXoaLk7hArWQ7+xO73Vmif9SUDp6IzCtWOXvoatj9eGW1L71i1Sq6jys+pbXwN/bVVtlGLqb4cqxydHtglCgbgo8GxTMV5/REWu93RwAahJvbVBpKNEAHx39gTo/r2BOpHQZ9F9MPaMZj8iXMP8JmDFXLVud/bCq8xH+T0HTZ0L1S/DX9sy37ToBPRFYslm9K67zIPR3ei5xIgRhYv+JnjMCeero3XgYetvg5HvZfU+kXqWhyjA0+yv9gB9HQLgF4lNSbxu07obGD9XZUNq+SZzfBz/XjJVb6uGRd2G4Dzr89bYsSPpHbd9PxpqQmHGCdg2G3JAc46lxFqQxKQaYUZA70sU27QgwJniPXUxtU5AxwTucYukqyObsKDvcHMSuJmEzGjLHbcwyDqwZDc5kerBO6Mg2ZigmkiH+A7i+dB8p/X4sAAAAAElFTkSuQmCC" | base64 -d > app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          mkdir -p app/src/main/res/mipmap-xxhdpi
-          echo "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" | base64 -d > app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          mkdir -p app/src/main/res/mipmap-xxxhdpi
-          echo "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" | base64 -d > app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
-          android.enableJetifier=false
+          android.enableJetifier=true
           org.gradle.jvmargs=-Xmx2048m
           EOF
 
@@ -49,51 +49,66 @@ jobs:
               repositories { google(); mavenCentral() }
               dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
-          allprojects { repositories { google(); mavenCentral() } }
+          allprojects {
+              repositories { google(); mavenCentral() }
+          }
           EOF
 
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
-              namespace 'com.rootautoswipedev'
+              namespace 'com.danish.auto'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.rootautoswipedev'
+                  applicationId 'com.danish.auto'
                   minSdk 26
                   targetSdk 34
-                  versionCode 2
-                  versionName '1.0-dev'
-              }
-              packagingOptions {
-                  exclude 'META-INF/LICENSE.md'
-                  exclude 'META-INF/LICENSE-notice.md'
+                  versionCode 1
+                  versionName '1.0'
               }
           }
-          dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
+          dependencies {
+              compileOnly files('libs/api-82.jar')
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+          }
           EOF
+
+          # Generate icon (blue circle with white "D")
+          convert -size 48x48 xc:none -fill "#1DB954" -draw "circle 24,24 24,14" -fill white -font "Arial" -pointsize 24 -gravity center -annotate 0 "D" app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert -size 72x72 xc:none -fill "#1DB954" -draw "circle 36,36 36,20" -fill white -font "Arial" -pointsize 36 -gravity center -annotate 0 "D" app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert -size 96x96 xc:none -fill "#1DB954" -draw "circle 48,48 48,28" -fill white -font "Arial" -pointsize 48 -gravity center -annotate 0 "D" app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert -size 144x144 xc:none -fill "#1DB954" -draw "circle 72,72 72,40" -fill white -font "Arial" -pointsize 72 -gravity center -annotate 0 "D" app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert -size 192x192 xc:none -fill "#1DB954" -draw "circle 96,96 96,54" -fill white -font "Arial" -pointsize 96 -gravity center -annotate 0 "D" app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.READ_LOGS"/>
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-              <uses-permission android:name="android.permission.VIBRATE"/>
-              <application android:label="@string/app_name" android:icon="@mipmap/ic_launcher"
-                  android:theme="@style/Theme.AppCompat">
-                  <activity android:name=".MainActivity" android:exported="true">
+              <application
+                  android:label="Danish Auto"
+                  android:icon="@mipmap/ic_launcher"
+                  android:theme="@android:style/Theme.DeviceDefault">
+                  <meta-data
+                      android:name="xposedmodule"
+                      android:value="true" />
+                  <meta-data
+                      android:name="xposeddescription"
+                      android:value="Silent Auto Accept (Notification-based)" />
+                  <meta-data
+                      android:name="xposedminversion"
+                      android:value="82" />
+                  <activity
+                      android:name=".SettingsActivity"
+                      android:exported="true">
                       <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  <activity android:name=".LogActivity" android:label="Logs" android:exported="false"/>
-                  <activity android:name=".PopupActivity" android:exported="false"
-                      android:theme="@style/Theme.AppCompat.Dialog"
-                      android:excludeFromRecents="true" android:launchMode="singleInstance"/>
-                  <service android:name=".AutoSwipeService" android:exported="false"
-                      android:foregroundServiceType="dataSync"/>
+                  <activity
+                      android:name=".PopupActivity"
+                      android:theme="@android:style/Theme.DeviceDefault.Dialog"
+                      android:excludeFromRecents="true"
+                      android:exported="false" />
               </application>
           </manifest>
           EOF
@@ -101,480 +116,415 @@ jobs:
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">RAS Dev</string>
+              <string name="app_name">Danish Auto</string>
           </resources>
           EOF
 
-          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent">
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:orientation="vertical" android:padding="20dp" android:background="#121212">
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="🟠 RAS Dev" android:textSize="24sp"
-                      android:textColor="#FF9800" android:textStyle="bold"/>
-                  <TextView android:id="@+id/tv_status" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Stopped" android:textSize="14sp" android:textColor="#FF5555" android:layout_marginTop="16dp"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Target Package" android:textColor="#AAAAAA" android:layout_marginTop="16dp"/>
-                  <EditText android:id="@+id/et_package" android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:text="net.jahez.fleets" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Max Pickup (km)" android:textColor="#AAAAAA" android:layout_marginTop="10dp"/>
-                  <EditText android:id="@+id/et_pickup_max" android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:inputType="numberDecimal" android:text="1.5" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Max Drop (km)" android:textColor="#AAAAAA" android:layout_marginTop="10dp"/>
-                  <EditText android:id="@+id/et_drop_max" android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:inputType="numberDecimal" android:text="3.5" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp"/>
-                  <TextView android:id="@+id/tv_swipe_duration_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                      android:text="Swipe Duration: 300ms" android:textColor="#FF9800" android:layout_marginTop="16dp"/>
-                  <SeekBar android:id="@+id/sb_swipe_duration" android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:max="900" android:progress="200" android:thumbTint="#FF9800" android:progressTint="#FF9800"/>
-                  <Button android:id="@+id/btn_start" android:layout_width="match_parent" android:layout_height="50dp"
-                      android:text="START" android:backgroundTint="#FF9800" android:layout_marginTop="20dp"/>
-                  <Button android:id="@+id/btn_stop" android:layout_width="match_parent" android:layout_height="50dp"
-                      android:text="STOP" android:backgroundTint="#F44336" android:layout_marginTop="10dp"/>
-                  <Button android:id="@+id/btn_logs" android:layout_width="match_parent" android:layout_height="50dp"
-                      android:text="LOGS" android:backgroundTint="#2196F3" android:layout_marginTop="10dp"/>
-              </LinearLayout>
-          </ScrollView>
-          EOF
-
-          cat > app/src/main/res/layout/activity_log.xml << 'EOF'
+          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:background="#000000" android:padding="10dp">
-              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:text="Logs [Dev]" android:textSize="20sp" android:textColor="#FF9800" android:gravity="center"/>
-              <ScrollView android:id="@+id/log_scroll" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-                  <TextView android:id="@+id/tv_logs" android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:textColor="#FFE0B2" android:fontFamily="monospace" android:textSize="10sp" android:text="Waiting..."/>
-              </ScrollView>
-              <Button android:id="@+id/btn_clear" android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:text="CLEAR" android:backgroundTint="#F44336"/>
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:padding="20dp"
+              android:background="#121212">
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Danish Auto"
+                  android:textSize="26sp"
+                  android:textColor="#1DB954"
+                  android:textStyle="bold"
+                  android:layout_gravity="center"
+                  android:layout_marginBottom="20dp"/>
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Pickup Max (km)"
+                  android:textColor="#AAAAAA"/>
+              <EditText
+                  android:id="@+id/et_pickup"
+                  android:layout_width="match_parent"
+                  android:layout_height="55dp"
+                  android:inputType="numberDecimal"
+                  android:text="1.5"
+                  android:textColor="#FFFFFF"
+                  android:background="#333333"
+                  android:padding="10dp"
+                  android:layout_marginBottom="15dp"/>
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Drop Max (km)"
+                  android:textColor="#AAAAAA"/>
+              <EditText
+                  android:id="@+id/et_drop"
+                  android:layout_width="match_parent"
+                  android:layout_height="55dp"
+                  android:inputType="numberDecimal"
+                  android:text="3.5"
+                  android:textColor="#FFFFFF"
+                  android:background="#333333"
+                  android:padding="10dp"
+                  android:layout_marginBottom="15dp"/>
+              <Switch
+                  android:id="@+id/switch_enabled"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Auto Accept"
+                  android:textColor="#FFFFFF"
+                  android:layout_marginBottom="20dp"/>
+              <Button
+                  android:id="@+id/btn_save"
+                  android:layout_width="match_parent"
+                  android:layout_height="55dp"
+                  android:text="SAVE"
+                  android:backgroundTint="#1DB954"/>
           </LinearLayout>
           EOF
 
           cat > app/src/main/res/layout/activity_popup.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="300dp" android:layout_height="wrap_content"
-              android:orientation="vertical" android:background="#1E1E1E" android:padding="24dp">
-              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:text="Order Accepted!" android:textSize="22sp" android:textColor="#FF9800"
-                  android:textStyle="bold" android:gravity="center"/>
-              <TextView android:id="@+id/tv_pickup" android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:text="Pickup: -- km" android:textSize="16sp" android:textColor="#FFFFFF" android:layout_marginTop="16dp"/>
-              <TextView android:id="@+id/tv_drop" android:layout_width="match_parent" android:layout_height="wrap_content"
-                  android:text="Drop: -- km" android:textSize="16sp" android:textColor="#FFFFFF" android:layout_marginTop="8dp"/>
-              <Button android:id="@+id/btn_ok" android:layout_width="match_parent" android:layout_height="45dp"
-                  android:text="OK" android:backgroundTint="#FF9800" android:layout_marginTop="20dp"/>
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="vertical"
+              android:padding="20dp"
+              android:background="#1E1E1E">
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="✅ Order Accepted"
+                  android:textSize="22sp"
+                  android:textColor="#4CAF50"
+                  android:textStyle="bold"
+                  android:layout_gravity="center"
+                  android:layout_marginBottom="15dp"/>
+              <TextView
+                  android:id="@+id/tv_pickup"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Pickup: -- km"
+                  android:textSize="16sp"
+                  android:textColor="#FFFFFF"/>
+              <TextView
+                  android:id="@+id/tv_drop"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="Drop: -- km"
+                  android:textSize="16sp"
+                  android:textColor="#FFFFFF"
+                  android:layout_marginBottom="20dp"/>
+              <Button
+                  android:id="@+id/btn_ok"
+                  android:layout_width="match_parent"
+                  android:layout_height="45dp"
+                  android:text="OK"
+                  android:backgroundTint="#4CAF50"/>
           </LinearLayout>
           EOF
 
-          cat > app/src/main/java/com/rootautoswipedev/PopupActivity.java << 'EOF'
-          package com.rootautoswipedev;
+          cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'EOF'
+          package com.danish.auto;
+
+          import android.content.SharedPreferences;
           import android.os.Bundle;
-          import android.os.Handler;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.Switch;
+          import android.widget.Toast;
+          import androidx.appcompat.app.AppCompatActivity;
+
+          public class SettingsActivity extends AppCompatActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_settings);
+                  SharedPreferences prefs = getSharedPreferences("danish_prefs", MODE_PRIVATE);
+
+                  EditText etPickup = findViewById(R.id.et_pickup);
+                  EditText etDrop = findViewById(R.id.et_drop);
+                  Switch sw = findViewById(R.id.switch_enabled);
+                  Button btnSave = findViewById(R.id.btn_save);
+
+                  etPickup.setText(String.valueOf(prefs.getFloat("pickup_max", 1.5f)));
+                  etDrop.setText(String.valueOf(prefs.getFloat("drop_max", 3.5f)));
+                  sw.setChecked(prefs.getBoolean("enabled", false));
+
+                  btnSave.setOnClickListener(v -> {
+                      prefs.edit()
+                          .putFloat("pickup_max", Float.parseFloat(etPickup.getText().toString()))
+                          .putFloat("drop_max", Float.parseFloat(etDrop.getText().toString()))
+                          .putBoolean("enabled", sw.isChecked())
+                          .apply();
+                      Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
+                  });
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'EOF'
+          package com.danish.auto;
+
+          import android.os.Bundle;
           import android.widget.TextView;
           import androidx.appcompat.app.AppCompatActivity;
+
           public class PopupActivity extends AppCompatActivity {
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_popup);
-                  float pk = getIntent().getFloatExtra("pickup", 0f);
-                  float dr = getIntent().getFloatExtra("drop", 0f);
-                  ((TextView) findViewById(R.id.tv_pickup)).setText("Pickup: " + pk + " km");
-                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop:   " + dr + " km");
+                  float pickup = getIntent().getFloatExtra("pickup", 0);
+                  float drop = getIntent().getFloatExtra("drop", 0);
+                  ((TextView) findViewById(R.id.tv_pickup)).setText("Pickup: " + pickup + " km");
+                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop: " + drop + " km");
                   findViewById(R.id.btn_ok).setOnClickListener(v -> finish());
-                  new Handler().postDelayed(this::finish, 5000);
               }
           }
           EOF
 
-          cat > app/src/main/java/com/rootautoswipedev/MainActivity.java << 'EOF'
-          package com.rootautoswipedev;
-          import android.content.Intent;
-          import android.content.SharedPreferences;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.widget.*;
-          import androidx.appcompat.app.AppCompatActivity;
-          public class MainActivity extends AppCompatActivity {
-              private EditText etPkg, etPk, etDr;
-              private SeekBar sbSw;
-              private TextView tvSw, tvSt;
-              private SharedPreferences pr;
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_main);
-                  pr = getSharedPreferences("ras_prefs", MODE_PRIVATE);
-                  etPkg = findViewById(R.id.et_package);
-                  etPk  = findViewById(R.id.et_pickup_max);
-                  etDr  = findViewById(R.id.et_drop_max);
-                  sbSw  = findViewById(R.id.sb_swipe_duration);
-                  tvSw  = findViewById(R.id.tv_swipe_duration_label);
-                  tvSt  = findViewById(R.id.tv_status);
-                  etPkg.setText(pr.getString("target_pkg", "net.jahez.fleets"));
-                  etPk.setText(String.valueOf(pr.getFloat("pickup_max", 1.5f)));
-                  etDr.setText(String.valueOf(pr.getFloat("drop_max", 3.5f)));
-                  int sd = pr.getInt("swipe_duration", 300);
-                  sbSw.setProgress(sd - 100);
-                  tvSw.setText("Swipe Duration: " + sd + "ms");
-                  sbSw.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                      @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
-                          tvSw.setText("Swipe Duration: " + (p + 100) + "ms");
-                      }
-                      @Override public void onStartTrackingTouch(SeekBar s) {}
-                      @Override public void onStopTrackingTouch(SeekBar s) {}
-                  });
-                  findViewById(R.id.btn_start).setOnClickListener(v -> {
-                      float pk, dr;
-                      try { pk = Float.parseFloat(etPk.getText().toString()); } catch (Exception e) { pk = 1.5f; }
-                      try { dr = Float.parseFloat(etDr.getText().toString()); } catch (Exception e) { dr = 3.5f; }
-                      pr.edit()
-                          .putString("target_pkg",  etPkg.getText().toString().trim())
-                          .putFloat("pickup_max",   pk)
-                          .putFloat("drop_max",     dr)
-                          .putInt("swipe_duration", sbSw.getProgress() + 100)
-                          .apply();
-                      Intent svc = new Intent(this, AutoSwipeService.class);
-                      if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
-                      else startService(svc);
-                      tvSt.setText("Running");
-                      tvSt.setTextColor(0xFF4CAF50);
-                      Toast.makeText(this, "Started", Toast.LENGTH_SHORT).show();
-                  });
-                  findViewById(R.id.btn_stop).setOnClickListener(v -> {
-                      stopService(new Intent(this, AutoSwipeService.class));
-                      tvSt.setText("Stopped");
-                      tvSt.setTextColor(0xFFFF5555);
-                      Toast.makeText(this, "Stopped", Toast.LENGTH_SHORT).show();
-                  });
-                  findViewById(R.id.btn_logs).setOnClickListener(v ->
-                      startActivity(new Intent(this, LogActivity.class))
-                  );
-              }
-          }
+          cat > app/src/main/assets/xposed_init << 'EOF'
+          com.danish.auto.MainHook
           EOF
 
-          cat > app/src/main/java/com/rootautoswipedev/AutoSwipeService.java << 'EOF'
-          package com.rootautoswipedev;
+          cat > app/src/main/java/com/danish/auto/MainHook.java << 'EOF'
+          package com.danish.auto;
+
+          import android.app.Activity;
           import android.app.Notification;
-          import android.app.NotificationChannel;
           import android.app.NotificationManager;
-          import android.app.Service;
+          import android.app.PendingIntent;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
           import android.content.Intent;
           import android.content.SharedPreferences;
-          import android.os.Build;
-          import android.os.IBinder;
-          import android.os.VibrationEffect;
-          import android.os.Vibrator;
-          import android.util.Log;
-          import java.io.BufferedReader;
-          import java.io.InputStreamReader;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.TextView;
+
+          import java.lang.reflect.Method;
           import java.util.ArrayList;
           import java.util.List;
           import java.util.regex.Matcher;
           import java.util.regex.Pattern;
 
-          public class AutoSwipeService extends Service {
-              static final String TAG = "RASdev";
-              static final String CH  = "com.rootautoswipedev_ch";
-              static final String CHA = "com.rootautoswipedev_alert";
-              static final int NID = 3001;
-              static final int AID = 3002;
+          import de.robv.android.xposed.XC_MethodHook;
+          import de.robv.android.xposed.XposedBridge;
+          import de.robv.android.xposed.XposedHelpers;
+          import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
-              Thread th;
-              boolean run = false;
-              SharedPreferences pr;
-              NotificationManager nm;
-
-              String pkg   = "net.jahez.fleets";
-              float pkMax  = 1.5f;
-              float drMax  = 3.5f;
-              int sw       = 300;
-
-              void log(String m) {
-                  Log.d(TAG, m);
-                  Intent i = new Intent("RAS_LOG_ACTION");
-                  i.setPackage("com.rootautoswipedev");
-                  i.putExtra("log_msg", m);
-                  sendBroadcast(i);
-              }
-
-              String exec(String c) {
-                  try {
-                      Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", c});
-                      BufferedReader b = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                      StringBuilder sb = new StringBuilder();
-                      String l;
-                      while ((l = b.readLine()) != null) sb.append(l).append("\n");
-                      p.waitFor();
-                      return sb.toString().trim();
-                  } catch (Exception e) {
-                      log("ex:" + e.getMessage());
-                      return "";
-                  }
-              }
-
-              void startFgNotif() {
-                  nm = getSystemService(NotificationManager.class);
-                  if (Build.VERSION.SDK_INT >= 26) {
-                      nm.createNotificationChannel(new NotificationChannel(CH, "RAS Dev Svc", NotificationManager.IMPORTANCE_LOW));
-                      NotificationChannel ac = new NotificationChannel(CHA, "Order Alert", NotificationManager.IMPORTANCE_HIGH);
-                      ac.enableVibration(true);
-                      nm.createNotificationChannel(ac);
-                  }
-                  Notification.Builder b = Build.VERSION.SDK_INT >= 26
-                      ? new Notification.Builder(this, CH)
-                      : new Notification.Builder(this);
-                  startForeground(NID, b
-                      .setContentTitle("RAS Dev")
-                      .setContentText("Monitoring [/dev/stdout]...")
-                      .setSmallIcon(android.R.drawable.ic_menu_compass)
-                      .setOngoing(true)
-                      .build());
-                  log("Service started");
-              }
-
-              void alert(float pk, float dr) {
-                  try {
-                      Vibrator v = (Vibrator) getSystemService(VIBRATOR_SERVICE);
-                      if (v != null && v.hasVibrator()) {
-                          if (Build.VERSION.SDK_INT >= 26)
-                              v.vibrate(VibrationEffect.createWaveform(new long[]{0, 300, 150, 300}, -1));
-                          else
-                              v.vibrate(new long[]{0, 300, 150, 300}, -1);
-                      }
-                  } catch (Exception e) {}
-                  try {
-                      Notification.Builder b = Build.VERSION.SDK_INT >= 26
-                          ? new Notification.Builder(this, CHA)
-                          : new Notification.Builder(this);
-                      nm.notify(AID, b
-                          .setContentTitle("Order Accepted!")
-                          .setContentText("Pickup:" + pk + "km | Drop:" + dr + "km")
-                          .setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setAutoCancel(true)
-                          .build());
-                  } catch (Exception e) {}
-                  try {
-                      Intent i = new Intent(this, PopupActivity.class);
-                      i.putExtra("pickup", pk);
-                      i.putExtra("drop", dr);
-                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                      startActivity(i);
-                  } catch (Exception e) {}
-              }
+          public class MainHook implements de.robv.android.xposed.IXposedHookLoadPackage {
+              private static final String TAG = "DanishAuto";
+              private static SharedPreferences prefs;
+              private static float pendingPickup = -1;
+              private static float pendingDrop = -1;
+              private static ClassLoader classLoader;
 
               @Override
-              public void onCreate() {
-                  super.onCreate();
-                  pr = getSharedPreferences("ras_prefs", MODE_PRIVATE);
-              }
+              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
+                  if (!lpparam.packageName.equals("net.jahez.fleets")) return;
+                  classLoader = lpparam.classLoader;
+                  XposedBridge.log(TAG + " Hooked into Jahez");
 
-              @Override
-              public int onStartCommand(Intent intent, int flags, int startId) {
-                  startFgNotif();
-                  pkg   = pr.getString("target_pkg", "net.jahez.fleets");
-                  pkMax = pr.getFloat("pickup_max", 1.5f);
-                  drMax = pr.getFloat("drop_max", 3.5f);
-                  sw    = pr.getInt("swipe_duration", 300);
-                  log("Pkg:" + pkg + " P:" + pkMax + " D:" + drMax + " Sw:" + sw);
-
-                  if (th != null && th.isAlive()) return START_STICKY;
-
-                  run = true;
-                  th = new Thread(new Runnable() {
-                      @Override
-                      public void run() {
-                          log("Monitor [DEV /dev/stdout] FAST MODE");
-                          while (run) {
-                              try {
-                                  // 1. App foreground check
-                                  String top = Build.VERSION.SDK_INT >= 29
-                                      ? exec("dumpsys activity top | grep ACTIVITY | tail -1")
-                                      : exec("dumpsys activity top | grep ACTIVITY | head -1");
-                                  if (!top.contains(pkg)) { Thread.sleep(800); continue; }
-
-                                  // 2. Ek dump lo
-                          // stdout try, fallback file
-                          String dump = exec("uiautomator dump /dev/stdout 2>/dev/null");
-                          if (dump.isEmpty() || !dump.contains("<hierarchy")) {
-                              log("stdout fail, file fallback");
-                              dump = exec("uiautomator dump /data/local/tmp/ras.xml 2>/dev/null && cat /data/local/tmp/ras.xml");
-                          } else { log("stdout OK"); }
-
-                                  if (dump.isEmpty()) { Thread.sleep(300); continue; }
-
-                                  // 3. New Order check
-                                  if (!dump.contains("New Order")) { Thread.sleep(500); continue; }
-
-                                  log("New Order! Parsing same dump...");
-
-                                  // 4. Usi dump se distances nikalo — NO EXTRA WAIT
-                                  float[] d = dist(dump);
-                                  log("P:" + d[0] + " D:" + d[1]);
-
-                                  if (d[0] < 0 || d[1] < 0) {
-                                      log("Parse fail, retry");
-                                      Thread.sleep(300);
-                                      continue;
+                  // 1. Hook notification receiver to capture distances
+                  try {
+                      Class<?> receiverClass = XposedHelpers.findClass("net.saned.notification.dispatch.DispatchStatusChangesReceiver", classLoader);
+                      XposedHelpers.findAndHookMethod(receiverClass, "onReceive", Context.class, Intent.class, new XC_MethodHook() {
+                          @Override
+                          protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                              Context ctx = (Context) param.args[0];
+                              prefs = ctx.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                              Intent intent = (Intent) param.args[1];
+                              if (intent != null && intent.getExtras() != null) {
+                                  Bundle extras = intent.getExtras();
+                                  float pickup = -1, drop = -1;
+                                  if (extras.containsKey("pickup_distance")) {
+                                      pickup = (float) extras.getDouble("pickup_distance", -1);
+                                  } else if (extras.containsKey("pickup")) {
+                                      pickup = extras.getFloat("pickup", -1);
                                   }
-
-                                  // 5. Decision
-                                  if (d[0] <= pkMax && d[1] <= drMax) {
-                                      log("ACCEPT P:" + d[0] + " D:" + d[1]);
-                                      int[] c = acc(dump);
-                                      if (c != null) {
-                                          exec("input swipe " + (c[0]+c[2]/5) + " " + (c[1]+c[3]/2)
-                                              + " " + (c[0]+c[2]*4/5) + " " + (c[1]+c[3]/2) + " " + sw);
-                                      } else {
-                                          String sz = exec("wm size");
-                                          int W = 1080, H = 1920;
-                                          Matcher m = Pattern.compile("(\\d+)x(\\d+)").matcher(sz);
-                                          if (m.find()) {
-                                              W = Integer.parseInt(m.group(1));
-                                              H = Integer.parseInt(m.group(2));
-                                          }
-                                          exec("input swipe " + (int)(W*.15) + " " + (int)(H*.85)
-                                              + " " + (int)(W*.85) + " " + (int)(H*.85) + " " + sw);
-                                          log("Fallback swipe");
-                                      }
-                                      alert(d[0], d[1]);
-                                      Thread.sleep(3000);
-                                  } else {
-                                      log("REJECT P:" + d[0] + "/" + pkMax + " D:" + d[1] + "/" + drMax);
+                                  if (extras.containsKey("drop_distance")) {
+                                      drop = (float) extras.getDouble("drop_distance", -1);
+                                  } else if (extras.containsKey("drop")) {
+                                      drop = extras.getFloat("drop", -1);
                                   }
-                                  Thread.sleep(500);
-
-                              } catch (InterruptedException e) {
-                                  break;
-                              } catch (Exception e) {
-                                  log("E:" + e.getMessage());
+                                  if (pickup > 0 && drop > 0) {
+                                      pendingPickup = pickup;
+                                      pendingDrop = drop;
+                                      XposedBridge.log(TAG + " 📡 Captured distances: P=" + pickup + " D=" + drop);
+                                  }
                               }
                           }
-                          log("Monitor stopped");
-                      }
-                  });
-                  th.start();
-                  return START_STICKY;
+                      });
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + " Failed to hook receiver: " + e.getMessage());
+                  }
+
+                  // 2. Hook the order activity's onCreate to call accept method before screen shows
+                  try {
+                      Class<?> orderActivity = XposedHelpers.findClass("net.jahez.fleets.dispatch.accept.IncomingDispatchActivity", classLoader);
+                      XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                              Activity act = (Activity) param.thisObject;
+                              if (prefs == null) prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
+                              if (!prefs.getBoolean("enabled", false)) return;
+
+                              float pickup = pendingPickup;
+                              float drop = pendingDrop;
+                              if (pickup < 0 || drop < 0) {
+                                  XposedBridge.log(TAG + " No notification data, scanning UI...");
+                                  float[] ui = extractDistancesFromUI(act);
+                                  pickup = ui[0];
+                                  drop = ui[1];
+                              } else {
+                                  XposedBridge.log(TAG + " Using notification data");
+                              }
+                              pendingPickup = -1; // reset
+
+                              float pickupMax = prefs.getFloat("pickup_max", 1.5f);
+                              float dropMax = prefs.getFloat("drop_max", 3.5f);
+                              XposedBridge.log(TAG + " 📊 Distances: P=" + pickup + " D=" + drop + " Limits: " + pickupMax + "/" + dropMax);
+
+                              if (pickup > 0 && drop > 0 && pickup <= pickupMax && drop <= dropMax) {
+                                  XposedBridge.log(TAG + " ✅ Accepting order silently...");
+                                  // Try to call internal accept method first
+                                  boolean accepted = callAcceptMethod(act);
+                                  if (!accepted) {
+                                      XposedBridge.log(TAG + " Fallback: simulating click on Accept button");
+                                      simulateAcceptClick(act);
+                                  }
+                                  showPopupAndNotification(act, pickup, drop);
+                              } else {
+                                  XposedBridge.log(TAG + " ❌ Rejected (out of range)");
+                              }
+                          }
+                      });
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + " Failed to hook order activity: " + e.getMessage());
+                  }
               }
 
-              float[] dist(String x) {
-                  float[] r = {-1, -1};
-                  Matcher m = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk]m\\s+From\\s+You", Pattern.CASE_INSENSITIVE).matcher(x);
-                  if (m.find()) r[0] = Float.parseFloat(m.group(1));
-                  m = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk]m\\s+From\\s+Pickup", Pattern.CASE_INSENSITIVE).matcher(x);
-                  if (m.find()) r[1] = Float.parseFloat(m.group(1));
-                  if (r[0] < 0 || r[1] < 0) {
-                      String[] ln = x.split("node ");
-                      Pattern kp = Pattern.compile("text=\"(\\d+\\.?\\d*)\\s*[Kk]m\"");
-                      for (int i = 0; i < ln.length - 1; i++) {
-                          Matcher km = kp.matcher(ln[i]);
-                          if (km.find()) {
-                              float v = Float.parseFloat(km.group(1));
-                              StringBuilder nx = new StringBuilder();
-                              for (int j = i+1; j < Math.min(i+4, ln.length); j++) nx.append(ln[j]);
-                              String s = nx.toString().toLowerCase();
-                              if (s.contains("from you") && r[0] < 0) r[0] = v;
-                              else if (s.contains("from pickup") && r[1] < 0) r[1] = v;
+              private boolean callAcceptMethod(Activity act) {
+                  // Try to find method named "acceptOrder", "onAcceptClick", "accept", etc.
+                  Method[] methods = act.getClass().getDeclaredMethods();
+                  for (Method m : methods) {
+                      String name = m.getName().toLowerCase();
+                      if (name.contains("accept") && !name.contains("reject")) {
+                          try {
+                              m.setAccessible(true);
+                              m.invoke(act);
+                              XposedBridge.log(TAG + " Called method: " + m.getName());
+                              return true;
+                          } catch (Exception e) {
+                              XposedBridge.log(TAG + " Failed to call " + m.getName() + ": " + e.getMessage());
                           }
                       }
                   }
-                  if (r[0] < 0 || r[1] < 0) {
-                      Matcher ma = Pattern.compile("text=\"(\\d+\\.?\\d*)\\s*[Kk]m[^\"]*\"", Pattern.CASE_INSENSITIVE).matcher(x);
-                      List<Float> vs = new ArrayList<>();
-                      while (ma.find()) { float v = Float.parseFloat(ma.group(1)); if (v > 0 && v < 100) vs.add(v); }
-                      log("km vals:" + vs);
-                      if (vs.size() >= 2) { if (r[0] < 0) r[0] = vs.get(0); if (r[1] < 0) r[1] = vs.get(1); }
-                  }
-                  return r;
+                  // Also try to find click listener on accept button
+                  return false;
               }
 
-              int[] acc(String x) {
-                  Matcher m = Pattern.compile(
-                      "bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"[^/]*?text=\"(?:Accept|ACCEPT|قبول)\"|" +
-                      "text=\"(?:Accept|ACCEPT|قبول)\"[^/]*?bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"",
-                      Pattern.CASE_INSENSITIVE | Pattern.DOTALL).matcher(x);
-                  if (m.find()) {
-                      int l, t, ri, b;
-                      if (m.group(1) != null) {
-                          l=Integer.parseInt(m.group(1)); t=Integer.parseInt(m.group(2));
-                          ri=Integer.parseInt(m.group(3)); b=Integer.parseInt(m.group(4));
-                      } else {
-                          l=Integer.parseInt(m.group(5)); t=Integer.parseInt(m.group(6));
-                          ri=Integer.parseInt(m.group(7)); b=Integer.parseInt(m.group(8));
-                      }
-                      log("Accept:[" + l + "," + t + "][" + ri + "," + b + "]");
-                      return new int[]{l, t, ri-l, b-t};
+              private void simulateAcceptClick(Activity act) {
+                  View root = act.getWindow().getDecorView();
+                  View acceptBtn = findAcceptButton(root);
+                  if (acceptBtn != null) {
+                      acceptBtn.performClick();
+                      XposedBridge.log(TAG + " Simulated click on Accept button");
+                  } else {
+                      XposedBridge.log(TAG + " Accept button not found");
                   }
-                  log("Accept btn not found");
+              }
+
+              private View findAcceptButton(View v) {
+                  if (v instanceof TextView) {
+                      String text = ((TextView) v).getText().toString();
+                      if (text.equalsIgnoreCase("Accept") || text.equals("قبول")) return v;
+                  }
+                  if (v instanceof ViewGroup) {
+                      ViewGroup g = (ViewGroup) v;
+                      for (int i = 0; i < g.getChildCount(); i++) {
+                          View found = findAcceptButton(g.getChildAt(i));
+                          if (found != null) return found;
+                      }
+                  }
                   return null;
               }
 
-              @Override
-              public void onDestroy() {
-                  run = false;
-                  if (th != null) th.interrupt();
-                  stopForeground(true);
-                  super.onDestroy();
-              }
-
-              @Override
-              public IBinder onBind(Intent intent) { return null; }
-          }
-          EOF
-
-          cat > app/src/main/java/com/rootautoswipedev/LogActivity.java << 'EOF'
-          package com.rootautoswipedev;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.widget.Button;
-          import android.widget.ScrollView;
-          import android.widget.TextView;
-          import androidx.appcompat.app.AppCompatActivity;
-          public class LogActivity extends AppCompatActivity {
-              private TextView tv;
-              private ScrollView sv;
-              private final BroadcastReceiver rc = new BroadcastReceiver() {
-                  @Override
-                  public void onReceive(Context c, Intent i) {
-                      String m = i.getStringExtra("log_msg");
-                      if (m == null || tv == null) return;
-                      tv.append("\n" + m);
-                      if (sv != null) sv.post(() -> sv.fullScroll(ScrollView.FOCUS_DOWN));
+              private float[] extractDistancesFromUI(Activity act) {
+                  float[] result = {-1, -1};
+                  try {
+                      View root = act.getWindow().getDecorView();
+                      List<Float> list = new ArrayList<>();
+                      collectKmNumbers(root, list);
+                      if (list.size() >= 2) {
+                          result[0] = list.get(0);
+                          result[1] = list.get(1);
+                      }
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + " UI scan error: " + e.getMessage());
                   }
-              };
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_log);
-                  tv = findViewById(R.id.tv_logs);
-                  sv = findViewById(R.id.log_scroll);
-                  ((Button) findViewById(R.id.btn_clear)).setOnClickListener(v -> tv.setText("Cleared"));
-                  IntentFilter f = new IntentFilter("RAS_LOG_ACTION");
-                  if (Build.VERSION.SDK_INT >= 33)
-                      registerReceiver(rc, f, Context.RECEIVER_NOT_EXPORTED);
-                  else if (Build.VERSION.SDK_INT >= 26)
-                      registerReceiver(rc, f, Context.RECEIVER_EXPORTED);
-                  else
-                      registerReceiver(rc, f);
+                  return result;
               }
-              @Override
-              protected void onDestroy() {
-                  super.onDestroy();
-                  unregisterReceiver(rc);
+
+              private void collectKmNumbers(View v, List<Float> out) {
+                  if (v == null) return;
+                  if (v instanceof TextView) {
+                      String text = ((TextView) v).getText().toString();
+                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
+                      Matcher m = p.matcher(text);
+                      if (m.find()) {
+                          try {
+                              float val = Float.parseFloat(m.group(1).replace(",", "."));
+                              if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
+                          } catch (Exception e) {}
+                      }
+                  } else if (v instanceof ViewGroup) {
+                      ViewGroup g = (ViewGroup) v;
+                      for (int i = 0; i < g.getChildCount(); i++) {
+                          collectKmNumbers(g.getChildAt(i), out);
+                      }
+                  }
+              }
+
+              private void showPopupAndNotification(Context ctx, float pickup, float drop) {
+                  // Popup (optional)
+                  try {
+                      Intent popupIntent = new Intent(ctx, PopupActivity.class);
+                      popupIntent.putExtra("pickup", pickup);
+                      popupIntent.putExtra("drop", drop);
+                      popupIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                      ctx.startActivity(popupIntent);
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + " Popup error: " + e.getMessage());
+                  }
+
+                  // Notification
+                  try {
+                      NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+                      if (android.os.Build.VERSION.SDK_INT >= 26) {
+                          android.app.NotificationChannel channel = new android.app.NotificationChannel("danish_channel", "Danish Auto", NotificationManager.IMPORTANCE_HIGH);
+                          nm.createNotificationChannel(channel);
+                      }
+                      Intent mainIntent = new Intent(ctx, SettingsActivity.class);
+                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, mainIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                      android.app.Notification.Builder builder;
+                      if (android.os.Build.VERSION.SDK_INT >= 26) {
+                          builder = new android.app.Notification.Builder(ctx, "danish_channel");
+                      } else {
+                          builder = new android.app.Notification.Builder(ctx);
+                      }
+                      builder.setContentTitle("✅ Order Accepted")
+                             .setContentText("Pickup: " + pickup + "km | Drop: " + drop + "km")
+                             .setSmallIcon(android.R.drawable.ic_dialog_info)
+                             .setContentIntent(pi)
+                             .setAutoCancel(true);
+                      nm.notify(1001, builder.build());
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + " Notification error: " + e.getMessage());
+                  }
               }
           }
           EOF
@@ -585,5 +535,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: RootAutoSwipe-Dev
+          name: Danish-Auto-Silent
           path: app/build/outputs/apk/debug/*.apk
