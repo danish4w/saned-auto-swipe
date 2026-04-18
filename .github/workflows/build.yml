@@ -13,6 +13,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
       - name: Download Xposed API jar
         run: |
           mkdir -p app/libs
@@ -73,7 +76,7 @@ jobs:
           }
           EOF
 
-          # Generate icon (blue circle with white "D")
+          # Generate icon
           convert -size 48x48 xc:none -fill "#1DB954" -draw "circle 24,24 24,14" -fill white -font "Arial" -pointsize 24 -gravity center -annotate 0 "D" app/src/main/res/mipmap-mdpi/ic_launcher.png
           convert -size 72x72 xc:none -fill "#1DB954" -draw "circle 36,36 36,20" -fill white -font "Arial" -pointsize 36 -gravity center -annotate 0 "D" app/src/main/res/mipmap-hdpi/ic_launcher.png
           convert -size 96x96 xc:none -fill "#1DB954" -draw "circle 48,48 48,28" -fill white -font "Arial" -pointsize 48 -gravity center -annotate 0 "D" app/src/main/res/mipmap-xhdpi/ic_launcher.png
@@ -121,7 +124,6 @@ jobs:
           EOF
 
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
@@ -184,7 +186,6 @@ jobs:
           EOF
 
           cat > app/src/main/res/layout/activity_popup.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="wrap_content"
@@ -320,17 +321,15 @@ jobs:
               private static SharedPreferences prefs;
               private static float pendingPickup = -1;
               private static float pendingDrop = -1;
-              private static ClassLoader classLoader;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
                   if (!lpparam.packageName.equals("net.jahez.fleets")) return;
-                  classLoader = lpparam.classLoader;
                   XposedBridge.log(TAG + " Hooked into Jahez");
 
-                  // 1. Hook notification receiver to capture distances
+                  // Hook notification receiver
                   try {
-                      Class<?> receiverClass = XposedHelpers.findClass("net.saned.notification.dispatch.DispatchStatusChangesReceiver", classLoader);
+                      Class<?> receiverClass = XposedHelpers.findClass("net.saned.notification.dispatch.DispatchStatusChangesReceiver", lpparam.classLoader);
                       XposedHelpers.findAndHookMethod(receiverClass, "onReceive", Context.class, Intent.class, new XC_MethodHook() {
                           @Override
                           protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
@@ -362,9 +361,9 @@ jobs:
                       XposedBridge.log(TAG + " Failed to hook receiver: " + e.getMessage());
                   }
 
-                  // 2. Hook the order activity's onCreate to call accept method before screen shows
+                  // Hook order activity
                   try {
-                      Class<?> orderActivity = XposedHelpers.findClass("net.jahez.fleets.dispatch.accept.IncomingDispatchActivity", classLoader);
+                      Class<?> orderActivity = XposedHelpers.findClass("net.jahez.fleets.dispatch.accept.IncomingDispatchActivity", lpparam.classLoader);
                       XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
                           @Override
                           protected void afterHookedMethod(MethodHookParam param) throws Throwable {
@@ -375,42 +374,33 @@ jobs:
                               float pickup = pendingPickup;
                               float drop = pendingDrop;
                               if (pickup < 0 || drop < 0) {
-                                  XposedBridge.log(TAG + " No notification data, scanning UI...");
                                   float[] ui = extractDistancesFromUI(act);
                                   pickup = ui[0];
                                   drop = ui[1];
-                              } else {
-                                  XposedBridge.log(TAG + " Using notification data");
                               }
-                              pendingPickup = -1; // reset
+                              pendingPickup = -1;
 
                               float pickupMax = prefs.getFloat("pickup_max", 1.5f);
                               float dropMax = prefs.getFloat("drop_max", 3.5f);
-                              XposedBridge.log(TAG + " 📊 Distances: P=" + pickup + " D=" + drop + " Limits: " + pickupMax + "/" + dropMax);
+                              XposedBridge.log(TAG + " 📊 P=" + pickup + " D=" + drop + " Limits: " + pickupMax + "/" + dropMax);
 
                               if (pickup > 0 && drop > 0 && pickup <= pickupMax && drop <= dropMax) {
                                   XposedBridge.log(TAG + " ✅ Accepting order silently...");
-                                  // Try to call internal accept method first
                                   boolean accepted = callAcceptMethod(act);
-                                  if (!accepted) {
-                                      XposedBridge.log(TAG + " Fallback: simulating click on Accept button");
-                                      simulateAcceptClick(act);
-                                  }
+                                  if (!accepted) simulateAcceptClick(act);
                                   showPopupAndNotification(act, pickup, drop);
                               } else {
-                                  XposedBridge.log(TAG + " ❌ Rejected (out of range)");
+                                  XposedBridge.log(TAG + " ❌ Rejected");
                               }
                           }
                       });
                   } catch (Exception e) {
-                      XposedBridge.log(TAG + " Failed to hook order activity: " + e.getMessage());
+                      XposedBridge.log(TAG + " Failed to hook activity: " + e.getMessage());
                   }
               }
 
               private boolean callAcceptMethod(Activity act) {
-                  // Try to find method named "acceptOrder", "onAcceptClick", "accept", etc.
-                  Method[] methods = act.getClass().getDeclaredMethods();
-                  for (Method m : methods) {
+                  for (Method m : act.getClass().getDeclaredMethods()) {
                       String name = m.getName().toLowerCase();
                       if (name.contains("accept") && !name.contains("reject")) {
                           try {
@@ -418,35 +408,26 @@ jobs:
                               m.invoke(act);
                               XposedBridge.log(TAG + " Called method: " + m.getName());
                               return true;
-                          } catch (Exception e) {
-                              XposedBridge.log(TAG + " Failed to call " + m.getName() + ": " + e.getMessage());
-                          }
+                          } catch (Exception e) {}
                       }
                   }
-                  // Also try to find click listener on accept button
                   return false;
               }
 
               private void simulateAcceptClick(Activity act) {
                   View root = act.getWindow().getDecorView();
-                  View acceptBtn = findAcceptButton(root);
-                  if (acceptBtn != null) {
-                      acceptBtn.performClick();
-                      XposedBridge.log(TAG + " Simulated click on Accept button");
-                  } else {
-                      XposedBridge.log(TAG + " Accept button not found");
-                  }
+                  View btn = findAcceptButton(root);
+                  if (btn != null) btn.performClick();
               }
 
               private View findAcceptButton(View v) {
                   if (v instanceof TextView) {
-                      String text = ((TextView) v).getText().toString();
-                      if (text.equalsIgnoreCase("Accept") || text.equals("قبول")) return v;
+                      String t = ((TextView) v).getText().toString();
+                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")) return v;
                   }
                   if (v instanceof ViewGroup) {
-                      ViewGroup g = (ViewGroup) v;
-                      for (int i = 0; i < g.getChildCount(); i++) {
-                          View found = findAcceptButton(g.getChildAt(i));
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
+                          View found = findAcceptButton(((ViewGroup) v).getChildAt(i));
                           if (found != null) return found;
                       }
                   }
@@ -454,77 +435,50 @@ jobs:
               }
 
               private float[] extractDistancesFromUI(Activity act) {
-                  float[] result = {-1, -1};
-                  try {
-                      View root = act.getWindow().getDecorView();
-                      List<Float> list = new ArrayList<>();
-                      collectKmNumbers(root, list);
-                      if (list.size() >= 2) {
-                          result[0] = list.get(0);
-                          result[1] = list.get(1);
-                      }
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + " UI scan error: " + e.getMessage());
-                  }
-                  return result;
+                  List<Float> list = new ArrayList<>();
+                  collectKmNumbers(act.getWindow().getDecorView(), list);
+                  if (list.size() >= 2) return new float[]{list.get(0), list.get(1)};
+                  return new float[]{-1, -1};
               }
 
               private void collectKmNumbers(View v, List<Float> out) {
-                  if (v == null) return;
                   if (v instanceof TextView) {
                       String text = ((TextView) v).getText().toString();
-                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
-                      Matcher m = p.matcher(text);
+                      Matcher m = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]").matcher(text);
                       if (m.find()) {
-                          try {
-                              float val = Float.parseFloat(m.group(1).replace(",", "."));
-                              if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
-                          } catch (Exception e) {}
+                          try { float val = Float.parseFloat(m.group(1)); if (val>0 && val<100 && !out.contains(val)) out.add(val); } catch(Exception e){}
                       }
                   } else if (v instanceof ViewGroup) {
-                      ViewGroup g = (ViewGroup) v;
-                      for (int i = 0; i < g.getChildCount(); i++) {
-                          collectKmNumbers(g.getChildAt(i), out);
-                      }
+                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) collectKmNumbers(((ViewGroup) v).getChildAt(i), out);
                   }
               }
 
-              private void showPopupAndNotification(Context ctx, float pickup, float drop) {
-                  // Popup (optional)
+              private void showPopupAndNotification(Context ctx, float p, float d) {
                   try {
-                      Intent popupIntent = new Intent(ctx, PopupActivity.class);
-                      popupIntent.putExtra("pickup", pickup);
-                      popupIntent.putExtra("drop", drop);
-                      popupIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                      ctx.startActivity(popupIntent);
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + " Popup error: " + e.getMessage());
-                  }
+                      Intent popup = new Intent(ctx, PopupActivity.class);
+                      popup.putExtra("pickup", p);
+                      popup.putExtra("drop", d);
+                      popup.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                      ctx.startActivity(popup);
+                  } catch (Exception e) {}
 
-                  // Notification
                   try {
                       NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
                       if (android.os.Build.VERSION.SDK_INT >= 26) {
-                          android.app.NotificationChannel channel = new android.app.NotificationChannel("danish_channel", "Danish Auto", NotificationManager.IMPORTANCE_HIGH);
-                          nm.createNotificationChannel(channel);
+                          nm.createNotificationChannel(new android.app.NotificationChannel("danish_channel", "Danish Auto", NotificationManager.IMPORTANCE_HIGH));
                       }
-                      Intent mainIntent = new Intent(ctx, SettingsActivity.class);
-                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, mainIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                      android.app.Notification.Builder builder;
-                      if (android.os.Build.VERSION.SDK_INT >= 26) {
-                          builder = new android.app.Notification.Builder(ctx, "danish_channel");
-                      } else {
-                          builder = new android.app.Notification.Builder(ctx);
-                      }
+                      Intent main = new Intent(ctx, SettingsActivity.class);
+                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, main, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                      android.app.Notification.Builder builder = android.os.Build.VERSION.SDK_INT >= 26
+                              ? new android.app.Notification.Builder(ctx, "danish_channel")
+                              : new android.app.Notification.Builder(ctx);
                       builder.setContentTitle("✅ Order Accepted")
-                             .setContentText("Pickup: " + pickup + "km | Drop: " + drop + "km")
+                             .setContentText("Pickup: " + p + "km | Drop: " + d + "km")
                              .setSmallIcon(android.R.drawable.ic_dialog_info)
                              .setContentIntent(pi)
                              .setAutoCancel(true);
                       nm.notify(1001, builder.build());
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + " Notification error: " + e.getMessage());
-                  }
+                  } catch (Exception e) {}
               }
           }
           EOF
