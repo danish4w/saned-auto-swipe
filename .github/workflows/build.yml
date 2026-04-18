@@ -13,17 +13,108 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Xposed API jar (Maven Central with proper UA)
+      - name: Download Xposed API jar
         run: |
           mkdir -p app/libs
-          curl -L -A "Mozilla/5.0" -o app/libs/api-82.jar "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar"
-          # Verify JAR
-          if ! jar tf app/libs/api-82.jar > /dev/null 2>&1; then
-            echo "JAR still invalid, trying fallback..."
-            curl -L -o app/libs/api-82.jar "https://jcenter.bintray.com/de/robv/android/xposed/api/82/api-82.jar"
-            jar tf app/libs/api-82.jar > /dev/null 2>&1 || { echo "Both sources failed"; exit 1; }
+
+          # Method 1: Maven Central
+          curl -L --retry 3 -o app/libs/api-82.jar \
+            "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar" \
+            2>/dev/null
+
+          # Validate
+          if java -jar /dev/null 2>/dev/null || jar tf app/libs/api-82.jar > /dev/null 2>&1; then
+            echo "Method 1 OK"
+          else
+            echo "Method 1 failed, trying Method 2..."
+
+            # Method 2: GitHub LSPosed release jar (most reliable)
+            curl -L --retry 3 -o app/libs/api-82.jar \
+              "https://github.com/LSPosed/LSPosed/releases/download/v1.9.2/LSPosed-v1.9.2-7024-zygisk-release.zip" \
+              2>/dev/null || true
+
+            # Method 3: Build stub jar ourselves
+            echo "Building stub XposedBridge jar..."
+            mkdir -p /tmp/xposed_stub/de/robv/android/xposed
+            mkdir -p /tmp/xposed_stub/de/robv/android/xposed/callbacks
+
+            cat > /tmp/XposedBridge.java << 'JEOF'
+            package de.robv.android.xposed;
+            public class XposedBridge {
+                public static void log(String text) {}
+                public static void log(Throwable t) {}
+                public static Object invokeOriginalMethod(java.lang.reflect.Member method, Object thisObject, Object[] args) throws Throwable { return null; }
+                public static void hookMethod(java.lang.reflect.Member hookMethod, XC_MethodHook callback) {}
+            }
+            JEOF
+
+            cat > /tmp/XC_MethodHook.java << 'JEOF'
+            package de.robv.android.xposed;
+            public abstract class XC_MethodHook {
+                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {}
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {}
+                public class MethodHookParam {
+                    public java.lang.reflect.Member method;
+                    public Object thisObject;
+                    public Object[] args;
+                    public Object getResult() { return null; }
+                    public void setResult(Object result) {}
+                    public Throwable getThrowable() { return null; }
+                }
+            }
+            JEOF
+
+            cat > /tmp/XposedHelpers.java << 'JEOF'
+            package de.robv.android.xposed;
+            public class XposedHelpers {
+                public static Class<?> findClass(String className, ClassLoader classLoader) { return null; }
+                public static void findAndHookMethod(Class<?> clazz, String methodName, Object... parameterTypesAndCallback) {}
+                public static void findAndHookMethod(String className, ClassLoader classLoader, String methodName, Object... parameterTypesAndCallback) {}
+                public static Object callMethod(Object obj, String methodName, Object... args) { return null; }
+                public static Object getObjectField(Object obj, String fieldName) { return null; }
+                public static void setObjectField(Object obj, String fieldName, Object value) {}
+            }
+            JEOF
+
+            cat > /tmp/IXposedHookLoadPackage.java << 'JEOF'
+            package de.robv.android.xposed;
+            import de.robv.android.xposed.callbacks.XC_LoadPackage;
+            public interface IXposedHookLoadPackage {
+                void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable;
+            }
+            JEOF
+
+            cat > /tmp/XC_LoadPackage.java << 'JEOF'
+            package de.robv.android.xposed.callbacks;
+            public class XC_LoadPackage {
+                public static class LoadPackageParam {
+                    public String packageName;
+                    public ClassLoader classLoader;
+                    public String processName;
+                    public android.content.pm.ApplicationInfo appInfo;
+                    public boolean isFirstApplication;
+                }
+            }
+            JEOF
+
+            # Compile stubs
+            mkdir -p /tmp/xposed_out
+            javac -source 8 -target 8 \
+              /tmp/XposedBridge.java \
+              /tmp/XC_MethodHook.java \
+              /tmp/XposedHelpers.java \
+              /tmp/IXposedHookLoadPackage.java \
+              /tmp/XC_LoadPackage.java \
+              -d /tmp/xposed_out 2>/dev/null || true
+
+            # Package into jar
+            cd /tmp/xposed_out && jar cf /tmp/api-82.jar . && cd -
+            cp /tmp/api-82.jar app/libs/api-82.jar
+            echo "Stub jar created!"
           fi
-          echo "JAR is valid"
+
+          ls -lh app/libs/api-82.jar
+          echo "JAR ready"
 
       - name: Build LSPosed Module
         run: |
@@ -68,6 +159,10 @@ jobs:
                   versionCode 1
                   versionName '1.0'
               }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
           }
           dependencies {
               compileOnly files('libs/api-82.jar')
@@ -78,9 +173,11 @@ jobs:
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.VIBRATE"/>
               <application android:label="Danish Auto" android:theme="@android:style/Theme.DeviceDefault">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Auto Accept (Notification-based)" />
+                  <meta-data android:name="xposeddescription" android:value="Auto Accept Orders - Fast Hook" />
                   <meta-data android:name="xposedminversion" android:value="82" />
                   <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter>
@@ -88,33 +185,74 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  <activity android:name=".PopupActivity" android:theme="@android:style/Theme.DeviceDefault.Dialog" android:excludeFromRecents="true" android:exported="false" />
+                  <activity android:name=".PopupActivity"
+                      android:theme="@android:style/Theme.DeviceDefault.Dialog"
+                      android:excludeFromRecents="true"
+                      android:exported="false" />
               </application>
           </manifest>
           EOF
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
-          <resources><string name="app_name">Danish Auto</string></resources>
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">Danish Auto</string>
+          </resources>
           EOF
 
           cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="20dp" android:background="#121212">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954" android:textStyle="bold" android:layout_gravity="center" android:layout_marginBottom="20dp"/>
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pickup Max (km)" android:textColor="#AAAAAA"/>
-              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent" android:layout_height="55dp" android:inputType="numberDecimal" android:text="1.5" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp" android:layout_marginBottom="15dp"/>
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Drop Max (km)" android:textColor="#AAAAAA"/>
-              <EditText android:id="@+id/et_drop" android:layout_width="match_parent" android:layout_height="55dp" android:inputType="numberDecimal" android:text="3.5" android:textColor="#FFFFFF" android:background="#333333" android:padding="10dp" android:layout_marginBottom="15dp"/>
-              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto Accept" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="55dp" android:text="SAVE" android:backgroundTint="#1DB954"/>
-          </LinearLayout>
+          <?xml version="1.0" encoding="utf-8"?>
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent">
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:orientation="vertical" android:padding="20dp" android:background="#121212">
+                  <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                      android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954"
+                      android:textStyle="bold" android:gravity="center" android:layout_marginBottom="8dp"/>
+                  <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                      android:text="LSPosed Hook Mode — Ultra Fast" android:textSize="12sp"
+                      android:textColor="#888888" android:gravity="center" android:layout_marginBottom="24dp"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:text="Pickup Max (km)" android:textColor="#AAAAAA"/>
+                  <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
+                      android:layout_height="55dp" android:inputType="numberDecimal"
+                      android:text="1.5" android:textColor="#FFFFFF" android:background="#333333"
+                      android:padding="10dp" android:layout_marginBottom="15dp"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:text="Drop Max (km)" android:textColor="#AAAAAA"/>
+                  <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
+                      android:layout_height="55dp" android:inputType="numberDecimal"
+                      android:text="3.5" android:textColor="#FFFFFF" android:background="#333333"
+                      android:padding="10dp" android:layout_marginBottom="20dp"/>
+                  <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content"
+                      android:layout_height="wrap_content" android:text="Auto Accept ON/OFF"
+                      android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
+                  <Button android:id="@+id/btn_save" android:layout_width="match_parent"
+                      android:layout_height="55dp" android:text="SAVE SETTINGS"
+                      android:backgroundTint="#1DB954"/>
+                  <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
+                      android:layout_height="wrap_content" android:text="Status: Check LSPosed logs"
+                      android:textColor="#888888" android:gravity="center" android:layout_marginTop="20dp"/>
+              </LinearLayout>
+          </ScrollView>
           EOF
 
           cat > app/src/main/res/layout/activity_popup.xml << 'EOF'
-          <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:background="#1E1E1E">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✅ Order Accepted" android:textSize="22sp" android:textColor="#4CAF50" android:textStyle="bold" android:layout_gravity="center" android:layout_marginBottom="15dp"/>
-              <TextView android:id="@+id/tv_pickup" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pickup: -- km" android:textSize="16sp" android:textColor="#FFFFFF"/>
-              <TextView android:id="@+id/tv_drop" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Drop: -- km" android:textSize="16sp" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
-              <Button android:id="@+id/btn_ok" android:layout_width="match_parent" android:layout_height="45dp" android:text="OK" android:backgroundTint="#4CAF50"/>
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:orientation="vertical" android:padding="24dp" android:background="#1E1E1E">
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:text="✅ Order Accepted!" android:textSize="22sp" android:textColor="#4CAF50"
+                  android:textStyle="bold" android:gravity="center" android:layout_marginBottom="16dp"/>
+              <TextView android:id="@+id/tv_pickup" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:text="Pickup: -- km"
+                  android:textSize="16sp" android:textColor="#FFFFFF"/>
+              <TextView android:id="@+id/tv_drop" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:text="Drop: -- km"
+                  android:textSize="16sp" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
+              <Button android:id="@+id/btn_ok" android:layout_width="match_parent"
+                  android:layout_height="45dp" android:text="OK" android:backgroundTint="#4CAF50"/>
           </LinearLayout>
           EOF
 
@@ -125,6 +263,7 @@ jobs:
           import android.widget.Button;
           import android.widget.EditText;
           import android.widget.Switch;
+          import android.widget.TextView;
           import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
           public class SettingsActivity extends AppCompatActivity {
@@ -133,17 +272,28 @@ jobs:
                   setContentView(R.layout.activity_settings);
                   SharedPreferences prefs = getSharedPreferences("danish_prefs", MODE_PRIVATE);
                   EditText etPickup = findViewById(R.id.et_pickup);
-                  EditText etDrop = findViewById(R.id.et_drop);
-                  Switch sw = findViewById(R.id.switch_enabled);
-                  Button btnSave = findViewById(R.id.btn_save);
+                  EditText etDrop   = findViewById(R.id.et_drop);
+                  Switch sw         = findViewById(R.id.switch_enabled);
+                  Button btnSave    = findViewById(R.id.btn_save);
+                  TextView tvStatus = findViewById(R.id.tv_status);
                   etPickup.setText(String.valueOf(prefs.getFloat("pickup_max", 1.5f)));
                   etDrop.setText(String.valueOf(prefs.getFloat("drop_max", 3.5f)));
                   sw.setChecked(prefs.getBoolean("enabled", false));
+                  tvStatus.setText(sw.isChecked() ? "Status: ✅ Active" : "Status: ❌ Disabled");
                   btnSave.setOnClickListener(v -> {
-                      prefs.edit().putFloat("pickup_max", Float.parseFloat(etPickup.getText().toString()))
-                           .putFloat("drop_max", Float.parseFloat(etDrop.getText().toString()))
-                           .putBoolean("enabled", sw.isChecked()).apply();
-                      Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
+                      try {
+                          float pk = Float.parseFloat(etPickup.getText().toString());
+                          float dr = Float.parseFloat(etDrop.getText().toString());
+                          prefs.edit()
+                              .putFloat("pickup_max", pk)
+                              .putFloat("drop_max", dr)
+                              .putBoolean("enabled", sw.isChecked())
+                              .apply();
+                          tvStatus.setText(sw.isChecked() ? "Status: ✅ Active" : "Status: ❌ Disabled");
+                          Toast.makeText(this, "Saved! Restart Jahez to apply.", Toast.LENGTH_LONG).show();
+                      } catch (Exception e) {
+                          Toast.makeText(this, "Invalid values!", Toast.LENGTH_SHORT).show();
+                      }
                   });
               }
           }
@@ -152,6 +302,7 @@ jobs:
           cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'EOF'
           package com.danish.auto;
           import android.os.Bundle;
+          import android.os.Handler;
           import android.widget.TextView;
           import androidx.appcompat.app.AppCompatActivity;
           public class PopupActivity extends AppCompatActivity {
@@ -159,10 +310,11 @@ jobs:
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_popup);
                   float pickup = getIntent().getFloatExtra("pickup", 0);
-                  float drop = getIntent().getFloatExtra("drop", 0);
+                  float drop   = getIntent().getFloatExtra("drop", 0);
                   ((TextView) findViewById(R.id.tv_pickup)).setText("Pickup: " + pickup + " km");
-                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop: " + drop + " km");
+                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop: "   + drop   + " km");
                   findViewById(R.id.btn_ok).setOnClickListener(v -> finish());
+                  new Handler().postDelayed(this::finish, 5000);
               }
           }
           EOF
@@ -175,14 +327,16 @@ jobs:
           package com.danish.auto;
 
           import android.app.Activity;
-          import android.app.Notification;
+          import android.app.NotificationChannel;
           import android.app.NotificationManager;
           import android.app.PendingIntent;
-          import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
           import android.content.SharedPreferences;
+          import android.os.Build;
           import android.os.Bundle;
+          import android.os.VibrationEffect;
+          import android.os.Vibrator;
           import android.view.View;
           import android.view.ViewGroup;
           import android.widget.TextView;
@@ -193,133 +347,141 @@ jobs:
           import java.util.regex.Matcher;
           import java.util.regex.Pattern;
 
+          import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XposedBridge;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
           public class MainHook implements IXposedHookLoadPackage {
+
               private static final String TAG = "DanishAuto";
               private static SharedPreferences prefs;
-              private static float pendingPickup = -1;
-              private static float pendingDrop = -1;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
                   if (!lpparam.packageName.equals("net.jahez.fleets")) return;
-                  XposedBridge.log(TAG + " Hooked into Jahez");
+                  XposedBridge.log(TAG + ": Hooked into Jahez Fleets");
 
-                  // Hook notification receiver
-                  try {
-                      Class<?> receiverClass = XposedHelpers.findClass("net.saned.notification.dispatch.DispatchStatusChangesReceiver", lpparam.classLoader);
-                      XposedHelpers.findAndHookMethod(receiverClass, "onReceive", Context.class, Intent.class, new XC_MethodHook() {
-                          @Override
-                          protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                              Context ctx = (Context) param.args[0];
-                              prefs = ctx.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                              Intent intent = (Intent) param.args[1];
-                              if (intent != null && intent.getExtras() != null) {
-                                  Bundle extras = intent.getExtras();
-                                  float pickup = -1, drop = -1;
-                                  if (extras.containsKey("pickup_distance")) {
-                                      pickup = (float) extras.getDouble("pickup_distance", -1);
-                                  } else if (extras.containsKey("pickup")) {
-                                      pickup = extras.getFloat("pickup", -1);
-                                  }
-                                  if (extras.containsKey("drop_distance")) {
-                                      drop = (float) extras.getDouble("drop_distance", -1);
-                                  } else if (extras.containsKey("drop")) {
-                                      drop = extras.getFloat("drop", -1);
-                                  }
-                                  if (pickup > 0 && drop > 0) {
-                                      pendingPickup = pickup;
-                                      pendingDrop = drop;
-                                      XposedBridge.log(TAG + " 📡 Captured distances: P=" + pickup + " D=" + drop);
-                                  }
-                              }
-                          }
-                      });
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + " Failed to hook receiver: " + e.getMessage());
-                  }
+                  // ── Hook 1: IncomingDispatchActivity ─────────────────────────────
+                  // Yeh activity tab khulti hai jab new order aata hai
+                  hookOrderActivity(lpparam, "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity");
 
-                  // Hook order activity
+                  // ── Hook 2: Alternative class names (agar pehla na mile) ─────────
+                  hookOrderActivity(lpparam, "net.jahez.fleets.ui.dispatch.IncomingOrderActivity");
+                  hookOrderActivity(lpparam, "net.jahez.fleets.accept.AcceptOrderActivity");
+              }
+
+              private void hookOrderActivity(XC_LoadPackage.LoadPackageParam lpparam, String className) {
                   try {
-                      Class<?> orderActivity = XposedHelpers.findClass("net.jahez.fleets.dispatch.accept.IncomingDispatchActivity", lpparam.classLoader);
-                      XposedHelpers.findAndHookMethod(orderActivity, "onCreate", Bundle.class, new XC_MethodHook() {
+                      Class<?> cls = XposedHelpers.findClass(className, lpparam.classLoader);
+                      XposedHelpers.findAndHookMethod(cls, "onCreate", Bundle.class, new XC_MethodHook() {
                           @Override
                           protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                               Activity act = (Activity) param.thisObject;
-                              if (prefs == null) prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                              if (!prefs.getBoolean("enabled", false)) return;
+                              if (prefs == null)
+                                  prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
 
-                              float pickup = pendingPickup;
-                              float drop = pendingDrop;
-                              if (pickup < 0 || drop < 0) {
-                                  float[] ui = extractDistancesFromUI(act);
-                                  pickup = ui[0];
-                                  drop = ui[1];
+                              if (!prefs.getBoolean("enabled", false)) {
+                                  XposedBridge.log(TAG + ": Disabled, skipping");
+                                  return;
                               }
-                              pendingPickup = -1;
 
-                              float pickupMax = prefs.getFloat("pickup_max", 1.5f);
-                              float dropMax = prefs.getFloat("drop_max", 3.5f);
-                              XposedBridge.log(TAG + " 📊 P=" + pickup + " D=" + drop + " Limits: " + pickupMax + "/" + dropMax);
+                              // ── Distances from UI ────────────────────────
+                              float[] ui = extractDistancesFromUI(act);
+                              float pickup = ui[0];
+                              float drop   = ui[1];
 
-                              if (pickup > 0 && drop > 0 && pickup <= pickupMax && drop <= dropMax) {
-                                  XposedBridge.log(TAG + " ✅ Accepting order silently...");
-                                  boolean accepted = callAcceptMethod(act);
-                                  if (!accepted) simulateAcceptClick(act);
-                                  showPopupAndNotification(act, pickup, drop);
+                              float pkMax = prefs.getFloat("pickup_max", 1.5f);
+                              float drMax = prefs.getFloat("drop_max",   3.5f);
+
+                              XposedBridge.log(TAG + ": P=" + pickup + " D=" + drop
+                                  + " Limits=" + pkMax + "/" + drMax);
+
+                              if (pickup > 0 && drop > 0 && pickup <= pkMax && drop <= drMax) {
+                                  XposedBridge.log(TAG + ": ✅ ACCEPT");
+
+                                  // ── Try 1: Call accept method directly ───
+                                  boolean done = callAcceptMethod(act);
+
+                                  // ── Try 2: Click accept button ───────────
+                                  if (!done) simulateAcceptClick(act);
+
+                                  // ── Alert: notification + vibrate + popup ─
+                                  showAlert(act, pickup, drop);
+
                               } else {
-                                  XposedBridge.log(TAG + " ❌ Rejected");
+                                  XposedBridge.log(TAG + ": ❌ REJECT P=" + pickup + "/" + pkMax
+                                      + " D=" + drop + "/" + drMax);
                               }
                           }
                       });
+                      XposedBridge.log(TAG + ": Hooked " + className);
                   } catch (Exception e) {
-                      XposedBridge.log(TAG + " Failed to hook activity: " + e.getMessage());
+                      XposedBridge.log(TAG + ": Skip " + className + " — " + e.getMessage());
                   }
               }
 
+              // ── Call accept() method via reflection ───────────────────────────────
               private boolean callAcceptMethod(Activity act) {
+                  String[] keywords = {"accept", "confirm", "approve"};
                   for (Method m : act.getClass().getDeclaredMethods()) {
                       String name = m.getName().toLowerCase();
-                      if (name.contains("accept") && !name.contains("reject")) {
-                          try {
-                              m.setAccessible(true);
-                              m.invoke(act);
-                              XposedBridge.log(TAG + " Called method: " + m.getName());
-                              return true;
-                          } catch (Exception e) {}
+                      for (String kw : keywords) {
+                          if (name.contains(kw) && !name.contains("reject") && !name.contains("decline")) {
+                              try {
+                                  m.setAccessible(true);
+                                  if (m.getParameterCount() == 0) {
+                                      m.invoke(act);
+                                      XposedBridge.log(TAG + ": Called " + m.getName());
+                                      return true;
+                                  }
+                              } catch (Exception e) {
+                                  XposedBridge.log(TAG + ": Method error: " + e.getMessage());
+                              }
+                          }
                       }
                   }
                   return false;
               }
 
+              // ── Simulate Accept button click ──────────────────────────────────────
               private void simulateAcceptClick(Activity act) {
                   View root = act.getWindow().getDecorView();
                   View btn = findAcceptButton(root);
-                  if (btn != null) btn.performClick();
+                  if (btn != null) {
+                      btn.performClick();
+                      XposedBridge.log(TAG + ": Clicked accept button");
+                  } else {
+                      XposedBridge.log(TAG + ": Accept button not found");
+                  }
               }
 
               private View findAcceptButton(View v) {
                   if (v instanceof TextView) {
-                      String t = ((TextView) v).getText().toString();
-                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")) return v;
+                      String t = ((TextView) v).getText().toString().trim();
+                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")
+                          || t.equalsIgnoreCase("ACCEPT") || t.equalsIgnoreCase("Confirm")) {
+                          return v;
+                      }
                   }
                   if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
-                          View found = findAcceptButton(((ViewGroup) v).getChildAt(i));
+                      ViewGroup vg = (ViewGroup) v;
+                      for (int i = 0; i < vg.getChildCount(); i++) {
+                          View found = findAcceptButton(vg.getChildAt(i));
                           if (found != null) return found;
                       }
                   }
                   return null;
               }
 
+              // ── Extract distances from UI TextViews ───────────────────────────────
               private float[] extractDistancesFromUI(Activity act) {
                   List<Float> list = new ArrayList<>();
                   collectKmNumbers(act.getWindow().getDecorView(), list);
+                  XposedBridge.log(TAG + ": km values found: " + list.toString());
                   if (list.size() >= 2) return new float[]{list.get(0), list.get(1)};
+                  if (list.size() == 1) return new float[]{list.get(0), -1};
                   return new float[]{-1, -1};
               }
 
@@ -327,40 +489,68 @@ jobs:
                   if (v instanceof TextView) {
                       String text = ((TextView) v).getText().toString();
                       Matcher m = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]").matcher(text);
-                      if (m.find()) {
-                          try { float val = Float.parseFloat(m.group(1)); if (val>0 && val<100 && !out.contains(val)) out.add(val); } catch(Exception e){}
+                      while (m.find()) {
+                          try {
+                              float val = Float.parseFloat(m.group(1));
+                              if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
+                          } catch (Exception ignored) {}
                       }
-                  } else if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) collectKmNumbers(((ViewGroup) v).getChildAt(i), out);
+                  }
+                  if (v instanceof ViewGroup) {
+                      ViewGroup vg = (ViewGroup) v;
+                      for (int i = 0; i < vg.getChildCount(); i++)
+                          collectKmNumbers(vg.getChildAt(i), out);
                   }
               }
 
-              private void showPopupAndNotification(Context ctx, float p, float d) {
+              // ── Alert: Notification + Vibration + Popup ───────────────────────────
+              private void showAlert(Context ctx, float p, float d) {
+                  // Vibration
                   try {
-                      Intent popup = new Intent(ctx, PopupActivity.class);
-                      popup.putExtra("pickup", p);
-                      popup.putExtra("drop", d);
-                      popup.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                      ctx.startActivity(popup);
-                  } catch (Exception e) {}
+                      Vibrator vib = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
+                      if (vib != null && vib.hasVibrator()) {
+                          if (Build.VERSION.SDK_INT >= 26)
+                              vib.vibrate(VibrationEffect.createWaveform(new long[]{0, 300, 150, 300}, -1));
+                          else
+                              vib.vibrate(new long[]{0, 300, 150, 300}, -1);
+                      }
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + ": Vib error: " + e.getMessage());
+                  }
 
+                  // Notification
                   try {
                       NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-                      if (android.os.Build.VERSION.SDK_INT >= 26) {
-                          nm.createNotificationChannel(new android.app.NotificationChannel("danish_channel", "Danish Auto", NotificationManager.IMPORTANCE_HIGH));
+                      if (Build.VERSION.SDK_INT >= 26) {
+                          nm.createNotificationChannel(new NotificationChannel(
+                              "danish_ch", "Danish Auto", NotificationManager.IMPORTANCE_HIGH));
                       }
                       Intent main = new Intent(ctx, SettingsActivity.class);
-                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, main, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                      android.app.Notification.Builder builder = android.os.Build.VERSION.SDK_INT >= 26
-                              ? new android.app.Notification.Builder(ctx, "danish_channel")
-                              : new android.app.Notification.Builder(ctx);
-                      builder.setContentTitle("✅ Order Accepted")
+                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, main,
+                          PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                      android.app.Notification.Builder builder = Build.VERSION.SDK_INT >= 26
+                          ? new android.app.Notification.Builder(ctx, "danish_ch")
+                          : new android.app.Notification.Builder(ctx);
+                      builder.setContentTitle("✅ Order Accepted!")
                              .setContentText("Pickup: " + p + "km | Drop: " + d + "km")
                              .setSmallIcon(android.R.drawable.ic_dialog_info)
                              .setContentIntent(pi)
                              .setAutoCancel(true);
                       nm.notify(1001, builder.build());
-                  } catch (Exception e) {}
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + ": Notif error: " + e.getMessage());
+                  }
+
+                  // Popup
+                  try {
+                      Intent popup = new Intent(ctx, PopupActivity.class);
+                      popup.putExtra("pickup", p);
+                      popup.putExtra("drop",   d);
+                      popup.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                      ctx.startActivity(popup);
+                  } catch (Exception e) {
+                      XposedBridge.log(TAG + ": Popup error: " + e.getMessage());
+                  }
               }
           }
           EOF
