@@ -13,18 +13,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Prepare Xposed API JAR
-        run: |
-          mkdir -p app/libs
-          echo "UEsDBAoAAAgAAI+wklwAAAAAAAAAAAAAAAAJAAQATUVUQS1JTkYv/soAAFBLAwQUAAgICACPsJJcAAAAAAAAAAAAAAAAFAAAAE1FVEEtSU5GL01BTklGRVNULk1G803My0xLLS7RDUstKs7Mz7NSMNQz4OVyLkpNLElN0XWqtFIwAoroGRooaIQmleaVlGrycvFyAQBQSwcIS/xSPDgAAAA3AAAAUEsDBAoAAAgAAI+wklwAAAAAAAAAAAAAAAADAAAAZGUvUEsDBAoAAAgAAI+wklwAAAAAAAAAAAAAAAAIAAAAZGUvcm9idi9QSwMECgAACAAAj7CSXAAAAAAAAAAAAAAAABAAAABkZS9yb2J2L2FuZHJvaWQvUEsDBAoAAAgAAI+wklwAAAAAAAAAAAAAAAAXAAAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9QSwMEFAAICAgAj7CSXAAAAAAAAAAAAAAAADMAAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL0lYcG9zZWRIb29rTG9hZFBhY2thZ2UuY2xhc3OlULFKA0EQfXPGrDmjJlraWmih29jZCCFiIGBAkXQyt7ckl6y7YS/GfJuFH+BHiXM2HqKFOM2bN8x7b5i395dXAOfYV0gIp7nVMWQrzT6Pocj1ehFKm+vB+BOvQ5gPA+cjNnOeWIUGoTPjFWvHfqJvspk1S0J3KnJna5uE/vHwF2/DzmWyVupx76GmOar1I478eHFyT0j7a2MXyyL4UqFFOPiKv5vG8MyZk7T0NjxFY6+Kihz+fP1ZpSS0B97b2HNcllYsdwmX/z1UoUPQf3SRT373aRIIG6iK5NObaApXwhqCW0iQSp9gG23BVGY72EMXrQ9QSwcIMMoN5fMAAADVAQAAUEsDBBQACAgIAI+wklwAAAAAAAAAAAAAAAA6AAAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9YQ19NZXRob2RIb29rJE1ldGhvZEhvb2tQYXJhbS5jbGFzc42Sz27TQBDGv03SpHYMmLSltPyHtEqKhDn0VsQlEgIpBQQVQnBAm3pJ3DreatcpHHkgDnBASBx4AB4K8a0jCDWVyGVmd/Y338yO5sfPb98BbGPDQwXVBmoBFlAX2I5VZPTgOJJZbHQSR++PtFVx9LL3ZlflIx0/1PqwPTs+lUaOBer5KLHtuwKb/XkEdnwswmvAD9BEIBAeyGMZpTIbRk8GB2o/p+K9JEvy+wLVTvcFr+MiWWC9P2ONepsSjnbVeKDMjoDv2vit0OqXVUnUpBlagaXXpz12O/N17xqq9XSsBM71k0w9nrj6e3KQMhJOwWIwKleG1byhyp8pO0nZ1XKne1ppz86Qlc6/hCsZUGZvZPS7aaHVE0p/HigWjKT9C+QEX3E2z/XE7KsHiQu1TnzojpNh2qMsU6aXSmuVbeCWQHuecXAIpX3ADS7VIverBoEzOMsTIYSFP48WEIZu3XhfYKSJJfLLvN2kr9D7W7e/QGx9ReNzkbNCW6d3/AVnefwQMrCKi7QudZ3eARXxqZTi0a4V745bc4wjyso+7SVc/q9ck/YKrpa56scSF7DMtaLYdc5jql/hD9sQvwBQSwcID+4yK70BAAB+AwAAUEsDBBQACAgIAI+wklwAAAAAAAAAAAAAAAAqAAAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9YQ19NZXRob2RIb29rLmNsYXNznVC7TsNAEJyNnRhMIC8eoqBASpFQ4CYNAtFEIJDCQyKK6NA5dyEOiS86OyG/RYVEwQfwUYi1U0CgAOFiZm80uzvet/eXVwANbLnIwHJg55FFjlAciKnwhiK89678gerGhNxREAbxMcGq1TsOlghVqTyj/aknQml0IL3ZWEdKerfNuwsV97U80/qBYDe1VIRCKwjV5WTkK9MW/pCVsq962qjEpeS8g3BQa/1lbPWzvBZGjA7rHYJ7MuuqcRzoMHJQIFQ+/6LdN/pxvrYkerEyi1vdGz0xXXUapLkWNu0nQwj58zBUpjkUUaR4+gah8Z+cfIdvir0Lh4+ffBYoOT/jMr92mIk5u/cMeuKCYzLmUjEDGyvIMyfW7VTBT5uFVUab6zXG4u8N9peGDEqprYwKs8vaOkfdBH0AUEsHCNhAD6Y4AQAANwIAAFBLAwQUAAgICACPsJJcAAAAAAAAAAAAAAAAKQAAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvWHBvc2VkQnJpZGdlLmNsYXNzhU8xTgMxEJyNL3cQAgkFEhQUiCahwA0dEQVIVBEUiSJaX2wdjg4bmUvgW1RIFDyARyHWFhKRKHAxs56dndV+fr1/ADhDv4MWRIGsizZyQn+hVkrWylXytlyYeUPIR9bZ5oIgBsNZgQ3CsTYy+HIlldPBWy1fHv2T0fIu0WWwujKE7Mprpt7YOnOzfChNmKqyZkXUviLsDca/uyZNsK46H84I++v69D745ziVWp2JX4a5ubYxZXd922kcwREKviY+AYr3MG7y75CZmNsnb6BXLjiKMU9iiy1b6P5YD1IXf20i2bb/s2WMOym19w1QSwcIt3ncgewAAABkAQAAUEsDBBQACAgIAI+wklwAAAAAAAAAAAAAAAAqAAAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9YcG9zZWRIZWxwZXJzLmNsYXNzpZPLSsNAFIb/6S3We71XcSG4aF2YjQulpSKCCFZFKiK4mnbGOhozJU3FV/BtdCW48AF8KPFkrFqTCAGzmJM555/v/Cdk3t5fXgFsYGkYKaQtZEaRRY5h8prfcdvhbts+bl7Lls+QqypX+TWGdKl8ZmGIYVVI29PNO5u7wtNK2Pcd3ZXCPjdhXzod6XUZMrtaSIaJunLlUe+2Kb1T3nQok79Urth1eJdE1VL9p2XD95TbrgxkjKquuZBepRzOVwjVUG2X+z2PsNv/QFXXakQrBMZ2XLGv9c2h9K+0YNgqRdpG21zUw9+tUj4LDffdJ/Hxk+QDJWYOt7jjfM12UIqKkpGiKYbxtvQ/N3tKOoTfTISPZ3VDrK1ErD9mbuie15J7Kvj5pn79pevBAazAomsQPBZYcBFozdNumSKjmF17BnuiF2LRmjPJFElGMGoisEi5AJFijyFdGmNGPY4HTGCyry+aCqLYTF9eMPKpvpOiqcTIsySbxkxfFrhIx7rIUX0WcwO6eLcW1eexMNA21uUQrUXjc/EDUEsHCMapILSVAQAATAQAAFBLAwQKAAAIAACPsJJcAAAAAAAAAAAAAAAAIQAAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvY2FsbGJhY2tzL1BLAwQUAAgICACPsJJcAAAAAAAAAAAAAAAARgAAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvY2FsbGJhY2tzL1hDX0xvYWRQYWNrYWdlJExvYWRQYWNrYWdlUGFyYW0uY2xhc3OVUbtKA0EUPTevNZtoYqLGxkKwUItMY6eIEggIIQYiIjYyuzuEiZuZZWYT/C0rwcIP8KPE2Y2QaGdzzz33PWc+v94/AJxh30cBRQ+lOsqoEJpTvuAs5mrCboOpCFNC5UIqmV4Siscn9x42CFeRYEYHC8ZVZLSM2EuirYhYyOM44OGzZQ+9p4Hm0cgRPhFHa/6IGz4j1JIlHfKZILQGq7Xj1Eg1Oc9KjA6FtcuSWhhza7NBwhA6aw29VcJ1taTtS2PT6ySJZchTqRWBHgmlno7cnMZAKjGczwJh7ngQu4g/1nMTir7MSPv35d1sDaF+o5Qw+SJhPewR2D8lcMr+FQGH8Jz4QAmEKnznuWf+YB2bOW6hkSNl3+Ns07GDnAPl0zfQa57edraSB4tuZMthAW3sOPRd1MMuOqh+A1BLBwgXTDZNOgEAAPUBAABQSwMEFAAICAgAj7CSXAAAAAAAAAAAAAAAADUAAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL2NhbGxiYWNrcy9YQ19Mb2FkUGFja2FnZS5jbGFzc5VQTUsDMRB96ceuXVdb8exB8KAezMWjiLAgFIoWFPEmk00oqWkiSVv8W54ED/4Af5R0dk/qzQzMm/eG+ch8fX98AjjHXoEOujl6JfrIBEZzWpN05GfyVs1NvRTILqy3y0uB7vHJQ44tAamNjEGtJXkdg9Xy9SUko2VNzimqn5N8rJ4mgfSUCc2MQK8KmmE4sd7crBbKxHtSjpXiLqxiba5tQ/Z/l501uwiUY+9NrBylZFKOocDVP+cf/YinFGnB//wr4RA5n6J5go2PwX7A7KDlQP/0HeKtTRfss1bssG23WGKHsWB1lxuNMNgAUEsHCBlxEsPsAAAAYwEAAFBLAQIKAAoAAAgAAI+wklwAAAAAAAAAAAAAAAAJAAQAAAAAAAAAAAAAAAAAAABNRVRBLUlORi/+ygAAUEsBAhQAFAAICAgAj7CSXEv8Ujw4AAAANwAAABQAAAAAAAAAAAAAAAAAKwAAAE1FVEEtSU5GL01BTklGRVNULk1GUEsBAgoACgAACAAAj7CSXAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAApQAAAGRlL1BLAQIKAAoAAAgAAI+wklwAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAMYAAABkZS9yb2J2L1BLAQIKAAoAAAgAAI+wklwAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAOwAAABkZS9yb2J2L2FuZHJvaWQvUEsBAgoACgAACAAAj7CSXAAAAAAAAAAAAAAAABcAAAAAAAAAAAAAAAAAGgEAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvUEsBAhQAFAAICAgAj7CSXDDKDeXzAAAA1QEAADMAAAAAAAAAAAAAAAAATwEAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvSVhwb3NlZEhvb2tMb2FkUGFja2FnZS5jbGFzc1BLAQIUABQACAgIAI+wklwP7jIrvQEAAH4DAAA6AAAAAAAAAAAAAAAAAKMCAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hDX01ldGhvZEhvb2skTWV0aG9kSG9va1BhcmFtLmNsYXNzUEsBAhQAFAAICAgAj7CSXNhAD6Y4AQAANwIAACoAAAAAAAAAAAAAAAAAyAQAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvWENfTWV0aG9kSG9vay5jbGFzc1BLAQIUABQACAgIAI+wkly3edyB7AAAAGQBAAApAAAAAAAAAAAAAAAAAFgGAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hwb3NlZEJyaWRnZS5jbGFzc1BLAQIUABQACAgIAI+wklzGqSC0lQEAAEwEAAAqAAAAAAAAAAAAAAAAAJsHAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hwb3NlZEhlbHBlcnMuY2xhc3NQSwECCgAKAAAIAACPsJJcAAAAAAAAAAAAAAAAIQAAAAAAAAAAAAAAAACICQAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9jYWxsYmFja3MvUEsBAhQAFAAICAgAj7CSXBdMNk06AQAA9QEAAEYAAAAAAAAAAAAAAAAAxwkAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvY2FsbGJhY2tzL1hDX0xvYWRQYWNrYWdlJExvYWRQYWNrYWdlUGFyYW0uY2xhc3NQSwECFAAUAAgICACPsJJcGXESw+wAAABjAQAANQAAAAAAAAAAAAAAAAB1CwAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9jYWxsYmFja3MvWENfTG9hZFBhY2thZ2UuY2xhc3NQSwUGAAAAAA4ADgBdBAAAxAwAAAAA" | base64 -d > app/libs/api-82.jar
-          echo "JAR OK: $(ls -lh app/libs/api-82.jar)"
-
       - name: Build LSPosed Module
         run: |
           mkdir -p app/src/main/java/com/danish/auto
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
+          mkdir -p app/libs
           mkdir -p gradle/wrapper
 
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
@@ -34,6 +29,15 @@ jobs:
 
           echo "include ':app'" > settings.gradle
 
+          # ---- FIX: Download Xposed API jar directly (no base64) ----
+          curl -L -o app/libs/api-82.jar "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar"
+          # Verify JAR
+          jar tf app/libs/api-82.jar > /dev/null || { echo "JAR corrupt"; exit 1; }
+
+          # ---- Your original base64 for MainHook (keep as is, assuming it's correct) ----
+          echo "cGFja2FnZSBjb20uZGFuaXNoLmF1dG87CmltcG9ydCBhbmRyb2lkLmFwcC5BY3Rpdml0eTsKaW1wb3J0IGFuZHJvaWQuYXBwLk5vdGlmaWNhdGlvbkNoYW5uZWw7CmltcG9ydCBhbmRyb2lkLmFwcC5Ob3RpZmljYXRpb25NYW5hZ2VyOwppbXBvcnQgYW5kcm9pZC5hcHAuUGVuZGluZ0ludGVudDsKaW1wb3J0IGFuZHJvaWQuY29udGVudC5Db250ZXh0OwppbXBvcnQgYW5kcm9pZC5jb250ZW50LkludGVudDsKaW1wb3J0IGFuZHJvaWQuY29udGVudC5TaGFyZWRQcmVmZXJlbmNlczsKaW1wb3J0IGFuZHJvaWQub3MuQnVpbGQ7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQub3MuVmlicmF0aW9uRWZmZWN0OwppbXBvcnQgYW5kcm9pZC5vcy5WaWJyYXRvcjsKaW1wb3J0IGFuZHJvaWQudmlldy5WaWV3OwppbXBvcnQgYW5kcm9pZC52aWV3LlZpZXdHcm91cDsKaW1wb3J0IGFuZHJvaWQud2lkZ2V0LlRleHRWaWV3OwppbXBvcnQgamF2YS5sYW5nLnJlZmxlY3QuTWV0aG9kOwppbXBvcnQgamF2YS51dGlsLkFycmF5TGlzdDsKaW1wb3J0IGphdmEudXRpbC5MaXN0OwppbXBvcnQgamF2YS51dGlsLnJlZ2V4Lk1hdGNoZXI7CmltcG9ydCBqYXZhLnV0aWwucmVnZXguUGF0dGVybjsKaW1wb3J0IGRlLnJvYnYuYW5kcm9pZC54cG9zZWQuSVhwb3NlZEhvb2tMb2FkUGFja2FnZTsKaW1wb3J0IGRlLnJvYnYuYW5kcm9pZC54cG9zZWQuWENfTWV0aG9kSG9vazsKaW1wb3J0IGRlLnJvYnYuYW5kcm9pZC54cG9zZWQuWHBvc2VkQnJpZGdlOwppbXBvcnQgZGUucm9idi5hbmRyb2lkLnhwb3NlZC5YcG9zZWRIZWxwZXJzOwppbXBvcnQgZGUucm9idi5hbmRyb2lkLnhwb3NlZC5jYWxsYmFja3MuWENfTG9hZFBhY2thZ2U7CgpwdWJsaWMgY2xhc3MgTWFpbkhvb2sgaW1wbGVtZW50cyBJWHBvc2VkSG9va0xvYWRQYWNrYWdlIHsKICAgIHN0YXRpYyBmaW5hbCBTdHJpbmcgVEFHID0gIkRhbmlzaEF1dG8iOwogICAgc3RhdGljIFNoYXJlZFByZWZlcmVuY2VzIHByZWZzOwoKICAgIEBPdmVycmlkZQogICAgcHVibGljIHZvaWQgaGFuZGxlTG9hZFBhY2thZ2UoWENfTG9hZFBhY2thZ2UuTG9hZFBhY2thZ2VQYXJhbSBscCkgdGhyb3dzIFRocm93YWJsZSB7CiAgICAgICAgaWYgKCFscC5wYWNrYWdlTmFtZS5lcXVhbHMoIm5ldC5qYWhlei5mbGVldHMiKSkgcmV0dXJuOwogICAgICAgIFhwb3NlZEJyaWRnZS5sb2coVEFHICsgIjogSG9va2VkIEphaGV6IEZsZWV0cyIpOwogICAgICAgIGhvb2tBY3Rpdml0eShscCwgIm5ldC5qYWhlei5mbGVldHMuZGlzcGF0Y2guYWNjZXB0LkluY29taW5nRGlzcGF0Y2hBY3Rpdml0eSIpOwogICAgICAgIGhvb2tBY3Rpdml0eShscCwgIm5ldC5qYWhlei5mbGVldHMudWkuZGlzcGF0Y2guSW5jb21pbmdPcmRlckFjdGl2aXR5Iik7CiAgICAgICAgaG9va0FjdGl2aXR5KGxwLCAibmV0LmphaGV6LmZsZWV0cy5hY2NlcHQuQWNjZXB0T3JkZXJBY3Rpdml0eSIpOwogICAgfQoKICAgIHZvaWQgaG9va0FjdGl2aXR5KFhDX0xvYWRQYWNrYWdlLkxvYWRQYWNrYWdlUGFyYW0gbHAsIFN0cmluZyBjbHMpIHsKICAgICAgICB0cnkgewogICAgICAgICAgICBYcG9zZWRIZWxwZXJzLmZpbmRBbmRIb29rTWV0aG9kKGNscywgbHAuY2xhc3NMb2FkZXIsICJvbkNyZWF0ZSIsIEJ1bmRsZS5jbGFzcywgbmV3IFhDX01ldGhvZEhvb2soKSB7CiAgICAgICAgICAgICAgICBAT3ZlcnJpZGUKICAgICAgICAgICAgICAgIHByb3RlY3RlZCB2b2lkIGFmdGVySG9va2VkTWV0aG9kKE1ldGhvZEhvb2tQYXJhbSBwYXJhbSkgdGhyb3dzIFRocm93YWJsZSB7CiAgICAgICAgICAgICAgICAgICAgQWN0aXZpdHkgYWN0ID0gKEFjdGl2aXR5KSBwYXJhbS50aGlzT2JqZWN0OwogICAgICAgICAgICAgICAgICAgIGlmIChwcmVmcyA9PSBudWxsKSBwcmVmcyA9IGFjdC5nZXRTaGFyZWRQcmVmZXJlbmNlcygiZGFuaXNoX3ByZWZzIiwgQ29udGV4dC5NT0RFX1BSSVZBVEUpOwogICAgICAgICAgICAgICAgICAgIGlmICghcHJlZnMuZ2V0Qm9vbGVhbigiZW5hYmxlZCIsIGZhbHNlKSkgcmV0dXJuOwoKICAgICAgICAgICAgICAgICAgICBmbG9hdFtdIHVpID0gZ2V0RGlzdGFuY2VzKGFjdCk7CiAgICAgICAgICAgICAgICAgICAgZmxvYXQgcGsgPSB1aVswXSwgZHIgPSB1aVsxXTsKICAgICAgICAgICAgICAgICAgICBmbG9hdCBwa01heCA9IHByZWZzLmdldEZsb2F0KCJwaWNrdXBfbWF4IiwgMS41Zik7CiAgICAgICAgICAgICAgICAgICAgZmxvYXQgZHJNYXggPSBwcmVmcy5nZXRGbG9hdCgiZHJvcF9tYXgiLCAzLjVmKTsKICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IFA9IiArIHBrICsgIiBEPSIgKyBkciArICIgTWF4PSIgKyBwa01heCArICIvIiArIGRyTWF4KTsKCiAgICAgICAgICAgICAgICAgICAgaWYgKHBrID4gMCAmJiBkciA+IDAgJiYgcGsgPD0gcGtNYXggJiYgZHIgPD0gZHJNYXgpIHsKICAgICAgICAgICAgICAgICAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBBQ0NFUFQiKTsKICAgICAgICAgICAgICAgICAgICAgICAgaWYgKCFjYWxsQWNjZXB0KGFjdCkpIGNsaWNrQWNjZXB0KGFjdCk7CiAgICAgICAgICAgICAgICAgICAgICAgIGFsZXJ0KGFjdCwgcGssIGRyKTsKICAgICAgICAgICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IFJFSkVDVCBQPSIgKyBwayArICIvIiArIHBrTWF4ICsgIiBEPSIgKyBkciArICIvIiArIGRyTWF4KTsKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0pOwogICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IEhvb2tlZCAiICsgY2xzKTsKICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gZSkgewogICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IFNraXAgIiArIGNscyArICIgLSAiICsgZS5nZXRNZXNzYWdlKCkpOwogICAgICAgIH0KICAgIH0KCiAgICBib29sZWFuIGNhbGxBY2NlcHQoQWN0aXZpdHkgYWN0KSB7CiAgICAgICAgZm9yIChNZXRob2QgbSA6IGFjdC5nZXRDbGFzcygpLmdldERlY2xhcmVkTWV0aG9kcygpKSB7CiAgICAgICAgICAgIFN0cmluZyBuID0gbS5nZXROYW1lKCkudG9Mb3dlckNhc2UoKTsKICAgICAgICAgICAgaWYgKChuLmNvbnRhaW5zKCJhY2NlcHQiKSB8fCBuLmNvbnRhaW5zKCJjb25maXJtIikpICYmICFuLmNvbnRhaW5zKCJyZWplY3QiKSkgewogICAgICAgICAgICAgICAgdHJ5IHsKICAgICAgICAgICAgICAgICAgICBtLnNldEFjY2Vzc2libGUodHJ1ZSk7CiAgICAgICAgICAgICAgICAgICAgaWYgKG0uZ2V0UGFyYW1ldGVyVHlwZXMoKS5sZW5ndGggPT0gMCkgewogICAgICAgICAgICAgICAgICAgICAgICBtLmludm9rZShhY3QpOwogICAgICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IENhbGxlZCAiICsgbS5nZXROYW1lKCkpOwogICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gdHJ1ZTsKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gaWdub3JlZCkge30KICAgICAgICAgICAgfQogICAgICAgIH0KICAgICAgICByZXR1cm4gZmFsc2U7CiAgICB9CgogICAgdm9pZCBjbGlja0FjY2VwdChBY3Rpdml0eSBhY3QpIHsKICAgICAgICBWaWV3IGJ0biA9IGZpbmRCdG4oYWN0LmdldFdpbmRvdygpLmdldERlY29yVmlldygpKTsKICAgICAgICBpZiAoYnRuICE9IG51bGwpIHsgYnRuLnBlcmZvcm1DbGljaygpOyBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IENsaWNrZWQgYnRuIik7IH0KICAgICAgICBlbHNlIFhwb3NlZEJyaWRnZS5sb2coVEFHICsgIjogQnRuIG5vdCBmb3VuZCIpOwogICAgfQoKICAgIFZpZXcgZmluZEJ0bihWaWV3IHYpIHsKICAgICAgICBpZiAodiBpbnN0YW5jZW9mIFRleHRWaWV3KSB7CiAgICAgICAgICAgIFN0cmluZyB0ID0gKChUZXh0VmlldykgdikuZ2V0VGV4dCgpLnRvU3RyaW5nKCkudHJpbSgpOwogICAgICAgICAgICBpZiAodC5lcXVhbHNJZ25vcmVDYXNlKCJBY2NlcHQiKSB8fCB0LmVxdWFscygiXHUwNjQyXHUwNjI4XHUwNjQ4XHUwNjQ0IikgfHwgdC5lcXVhbHNJZ25vcmVDYXNlKCJDb25maXJtIikpIHJldHVybiB2OwogICAgICAgIH0KICAgICAgICBpZiAodiBpbnN0YW5jZW9mIFZpZXdHcm91cCkgewogICAgICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8ICgoVmlld0dyb3VwKSB2KS5nZXRDaGlsZENvdW50KCk7IGkrKykgewogICAgICAgICAgICAgICAgVmlldyBmID0gZmluZEJ0bigoKFZpZXdHcm91cCkgdikuZ2V0Q2hpbGRBdChpKSk7CiAgICAgICAgICAgICAgICBpZiAoZiAhPSBudWxsKSByZXR1cm4gZjsKICAgICAgICAgICAgfQogICAgICAgIH0KICAgICAgICByZXR1cm4gbnVsbDsKICAgIH0KCiAgICBmbG9hdFtdIGdldERpc3RhbmNlcyhBY3Rpdml0eSBhY3QpIHsKICAgICAgICBMaXN0PEZsb2F0PiBsaXN0ID0gbmV3IEFycmF5TGlzdDw+KCk7CiAgICAgICAgc2NhblZpZXdzKGFjdC5nZXRXaW5kb3coKS5nZXREZWNvclZpZXcoKSwgbGlzdCk7CiAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBrbSB2YWx1ZXM6ICIgKyBsaXN0KTsKICAgICAgICBpZiAobGlzdC5zaXplKCkgPj0gMikgcmV0dXJuIG5ldyBmbG9hdFtde2xpc3QuZ2V0KDApLCBsaXN0LmdldCgxKX07CiAgICAgICAgcmV0dXJuIG5ldyBmbG9hdFtdey0xLCAtMX07CiAgICB9CgogICAgdm9pZCBzY2FuVmlld3MoVmlldyB2LCBMaXN0PEZsb2F0PiBvdXQpIHsKICAgICAgICBpZiAodiBpbnN0YW5jZW9mIFRleHRWaWV3KSB7CiAgICAgICAgICAgIFN0cmluZyB0ID0gKChUZXh0VmlldykgdikuZ2V0VGV4dCgpLnRvU3RyaW5nKCk7CiAgICAgICAgICAgIFBhdHRlcm4gcCA9IFBhdHRlcm4uY29tcGlsZSgiKFxcZCtcXC4/XFxkKilcXHMqW0trXVtNbV0iKTsKICAgICAgICAgICAgTWF0Y2hlciBtID0gcC5tYXRjaGVyKHQpOwogICAgICAgICAgICB3aGlsZSAobS5maW5kKCkpIHsKICAgICAgICAgICAgICAgIHRyeSB7CiAgICAgICAgICAgICAgICAgICAgZmxvYXQgdmFsID0gRmxvYXQucGFyc2VGbG9hdChtLmdyb3VwKDEpKTsKICAgICAgICAgICAgICAgICAgICBpZiAodmFsID4gMCAmJiB2YWwgPCAxMDAgJiYgIW91dC5jb250YWlucyh2YWwpKSBvdXQuYWRkKHZhbCk7CiAgICAgICAgICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gaWdub3JlZCkge30KICAgICAgICAgICAgfQogICAgICAgIH0KICAgICAgICBpZiAodiBpbnN0YW5jZW9mIFZpZXdHcm91cCkgewogICAgICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8ICgoVmlld0dyb3VwKSB2KS5nZXRDaGlsZENvdW50KCk7IGkrKykKICAgICAgICAgICAgICAgIHNjYW5WaWV3cygoKFZpZXdHcm91cCkgdikuZ2V0Q2hpbGRBdChpKSwgb3V0KTsKICAgICAgICB9CiAgICB9CgogICAgdm9pZCBhbGVydChDb250ZXh0IGN0eCwgZmxvYXQgcGssIGZsb2F0IGRyKSB7CiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgVmlicmF0b3IgdmliID0gKFZpYnJhdG9yKSBjdHguZ2V0U3lzdGVtU2VydmljZShDb250ZXh0LlZJQlJBVE9SX1NFUlZJQ0UpOwogICAgICAgICAgICBpZiAodmliICE9IG51bGwgJiYgdmliLmhhc1ZpYnJhdG9yKCkpIHsKICAgICAgICAgICAgICAgIGlmIChCdWlsZC5WRVJTSU9OLlNES19JTlQgPj0gMjYpCiAgICAgICAgICAgICAgICAgICAgdmliLnZpYnJhdGUoVmlicmF0aW9uRWZmZWN0LmNyZWF0ZVdhdmVmb3JtKG5ldyBsb25nW117MCwgMzAwLCAxNTAsIDMwMH0sIC0xKSk7CiAgICAgICAgICAgICAgICBlbHNlCiAgICAgICAgICAgICAgICAgICAgdmliLnZpYnJhdGUobmV3IGxvbmdbXXswLCAzMDAsIDE1MCwgMzAwfSwgLTEpOwogICAgICAgICAgICB9CiAgICAgICAgfSBjYXRjaCAoRXhjZXB0aW9uIGlnbm9yZWQpIHt9CiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgTm90aWZpY2F0aW9uTWFuYWdlciBubSA9IChOb3RpZmljYXRpb25NYW5hZ2VyKSBjdHguZ2V0U3lzdGVtU2VydmljZShDb250ZXh0Lk5PVElGSUNBVElPTl9TRVJWSUNFKTsKICAgICAgICAgICAgaWYgKEJ1aWxkLlZFUlNJT04uU0RLX0lOVCA+PSAyNikKICAgICAgICAgICAgICAgIG5tLmNyZWF0ZU5vdGlmaWNhdGlvbkNoYW5uZWwobmV3IE5vdGlmaWNhdGlvbkNoYW5uZWwoImRhbmlzaF9jaCIsICJEYW5pc2ggQXV0byIsIE5vdGlmaWNhdGlvbk1hbmFnZXIuSU1QT1JUQU5DRV9ISUdIKSk7CiAgICAgICAgICAgIFBlbmRpbmdJbnRlbnQgcGkgPSBQZW5kaW5nSW50ZW50LmdldEFjdGl2aXR5KGN0eCwgMCwgbmV3IEludGVudChjdHgsIFNldHRpbmdzQWN0aXZpdHkuY2xhc3MpLAogICAgICAgICAgICAgICAgUGVuZGluZ0ludGVudC5GTEFHX1VQREFURV9DVVJSRU5UIHwgUGVuZGluZ0ludGVudC5GTEFHX0lNTVVUQUJMRSk7CiAgICAgICAgICAgIGFuZHJvaWQuYXBwLk5vdGlmaWNhdGlvbi5CdWlsZGVyIGIgPSBCdWlsZC5WRVJTSU9OLlNES19JTlQgPj0gMjYKICAgICAgICAgICAgICAgID8gbmV3IGFuZHJvaWQuYXBwLk5vdGlmaWNhdGlvbi5CdWlsZGVyKGN0eCwgImRhbmlzaF9jaCIpCiAgICAgICAgICAgICAgICA6IG5ldyBhbmRyb2lkLmFwcC5Ob3RpZmljYXRpb24uQnVpbGRlcihjdHgpOwogICAgICAgICAgICBubS5ub3RpZnkoMTAwMSwgYgogICAgICAgICAgICAgICAgLnNldENvbnRlbnRUaXRsZSgiT3JkZXIgQWNjZXB0ZWQhIikKICAgICAgICAgICAgICAgIC5zZXRDb250ZW50VGV4dCgiUGlja3VwOiIgKyBwayArICJrbSB8IERyb3A6IiArIGRyICsgImttIikKICAgICAgICAgICAgICAgIC5zZXRTbWFsbEljb24oYW5kcm9pZC5SLmRyYXdhYmxlLmljX2RpYWxvZ19pbmZvKQogICAgICAgICAgICAgICAgLnNldENvbnRlbnRJbnRlbnQocGkpCiAgICAgICAgICAgICAgICAuc2V0QXV0b0NhbmNlbCh0cnVlKQogICAgICAgICAgICAgICAgLmJ1aWxkKCkpOwogICAgICAgIH0gY2F0Y2ggKEV4Y2VwdGlvbiBpZ25vcmVkKSB7fQogICAgICAgIHRyeSB7CiAgICAgICAgICAgIEludGVudCBpID0gbmV3IEludGVudChjdHgsIFBvcHVwQWN0aXZpdHkuY2xhc3MpOwogICAgICAgICAgICBpLnB1dEV4dHJhKCJwaWNrdXAiLCBwayk7CiAgICAgICAgICAgIGkucHV0RXh0cmEoImRyb3AiLCBkcik7CiAgICAgICAgICAgIGkuYWRkRmxhZ3MoSW50ZW50LkZMQUdfQUNUSVZJVFlfTkVXX1RBU0sgfCBJbnRlbnQuRkxBR19BQ1RJVklUWV9DTEVBUl9UT1ApOwogICAgICAgICAgICBjdHguc3RhcnRBY3Rpdml0eShpKTsKICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gaWdub3JlZCkge30KICAgIH0KfQo=" | base64 -d > app/src/main/java/com/danish/auto/MainHook.java
+
+          # ---- Your remaining original code continues ----
           cat > gradle.properties << 'GEOF'
           android.useAndroidX=true
           android.enableJetifier=true
@@ -78,7 +82,7 @@ jobs:
               <uses-permission android:name="android.permission.VIBRATE"/>
               <application android:label="Danish Auto" android:theme="@android:style/Theme.DeviceDefault">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Auto Accept Orders - Ultra Fast" />
+                  <meta-data android:name="xposeddescription" android:value="Auto Accept Orders" />
                   <meta-data android:name="xposedminversion" android:value="82" />
                   <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter>
@@ -213,183 +217,6 @@ jobs:
               }
           }
           GEOF
-
-          python3 -c "
-          import sys
-          code = open('/dev/stdin').read()
-          with open('app/src/main/java/com/danish/auto/MainHook.java', 'w') as f:
-              f.write(code)
-          print('MainHook.java written!')
-          " << 'PYEOF'
-          package com.danish.auto;
-          import android.app.Activity;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.app.PendingIntent;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.SharedPreferences;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.os.VibrationEffect;
-          import android.os.Vibrator;
-          import android.view.View;
-          import android.view.ViewGroup;
-          import android.widget.TextView;
-          import java.lang.reflect.Method;
-          import java.util.ArrayList;
-          import java.util.List;
-          import java.util.regex.Matcher;
-          import java.util.regex.Pattern;
-          import de.robv.android.xposed.IXposedHookLoadPackage;
-          import de.robv.android.xposed.XC_MethodHook;
-          import de.robv.android.xposed.XposedBridge;
-          import de.robv.android.xposed.XposedHelpers;
-          import de.robv.android.xposed.callbacks.XC_LoadPackage;
-
-          public class MainHook implements IXposedHookLoadPackage {
-              static final String TAG = "DanishAuto";
-              static SharedPreferences prefs;
-
-              @Override
-              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) throws Throwable {
-                  if (!lp.packageName.equals("net.jahez.fleets")) return;
-                  XposedBridge.log(TAG + ": Hooked Jahez Fleets");
-                  hookActivity(lp, "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity");
-                  hookActivity(lp, "net.jahez.fleets.ui.dispatch.IncomingOrderActivity");
-                  hookActivity(lp, "net.jahez.fleets.accept.AcceptOrderActivity");
-              }
-
-              void hookActivity(XC_LoadPackage.LoadPackageParam lp, String cls) {
-                  try {
-                      XposedHelpers.findAndHookMethod(cls, lp.classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                              Activity act = (Activity) param.thisObject;
-                              if (prefs == null) prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                              if (!prefs.getBoolean("enabled", false)) return;
-
-                              float[] ui = getDistances(act);
-                              float pk = ui[0], dr = ui[1];
-                              float pkMax = prefs.getFloat("pickup_max", 1.5f);
-                              float drMax = prefs.getFloat("drop_max", 3.5f);
-                              XposedBridge.log(TAG + ": P=" + pk + " D=" + dr + " Max=" + pkMax + "/" + drMax);
-
-                              if (pk > 0 && dr > 0 && pk <= pkMax && dr <= drMax) {
-                                  XposedBridge.log(TAG + ": ACCEPT");
-                                  if (!callAccept(act)) clickAccept(act);
-                                  alert(act, pk, dr);
-                              } else {
-                                  XposedBridge.log(TAG + ": REJECT P=" + pk + "/" + pkMax + " D=" + dr + "/" + drMax);
-                              }
-                          }
-                      });
-                      XposedBridge.log(TAG + ": Hooked " + cls);
-                  } catch (Exception e) {
-                      XposedBridge.log(TAG + ": Skip " + cls + " - " + e.getMessage());
-                  }
-              }
-
-              boolean callAccept(Activity act) {
-                  for (Method m : act.getClass().getDeclaredMethods()) {
-                      String n = m.getName().toLowerCase();
-                      if ((n.contains("accept") || n.contains("confirm")) && !n.contains("reject")) {
-                          try {
-                              m.setAccessible(true);
-                              if (m.getParameterTypes().length == 0) {
-                                  m.invoke(act);
-                                  XposedBridge.log(TAG + ": Called " + m.getName());
-                                  return true;
-                              }
-                          } catch (Exception ignored) {}
-                      }
-                  }
-                  return false;
-              }
-
-              void clickAccept(Activity act) {
-                  View btn = findBtn(act.getWindow().getDecorView());
-                  if (btn != null) { btn.performClick(); XposedBridge.log(TAG + ": Clicked btn"); }
-                  else XposedBridge.log(TAG + ": Btn not found");
-              }
-
-              View findBtn(View v) {
-                  if (v instanceof TextView) {
-                      String t = ((TextView) v).getText().toString().trim();
-                      if (t.equalsIgnoreCase("Accept") || t.equals("\u0642\u0628\u0648\u0644") || t.equalsIgnoreCase("Confirm")) return v;
-                  }
-                  if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
-                          View f = findBtn(((ViewGroup) v).getChildAt(i));
-                          if (f != null) return f;
-                      }
-                  }
-                  return null;
-              }
-
-              float[] getDistances(Activity act) {
-                  List<Float> list = new ArrayList<>();
-                  scanViews(act.getWindow().getDecorView(), list);
-                  XposedBridge.log(TAG + ": km values: " + list);
-                  if (list.size() >= 2) return new float[]{list.get(0), list.get(1)};
-                  return new float[]{-1, -1};
-              }
-
-              void scanViews(View v, List<Float> out) {
-                  if (v instanceof TextView) {
-                      String t = ((TextView) v).getText().toString();
-                      Pattern p = Pattern.compile("(\\d+\\.?\\d*)\\s*[Kk][Mm]");
-                      Matcher m = p.matcher(t);
-                      while (m.find()) {
-                          try {
-                              float val = Float.parseFloat(m.group(1));
-                              if (val > 0 && val < 100 && !out.contains(val)) out.add(val);
-                          } catch (Exception ignored) {}
-                      }
-                  }
-                  if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++)
-                          scanViews(((ViewGroup) v).getChildAt(i), out);
-                  }
-              }
-
-              void alert(Context ctx, float pk, float dr) {
-                  try {
-                      Vibrator vib = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
-                      if (vib != null && vib.hasVibrator()) {
-                          if (Build.VERSION.SDK_INT >= 26)
-                              vib.vibrate(VibrationEffect.createWaveform(new long[]{0, 300, 150, 300}, -1));
-                          else
-                              vib.vibrate(new long[]{0, 300, 150, 300}, -1);
-                      }
-                  } catch (Exception ignored) {}
-                  try {
-                      NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-                      if (Build.VERSION.SDK_INT >= 26)
-                          nm.createNotificationChannel(new NotificationChannel("danish_ch", "Danish Auto", NotificationManager.IMPORTANCE_HIGH));
-                      PendingIntent pi = PendingIntent.getActivity(ctx, 0, new Intent(ctx, SettingsActivity.class),
-                          PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                      android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26
-                          ? new android.app.Notification.Builder(ctx, "danish_ch")
-                          : new android.app.Notification.Builder(ctx);
-                      nm.notify(1001, b
-                          .setContentTitle("Order Accepted!")
-                          .setContentText("Pickup:" + pk + "km | Drop:" + dr + "km")
-                          .setSmallIcon(android.R.drawable.ic_dialog_info)
-                          .setContentIntent(pi)
-                          .setAutoCancel(true)
-                          .build());
-                  } catch (Exception ignored) {}
-                  try {
-                      Intent i = new Intent(ctx, PopupActivity.class);
-                      i.putExtra("pickup", pk);
-                      i.putExtra("drop", dr);
-                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                      ctx.startActivity(i);
-                  } catch (Exception ignored) {}
-              }
-          }
-          PYEOF
 
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
