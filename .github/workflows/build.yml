@@ -29,13 +29,9 @@ jobs:
 
           echo "include ':app'" > settings.gradle
 
-          # ----- EMBEDDED Xposed API jar (base64) -----
-          # This is the official api-82.jar from XposedBridge
-          cat > app/libs/api-82.jar.b64 << 'JAR_B64'
-          UEsDBBQAAAAIAJpD0leJ4xVKRgAAAEYAAAAIABwAYXBpLTgyLmphcopQSwUGAAAAAAEAAQBiAAAAQwAAAAAA
-          [--- BASE64 CONTENT OF api-82.jar WILL BE HERE ---]
-          JAR_B64
-          base64 -d app/libs/api-82.jar.b64 > app/libs/api-82.jar
+          # ----- FIXED: Download official Xposed API jar -----
+          curl -L https://github.com/rovo89/XposedBridge/raw/master/jar/api-82.jar -o app/libs/api-82.jar
+          
           # Verify jar
           jar tf app/libs/api-82.jar > /dev/null || { echo "JAR corrupt"; exit 1; }
 
@@ -170,8 +166,8 @@ jobs:
                   sw.setChecked(pr.getBoolean("enabled", false));
                   findViewById(R.id.btn_save).setOnClickListener(v -> {
                       pr.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
-                           .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
-                           .putBoolean("enabled", sw.isChecked()).apply();
+                               .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
+                               .putBoolean("enabled", sw.isChecked()).apply();
                       Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
                   });
               }
@@ -197,7 +193,7 @@ jobs:
           }
           EOF
 
-          # ----- MainHook (simplified, reliable) -----
+          # ----- MainHook -----
           cat > app/src/main/java/com/danish/auto/MainHook.java << 'EOF'
           package com.danish.auto;
 
