@@ -19,36 +19,34 @@ jobs:
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/assets
+          mkdir -p app/libs
           mkdir -p gradle/wrapper
 
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradlew -o gradlew
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
           curl -fsSL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.properties -o gradle/wrapper/gradle-wrapper.properties
           chmod +x gradlew
-
           echo "include ':app'" > settings.gradle
 
-          cat > gradle.properties << 'EOF'
+          # Embed JAR and Java files as base64
+          echo "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GgEAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvUEsBAhQAFAAICAgAj7CSXDDKDeXzAAAA1QEAADMAAAAAAAAAAAAAAAAATwEAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvSVhwb3NlZEhvb2tMb2FkUGFja2FnZS5jbGFzc1BLAQIUABQACAgIAI+wklwP7jIrvQEAAH4DAAA6AAAAAAAAAAAAAAAAAKMCAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hDX01ldGhvZEhvb2skTWV0aG9kSG9va1BhcmFtLmNsYXNzUEsBAhQAFAAICAgAj7CSXNhAD6Y4AQAANwIAACoAAAAAAAAAAAAAAAAAyAQAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvWENfTWV0aG9kSG9vay5jbGFzc1BLAQIUABQACAgIAI+wkly3edyB7AAAAGQBAAApAAAAAAAAAAAAAAAAAFgGAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hwb3NlZEJyaWRnZS5jbGFzc1BLAQIUABQACAgIAI+wklzGqSC0lQEAAEwEAAAqAAAAAAAAAAAAAAAAAJsHAABkZS9yb2J2L2FuZHJvaWQveHBvc2VkL1hwb3NlZEhlbHBlcnMuY2xhc3NQSwECCgAKAAAIAACPsJJcAAAAAAAAAAAAAAAAIQAAAAAAAAAAAAAAAACICQAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9jYWxsYmFja3MvUEsBAhQAFAAICAgAj7CSXBdMNk06AQAA9QEAAEYAAAAAAAAAAAAAAAAAxwkAAGRlL3JvYnYvYW5kcm9pZC94cG9zZWQvY2FsbGJhY2tzL1hDX0xvYWRQYWNrYWdlJExvYWRQYWNrYWdlUGFyYW0uY2xhc3NQSwECFAAUAAgICACPsJJcGXESw+wAAABjAQAANQAAAAAAAAAAAAAAAAB1CwAAZGUvcm9idi9hbmRyb2lkL3hwb3NlZC9jYWxsYmFja3MvWENfTG9hZFBhY2thZ2UuY2xhc3NQSwUGAAAAAA4ADgBdBAAAxAwAAAAA" | base64 -d > app/libs/api-82.jar
+          echo "cGFja2FnZSBjb20uZGFuaXNoLmF1dG87CmltcG9ydCBhbmRyb2lkLmFwcC5BY3Rpdml0eTsKaW1wb3J0IGFuZHJvaWQuYXBwLk5vdGlmaWNhdGlvbkNoYW5uZWw7CmltcG9ydCBhbmRyb2lkLmFwcC5Ob3RpZmljYXRpb25NYW5hZ2VyOwppbXBvcnQgYW5kcm9pZC5hcHAuUGVuZGluZ0ludGVudDsKaW1wb3J0IGFuZHJvaWQuY29udGVudC5Db250ZXh0OwppbXBvcnQgYW5kcm9pZC5jb250ZW50LkludGVudDsKaW1wb3J0IGFuZHJvaWQuY29udGVudC5TaGFyZWRQcmVmZXJlbmNlczsKaW1wb3J0IGFuZHJvaWQub3MuQnVpbGQ7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQub3MuVmlicmF0aW9uRWZmZWN0OwppbXBvcnQgYW5kcm9pZC5vcy5WaWJyYXRvcjsKaW1wb3J0IGphdmEubGFuZy5yZWZsZWN0LkZpZWxkOwppbXBvcnQgamF2YS5sYW5nLnJlZmxlY3QuTWV0aG9kOwppbXBvcnQgZGUucm9idi5hbmRyb2lkLnhwb3NlZC5JWHBvc2VkSG9va0xvYWRQYWNrYWdlOwppbXBvcnQgZGUucm9idi5hbmRyb2lkLnhwb3NlZC5YQ19NZXRob2RIb29rOwppbXBvcnQgZGUucm9idi5hbmRyb2lkLnhwb3NlZC5YcG9zZWRCcmlkZ2U7CmltcG9ydCBkZS5yb2J2LmFuZHJvaWQueHBvc2VkLlhwb3NlZEhlbHBlcnM7CmltcG9ydCBkZS5yb2J2LmFuZHJvaWQueHBvc2VkLmNhbGxiYWNrcy5YQ19Mb2FkUGFja2FnZTsKCnB1YmxpYyBjbGFzcyBNYWluSG9vayBpbXBsZW1lbnRzIElYcG9zZWRIb29rTG9hZFBhY2thZ2UgewogICAgc3RhdGljIGZpbmFsIFN0cmluZyBUQUcgPSAiRGFuaXNoQXV0byI7CiAgICBzdGF0aWMgZmluYWwgU3RyaW5nIFRBUkdFVF9QS0cgPSAibmV0LmphaGV6LmZsZWV0cyI7CiAgICBzdGF0aWMgZmluYWwgU3RyaW5nIFRBUkdFVF9BQ1QgPSAibmV0LmphaGV6LmZsZWV0cy5kaXNwYXRjaC5hY2NlcHQuSW5jb21pbmdEaXNwYXRjaEFjdGl2aXR5IjsKICAgIHN0YXRpYyBTaGFyZWRQcmVmZXJlbmNlcyBwcmVmczsKCiAgICBAT3ZlcnJpZGUKICAgIHB1YmxpYyB2b2lkIGhhbmRsZUxvYWRQYWNrYWdlKFhDX0xvYWRQYWNrYWdlLkxvYWRQYWNrYWdlUGFyYW0gbHApIHRocm93cyBUaHJvd2FibGUgewogICAgICAgIGlmICghbHAucGFja2FnZU5hbWUuZXF1YWxzKFRBUkdFVF9QS0cpKSByZXR1cm47CiAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBIb29rZWQgaW50byAiICsgVEFSR0VUX1BLRyk7CgogICAgICAgIFhwb3NlZEhlbHBlcnMuZmluZEFuZEhvb2tNZXRob2QoCiAgICAgICAgICAgIFRBUkdFVF9BQ1QsCiAgICAgICAgICAgIGxwLmNsYXNzTG9hZGVyLAogICAgICAgICAgICAib25DcmVhdGUiLAogICAgICAgICAgICBCdW5kbGUuY2xhc3MsCiAgICAgICAgICAgIG5ldyBYQ19NZXRob2RIb29rKCkgewogICAgICAgICAgICAgICAgQE92ZXJyaWRlCiAgICAgICAgICAgICAgICBwcm90ZWN0ZWQgdm9pZCBhZnRlckhvb2tlZE1ldGhvZChNZXRob2RIb29rUGFyYW0gcGFyYW0pIHRocm93cyBUaHJvd2FibGUgewogICAgICAgICAgICAgICAgICAgIEFjdGl2aXR5IGFjdCA9IChBY3Rpdml0eSkgcGFyYW0udGhpc09iamVjdDsKCiAgICAgICAgICAgICAgICAgICAgaWYgKHByZWZzID09IG51bGwpCiAgICAgICAgICAgICAgICAgICAgICAgIHByZWZzID0gYWN0LmdldFNoYXJlZFByZWZlcmVuY2VzKCJkYW5pc2hfcHJlZnMiLCBDb250ZXh0Lk1PREVfUFJJVkFURSk7CgogICAgICAgICAgICAgICAgICAgIGlmICghcHJlZnMuZ2V0Qm9vbGVhbigiZW5hYmxlZCIsIGZhbHNlKSkgewogICAgICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IERpc2FibGVkLCBza2lwIik7CiAgICAgICAgICAgICAgICAgICAgICAgIHJldHVybjsKICAgICAgICAgICAgICAgICAgICB9CgogICAgICAgICAgICAgICAgICAgIC8vIOKUgOKUgCBTdGVwIDE6IEdldCBsYzIgb2JqZWN0IGZyb20gQWN0aXZpdHkgZmllbGQgVjAg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICAgICAgICAgICAgICAgICAgZG91YmxlIHBpY2t1cERpc3QgPSAtMTsKICAgICAgICAgICAgICAgICAgICBkb3VibGUgZHJvcERpc3QgICA9IC0xOwoKICAgICAgICAgICAgICAgICAgICB0cnkgewogICAgICAgICAgICAgICAgICAgICAgICAvLyBsYzIgaXMgc3RvcmVkIGluIGZpZWxkIFYwIG9mIEluY29taW5nRGlzcGF0Y2hBY3Rpdml0eQogICAgICAgICAgICAgICAgICAgICAgICBGaWVsZCB2MEZpZWxkID0gYWN0LmdldENsYXNzKCkuZ2V0RmllbGQoIlYwIik7CiAgICAgICAgICAgICAgICAgICAgICAgIHYwRmllbGQuc2V0QWNjZXNzaWJsZSh0cnVlKTsKICAgICAgICAgICAgICAgICAgICAgICAgT2JqZWN0IGxjMiA9IHYwRmllbGQuZ2V0KGFjdCk7CgogICAgICAgICAgICAgICAgICAgICAgICBpZiAobGMyICE9IG51bGwpIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIC8vIGZpZWxkIGY6RCA9IHBpY2t1cERpc3RhbmNlCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBGaWVsZCBmRmllbGQgPSBsYzIuZ2V0Q2xhc3MoKS5nZXRGaWVsZCgiZiIpOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgZkZpZWxkLnNldEFjY2Vzc2libGUodHJ1ZSk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBwaWNrdXBEaXN0ID0gZkZpZWxkLmdldERvdWJsZShsYzIpOwoKICAgICAgICAgICAgICAgICAgICAgICAgICAgIC8vIGZpZWxkIGc6RCA9IGRyb3BPZmZEaXN0YW5jZQogICAgICAgICAgICAgICAgICAgICAgICAgICAgRmllbGQgZ0ZpZWxkID0gbGMyLmdldENsYXNzKCkuZ2V0RmllbGQoImciKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGdGaWVsZC5zZXRBY2Nlc3NpYmxlKHRydWUpOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgZHJvcERpc3QgPSBnRmllbGQuZ2V0RG91YmxlKGxjMik7CgogICAgICAgICAgICAgICAgICAgICAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBsYzIgLT4gUD0iICsgcGlja3VwRGlzdCArICIgRD0iICsgZHJvcERpc3QpOwogICAgICAgICAgICAgICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBWMCBpcyBudWxsLCB0cnlpbmcgSW50ZW50IGV4dHJhcyIpOwogICAgICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgfSBjYXRjaCAoRXhjZXB0aW9uIGUpIHsKICAgICAgICAgICAgICAgICAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBsYzIgZmllbGQgZXJyb3I6ICIgKyBlLmdldE1lc3NhZ2UoKSk7CiAgICAgICAgICAgICAgICAgICAgfQoKICAgICAgICAgICAgICAgICAgICAvLyDilIDilIAgU3RlcCAyOiBGYWxsYmFjayDigJQgcmVhZCBmcm9tIEludGVudCBleHRyYXMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICAgICAgICAgICAgICAgICAgaWYgKHBpY2t1cERpc3QgPCAwIHx8IGRyb3BEaXN0IDwgMCkgewogICAgICAgICAgICAgICAgICAgICAgICB0cnkgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgSW50ZW50IGludGVudCA9IGFjdC5nZXRJbnRlbnQoKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIC8vIENhbGN1bGF0ZSBkaXN0YW5jZSBmcm9tIGxhdC9sbmcgaWYgZGlyZWN0IGRpc3RhbmNlIG5vdCBmb3VuZAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZG91YmxlIHBMYXQgPSBpbnRlbnQuZ2V0RG91YmxlRXh0cmEoIkVYVFJBX0RJU1BBVENIX1BJQ0tVUF9MQVRJVFVERSIsIDApOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgZG91YmxlIHBMbmcgPSBpbnRlbnQuZ2V0RG91YmxlRXh0cmEoIkVYVFJBX0RJU1BBVENIX1BJQ0tVUF9MT05HSVRVREUiLCAwKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGRvdWJsZSBkTGF0ID0gaW50ZW50LmdldERvdWJsZUV4dHJhKCJFWFRSQV9ESVNQQVRDSF9ERVNUX0xBVElUVURFIiwgMCk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBkb3VibGUgZExuZyA9IGludGVudC5nZXREb3VibGVFeHRyYSgiRVhUUkFfRElTUEFUQ0hfREVTVF9MT05HSVRVREUiLCAwKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIFhwb3NlZEJyaWRnZS5sb2coVEFHICsgIjogQ29vcmRzIFA9KCIgKyBwTGF0ICsgIiwiICsgcExuZyArICIpIEQ9KCIgKyBkTGF0ICsgIiwiICsgZExuZyArICIpIik7CiAgICAgICAgICAgICAgICAgICAgICAgIH0gY2F0Y2ggKEV4Y2VwdGlvbiBlKSB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IEludGVudCBmYWxsYmFjayBlcnJvcjogIiArIGUuZ2V0TWVzc2FnZSgpKTsKICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIH0KCiAgICAgICAgICAgICAgICAgICAgZmxvYXQgcGtNYXggPSBwcmVmcy5nZXRGbG9hdCgicGlja3VwX21heCIsIDEuNWYpOwogICAgICAgICAgICAgICAgICAgIGZsb2F0IGRyTWF4ID0gcHJlZnMuZ2V0RmxvYXQoImRyb3BfbWF4IiwgICAzLjVmKTsKCiAgICAgICAgICAgICAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBQPSIgKyBwaWNrdXBEaXN0ICsgIiBEPSIgKyBkcm9wRGlzdAogICAgICAgICAgICAgICAgICAgICAgICArICIgTGltaXRzPSIgKyBwa01heCArICIvIiArIGRyTWF4KTsKCiAgICAgICAgICAgICAgICAgICAgaWYgKHBpY2t1cERpc3QgPiAwICYmIGRyb3BEaXN0ID4gMAogICAgICAgICAgICAgICAgICAgICAgICAmJiBwaWNrdXBEaXN0IDw9IHBrTWF4ICYmIGRyb3BEaXN0IDw9IGRyTWF4KSB7CgogICAgICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IOKchSBBQ0NFUFQiKTsKCiAgICAgICAgICAgICAgICAgICAgICAgIC8vIOKUgOKUgCBTdGVwIDM6IENhbGwgbDEoKSDigJQgZGlyZWN0IGFjY2VwdCBtZXRob2Qg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICAgICAgICAgICAgICAgICAgICAgIGJvb2xlYW4gYWNjZXB0ZWQgPSBmYWxzZTsKICAgICAgICAgICAgICAgICAgICAgICAgdHJ5IHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIE1ldGhvZCBsMSA9IGFjdC5nZXRDbGFzcygpLmdldE1ldGhvZCgibDEiKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGwxLnNldEFjY2Vzc2libGUodHJ1ZSk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBsMS5pbnZva2UoYWN0KTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIFhwb3NlZEJyaWRnZS5sb2coVEFHICsgIjogbDEoKSBjYWxsZWQg4oCUIG9yZGVyIGFjY2VwdGVkISIpOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgYWNjZXB0ZWQgPSB0cnVlOwogICAgICAgICAgICAgICAgICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gZSkgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBsMSgpIGVycm9yOiAiICsgZS5nZXRNZXNzYWdlKCkpOwogICAgICAgICAgICAgICAgICAgICAgICB9CgogICAgICAgICAgICAgICAgICAgICAgICAvLyDilIDilIAgU3RlcCA0OiBGYWxsYmFjayDigJQgdHJ5IG90aGVyIGFjY2VwdCBtZXRob2RzIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogICAgICAgICAgICAgICAgICAgICAgICBpZiAoIWFjY2VwdGVkKSB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb3IgKE1ldGhvZCBtIDogYWN0LmdldENsYXNzKCkuZ2V0RGVjbGFyZWRNZXRob2RzKCkpIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBTdHJpbmcgbiA9IG0uZ2V0TmFtZSgpLnRvTG93ZXJDYXNlKCk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgaWYgKChuLmNvbnRhaW5zKCJhY2NlcHQiKSB8fCBuLmNvbnRhaW5zKCJjb25maXJtIikpCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICYmICFuLmNvbnRhaW5zKCJyZWplY3QiKSAmJiBtLmdldFBhcmFtZXRlclR5cGVzKCkubGVuZ3RoID09IDApIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdHJ5IHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG0uc2V0QWNjZXNzaWJsZSh0cnVlKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG0uaW52b2tlKGFjdCk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IEZhbGxiYWNrIGNhbGxlZDogIiArIG0uZ2V0TmFtZSgpKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGFjY2VwdGVkID0gdHJ1ZTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gaWdub3JlZCkge30KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgICAgIH0KCiAgICAgICAgICAgICAgICAgICAgICAgIC8vIOKUgOKUgCBTdGVwIDU6IEFsZXJ0IOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogICAgICAgICAgICAgICAgICAgICAgICBzaG93QWxlcnQoYWN0LCAoZmxvYXQpIHBpY2t1cERpc3QsIChmbG9hdCkgZHJvcERpc3QpOwoKICAgICAgICAgICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAgICAgICAgICAgICBYcG9zZWRCcmlkZ2UubG9nKFRBRyArICI6IOKdjCBSRUpFQ1QgUD0iICsgcGlja3VwRGlzdCArICIvIiArIHBrTWF4CiAgICAgICAgICAgICAgICAgICAgICAgICAgICArICIgRD0iICsgZHJvcERpc3QgKyAiLyIgKyBkck1heCk7CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgKTsKCiAgICAgICAgWHBvc2VkQnJpZGdlLmxvZyhUQUcgKyAiOiBIb29rIHJlZ2lzdGVyZWQgb24gIiArIFRBUkdFVF9BQ1QpOwogICAgfQoKICAgIHZvaWQgc2hvd0FsZXJ0KENvbnRleHQgY3R4LCBmbG9hdCBwaywgZmxvYXQgZHIpIHsKICAgICAgICAvLyBWaWJyYXRlCiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgVmlicmF0b3IgdmliID0gKFZpYnJhdG9yKSBjdHguZ2V0U3lzdGVtU2VydmljZShDb250ZXh0LlZJQlJBVE9SX1NFUlZJQ0UpOwogICAgICAgICAgICBpZiAodmliICE9IG51bGwgJiYgdmliLmhhc1ZpYnJhdG9yKCkpIHsKICAgICAgICAgICAgICAgIGlmIChCdWlsZC5WRVJTSU9OLlNES19JTlQgPj0gMjYpCiAgICAgICAgICAgICAgICAgICAgdmliLnZpYnJhdGUoVmlicmF0aW9uRWZmZWN0LmNyZWF0ZVdhdmVmb3JtKG5ldyBsb25nW117MCwgMzAwLCAxNTAsIDMwMH0sIC0xKSk7CiAgICAgICAgICAgICAgICBlbHNlCiAgICAgICAgICAgICAgICAgICAgdmliLnZpYnJhdGUobmV3IGxvbmdbXXswLCAzMDAsIDE1MCwgMzAwfSwgLTEpOwogICAgICAgICAgICB9CiAgICAgICAgfSBjYXRjaCAoRXhjZXB0aW9uIGlnbm9yZWQpIHt9CgogICAgICAgIC8vIE5vdGlmaWNhdGlvbgogICAgICAgIHRyeSB7CiAgICAgICAgICAgIE5vdGlmaWNhdGlvbk1hbmFnZXIgbm0gPSAoTm90aWZpY2F0aW9uTWFuYWdlcikKICAgICAgICAgICAgICAgIGN0eC5nZXRTeXN0ZW1TZXJ2aWNlKENvbnRleHQuTk9USUZJQ0FUSU9OX1NFUlZJQ0UpOwogICAgICAgICAgICBpZiAoQnVpbGQuVkVSU0lPTi5TREtfSU5UID49IDI2KQogICAgICAgICAgICAgICAgbm0uY3JlYXRlTm90aWZpY2F0aW9uQ2hhbm5lbChuZXcgTm90aWZpY2F0aW9uQ2hhbm5lbCgKICAgICAgICAgICAgICAgICAgICAiZGFuaXNoX2NoIiwgIkRhbmlzaCBBdXRvIiwgTm90aWZpY2F0aW9uTWFuYWdlci5JTVBPUlRBTkNFX0hJR0gpKTsKICAgICAgICAgICAgUGVuZGluZ0ludGVudCBwaSA9IFBlbmRpbmdJbnRlbnQuZ2V0QWN0aXZpdHkoY3R4LCAwLAogICAgICAgICAgICAgICAgbmV3IEludGVudChjdHgsIFNldHRpbmdzQWN0aXZpdHkuY2xhc3MpLAogICAgICAgICAgICAgICAgUGVuZGluZ0ludGVudC5GTEFHX1VQREFURV9DVVJSRU5UIHwgUGVuZGluZ0ludGVudC5GTEFHX0lNTVVUQUJMRSk7CiAgICAgICAgICAgIGFuZHJvaWQuYXBwLk5vdGlmaWNhdGlvbi5CdWlsZGVyIGIgPSBCdWlsZC5WRVJTSU9OLlNES19JTlQgPj0gMjYKICAgICAgICAgICAgICAgID8gbmV3IGFuZHJvaWQuYXBwLk5vdGlmaWNhdGlvbi5CdWlsZGVyKGN0eCwgImRhbmlzaF9jaCIpCiAgICAgICAgICAgICAgICA6IG5ldyBhbmRyb2lkLmFwcC5Ob3RpZmljYXRpb24uQnVpbGRlcihjdHgpOwogICAgICAgICAgICBubS5ub3RpZnkoMTAwMSwgYgogICAgICAgICAgICAgICAgLnNldENvbnRlbnRUaXRsZSgiT3JkZXIgQWNjZXB0ZWQhIikKICAgICAgICAgICAgICAgIC5zZXRDb250ZW50VGV4dCgiUGlja3VwOiIgKyBwayArICJrbSB8IERyb3A6IiArIGRyICsgImttIikKICAgICAgICAgICAgICAgIC5zZXRTbWFsbEljb24oYW5kcm9pZC5SLmRyYXdhYmxlLmljX2RpYWxvZ19pbmZvKQogICAgICAgICAgICAgICAgLnNldENvbnRlbnRJbnRlbnQocGkpCiAgICAgICAgICAgICAgICAuc2V0QXV0b0NhbmNlbCh0cnVlKQogICAgICAgICAgICAgICAgLmJ1aWxkKCkpOwogICAgICAgIH0gY2F0Y2ggKEV4Y2VwdGlvbiBpZ25vcmVkKSB7fQoKICAgICAgICAvLyBQb3B1cAogICAgICAgIHRyeSB7CiAgICAgICAgICAgIEludGVudCBpID0gbmV3IEludGVudChjdHgsIFBvcHVwQWN0aXZpdHkuY2xhc3MpOwogICAgICAgICAgICBpLnB1dEV4dHJhKCJwaWNrdXAiLCBwayk7CiAgICAgICAgICAgIGkucHV0RXh0cmEoImRyb3AiLCAgIGRyKTsKICAgICAgICAgICAgaS5hZGRGbGFncyhJbnRlbnQuRkxBR19BQ1RJVklUWV9ORVdfVEFTSyB8IEludGVudC5GTEFHX0FDVElWSVRZX0NMRUFSX1RPUCk7CiAgICAgICAgICAgIGN0eC5zdGFydEFjdGl2aXR5KGkpOwogICAgICAgIH0gY2F0Y2ggKEV4Y2VwdGlvbiBpZ25vcmVkKSB7fQogICAgfQp9Cg==" | base64 -d > app/src/main/java/com/danish/auto/MainHook.java
+
+          cat > gradle.properties << 'GEOF'
           android.useAndroidX=true
           android.enableJetifier=true
           org.gradle.jvmargs=-Xmx2048m
-          EOF
+          GEOF
 
-          cat > build.gradle << 'EOF'
+          cat > build.gradle << 'GEOF'
           buildscript {
               repositories { google(); mavenCentral() }
               dependencies { classpath 'com.android.tools.build:gradle:8.3.2' }
           }
-          allprojects { 
-              repositories { 
-                  google()
-                  mavenCentral()
-                  maven { url 'https://api.xposed.info/' }
-              } 
-          }
-          EOF
+          allprojects { repositories { google(); mavenCentral() } }
+          GEOF
 
-          cat > app/build.gradle << 'EOF'
+          cat > app/build.gradle << 'GEOF'
           plugins { id 'com.android.application' }
           android {
               namespace 'com.danish.auto'
@@ -60,31 +58,25 @@ jobs:
                   versionCode 1
                   versionName '1.0'
               }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
           }
           dependencies {
-              compileOnly 'de.robv.android.xposed:api:82'
+              compileOnly files('libs/api-82.jar')
               implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'com.google.android.material:material:1.9.0'
           }
-          EOF
+          GEOF
 
-          # ----- FIXED: Added AppCompat Theme in styles.xml -----
-          cat > app/src/main/res/values/themes.xml << 'EOF'
-          <resources>
-              <style name="Theme.DanishAuto" parent="Theme.AppCompat.DayNight.NoActionBar">
-                  <item name="colorPrimary">#1DB954</item>
-                  <item name="android:windowBackground">#121212</item>
-              </style>
-          </resources>
-          EOF
-
-          # ----- FIXED: Manifest now uses the new Theme.DanishAuto -----
-          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          cat > app/src/main/AndroidManifest.xml << 'GEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="Danish Auto" android:theme="@style/Theme.DanishAuto">
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.VIBRATE"/>
+              <application android:label="Danish Auto" android:theme="@android:style/Theme.DeviceDefault">
                   <meta-data android:name="xposedmodule" android:value="true" />
-                  <meta-data android:name="xposeddescription" android:value="Auto Accept Orders" />
+                  <meta-data android:name="xposeddescription" android:value="Auto Accept — Direct Hook" />
                   <meta-data android:name="xposedminversion" android:value="82" />
                   <activity android:name=".SettingsActivity" android:exported="true">
                       <intent-filter>
@@ -92,13 +84,79 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  <activity android:name=".PopupActivity" android:theme="@style/Theme.AppCompat.DayNight.Dialog"
-                      android:excludeFromRecents="true" android:exported="false" />
+                  <activity android:name=".PopupActivity"
+                      android:theme="@android:style/Theme.DeviceDefault.Dialog"
+                      android:excludeFromRecents="true"
+                      android:exported="false" />
               </application>
           </manifest>
-          EOF
+          GEOF
 
-          cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'EOF'
+          cat > app/src/main/res/values/strings.xml << 'GEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources><string name="app_name">Danish Auto</string></resources>
+          GEOF
+
+          cat > app/src/main/res/layout/activity_settings.xml << 'GEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent">
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:orientation="vertical" android:padding="20dp" android:background="#121212">
+                  <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                      android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954"
+                      android:textStyle="bold" android:gravity="center" android:layout_marginBottom="8dp"/>
+                  <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                      android:text="Direct Hook — Ultra Fast" android:textSize="12sp"
+                      android:textColor="#888888" android:gravity="center" android:layout_marginBottom="24dp"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:text="Pickup Max (km)" android:textColor="#AAAAAA"/>
+                  <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
+                      android:layout_height="55dp" android:inputType="numberDecimal"
+                      android:text="1.5" android:textColor="#FFFFFF" android:background="#333333"
+                      android:padding="10dp" android:layout_marginBottom="15dp"/>
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:text="Drop Max (km)" android:textColor="#AAAAAA"/>
+                  <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
+                      android:layout_height="55dp" android:inputType="numberDecimal"
+                      android:text="3.5" android:textColor="#FFFFFF" android:background="#333333"
+                      android:padding="10dp" android:layout_marginBottom="20dp"/>
+                  <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content"
+                      android:layout_height="wrap_content" android:text="Auto Accept ON/OFF"
+                      android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
+                  <Button android:id="@+id/btn_save" android:layout_width="match_parent"
+                      android:layout_height="55dp" android:text="SAVE" android:backgroundTint="#1DB954"/>
+                  <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
+                      android:layout_height="wrap_content" android:text="Status: Disabled"
+                      android:textColor="#888888" android:gravity="center" android:layout_marginTop="20dp"/>
+              </LinearLayout>
+          </ScrollView>
+          GEOF
+
+          cat > app/src/main/res/layout/activity_popup.xml << 'GEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:orientation="vertical" android:padding="24dp" android:background="#1E1E1E">
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:text="Order Accepted!" android:textSize="22sp" android:textColor="#1DB954"
+                  android:textStyle="bold" android:gravity="center" android:layout_marginBottom="16dp"/>
+              <TextView android:id="@+id/tv_pickup" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:text="Pickup: -- km"
+                  android:textSize="16sp" android:textColor="#FFFFFF"/>
+              <TextView android:id="@+id/tv_drop" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:text="Drop: -- km"
+                  android:textSize="16sp" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
+              <Button android:id="@+id/btn_ok" android:layout_width="match_parent"
+                  android:layout_height="45dp" android:text="OK" android:backgroundTint="#1DB954"/>
+          </LinearLayout>
+          GEOF
+
+          cat > app/src/main/assets/xposed_init << 'GEOF'
+          com.danish.auto.MainHook
+          GEOF
+
+          cat > app/src/main/java/com/danish/auto/SettingsActivity.java << 'GEOF'
           package com.danish.auto;
           import android.content.SharedPreferences;
           import android.os.Bundle;
@@ -111,27 +169,33 @@ jobs:
                   SharedPreferences pr = getSharedPreferences("danish_prefs", MODE_PRIVATE);
                   EditText etP = findViewById(R.id.et_pickup);
                   EditText etD = findViewById(R.id.et_drop);
-                  Switch sw = findViewById(R.id.switch_enabled);
+                  Switch sw    = findViewById(R.id.switch_enabled);
+                  TextView tvS = findViewById(R.id.tv_status);
                   etP.setText(String.valueOf(pr.getFloat("pickup_max", 1.5f)));
                   etD.setText(String.valueOf(pr.getFloat("drop_max", 3.5f)));
                   sw.setChecked(pr.getBoolean("enabled", false));
+                  tvS.setText(sw.isChecked() ? "Status: Active" : "Status: Disabled");
                   findViewById(R.id.btn_save).setOnClickListener(v -> {
                       try {
-                          pr.edit().putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
-                                   .putFloat("drop_max", Float.parseFloat(etD.getText().toString()))
-                                   .putBoolean("enabled", sw.isChecked()).apply();
-                          Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
+                          pr.edit()
+                              .putFloat("pickup_max", Float.parseFloat(etP.getText().toString()))
+                              .putFloat("drop_max",   Float.parseFloat(etD.getText().toString()))
+                              .putBoolean("enabled",  sw.isChecked())
+                              .apply();
+                          tvS.setText(sw.isChecked() ? "Status: Active" : "Status: Disabled");
+                          Toast.makeText(this, "Saved! Restart Jahez.", Toast.LENGTH_LONG).show();
                       } catch (Exception e) {
-                          Toast.makeText(this, "Error saving settings", Toast.LENGTH_SHORT).show();
+                          Toast.makeText(this, "Invalid values!", Toast.LENGTH_SHORT).show();
                       }
                   });
               }
           }
-          EOF
+          GEOF
 
-          cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'EOF'
+          cat > app/src/main/java/com/danish/auto/PopupActivity.java << 'GEOF'
           package com.danish.auto;
           import android.os.Bundle;
+          import android.os.Handler;
           import android.widget.TextView;
           import androidx.appcompat.app.AppCompatActivity;
           public class PopupActivity extends AppCompatActivity {
@@ -141,109 +205,14 @@ jobs:
                   float pk = getIntent().getFloatExtra("pickup", 0);
                   float dr = getIntent().getFloatExtra("drop", 0);
                   ((TextView) findViewById(R.id.tv_pickup)).setText("Pickup: " + pk + " km");
-                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop: " + dr + " km");
+                  ((TextView) findViewById(R.id.tv_drop)).setText("Drop:   " + dr + " km");
                   findViewById(R.id.btn_ok).setOnClickListener(v -> finish());
+                  new Handler().postDelayed(this::finish, 5000);
               }
           }
-          EOF
+          GEOF
 
-          cat > app/src/main/java/com/danish/auto/MainHook.java << 'EOF'
-          package com.danish.auto;
-          import android.app.*;
-          import android.content.*;
-          import android.view.*;
-          import android.widget.TextView;
-          import java.util.*;
-          import java.util.regex.*;
-          import de.robv.android.xposed.*;
-          import de.robv.android.xposed.callbacks.XC_LoadPackage;
-
-          public class MainHook implements IXposedHookLoadPackage {
-              private static SharedPreferences prefs;
-              @Override
-              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-                  if (!lpparam.packageName.equals("net.jahez.fleets")) return;
-                  Class<?> orderActivity = XposedHelpers.findClass("net.jahez.fleets.dispatch.accept.IncomingDispatchActivity", lpparam.classLoader);
-                  XposedHelpers.findAndHookMethod(orderActivity, "onResume", new XC_MethodHook() {
-                      @Override
-                      protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                          Activity act = (Activity) param.thisObject;
-                          if (prefs == null) prefs = act.getSharedPreferences("danish_prefs", Context.MODE_PRIVATE);
-                          if (!prefs.getBoolean("enabled", false)) return;
-                          float[] dist = extractDist(act);
-                          if (dist[0] > 0 && dist[0] <= prefs.getFloat("pickup_max", 1.5f) && dist[1] <= prefs.getFloat("drop_max", 3.5f)) {
-                              click(act);
-                              sendNotification(act, dist[0], dist[1]);
-                          }
-                      }
-                  });
-              }
-              private float[] extractDist(Activity act) {
-                  List<Float> l = new ArrayList<>();
-                  scan(act.getWindow().getDecorView(), l);
-                  return l.size() >= 2 ? new float[]{l.get(0), l.get(1)} : new float[]{-1, -1};
-              }
-              private void scan(View v, List<Float> out) {
-                  if (v instanceof TextView) {
-                      Matcher m = Pattern.compile("(\\d+\\.?\\d*)").matcher(((TextView) v).getText().toString());
-                      while (m.find()) { try { out.add(Float.parseFloat(m.group(1))); } catch(Exception e){} }
-                  } else if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) scan(((ViewGroup) v).getChildAt(i), out);
-                  }
-              }
-              private void click(Activity act) {
-                  View b = find(act.getWindow().getDecorView());
-                  if (b != null) b.performClick();
-              }
-              private View find(View v) {
-                  if (v instanceof TextView) {
-                      String t = ((TextView) v).getText().toString();
-                      if (t.equalsIgnoreCase("Accept") || t.equals("قبول")) return v;
-                  }
-                  if (v instanceof ViewGroup) {
-                      for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) {
-                          View f = find(((ViewGroup) v).getChildAt(i));
-                          if (f != null) return f;
-                      }
-                  }
-                  return null;
-              }
-              private void sendNotification(Context c, float p, float d) {
-                  try {
-                      Intent i = new Intent(c, PopupActivity.class).putExtra("pickup", p).putExtra("drop", d).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                      c.startActivity(i);
-                  } catch (Exception e) {}
-              }
-          }
-          EOF
-
-          cat > app/src/main/res/values/strings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources><string name="app_name">Danish Auto</string></resources>
-          EOF
-
-          cat > app/src/main/res/layout/activity_settings.xml << 'EOF'
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="20dp" android:background="#121212">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Danish Auto" android:textSize="26sp" android:textColor="#1DB954" android:layout_gravity="center" android:layout_marginBottom="20dp"/>
-              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent" android:layout_height="55dp" android:hint="Max Pickup" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp" android:inputType="numberDecimal" android:padding="10dp"/>
-              <EditText android:id="@+id/et_drop" android:layout_width="match_parent" android:layout_height="55dp" android:hint="Max Drop" android:textColor="#FFFFFF" android:background="#333333" android:layout_marginBottom="10dp" android:inputType="numberDecimal" android:padding="10dp"/>
-              <Switch android:id="@+id/switch_enabled" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Auto Accept" android:textColor="#FFFFFF" android:layout_marginBottom="20dp"/>
-              <Button android:id="@+id/btn_save" android:layout_width="match_parent" android:layout_height="55dp" android:text="SAVE" android:backgroundTint="#1DB954"/>
-          </LinearLayout>
-          EOF
-
-          cat > app/src/main/res/layout/activity_popup.xml << 'EOF'
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:background="#1E1E1E">
-              <TextView android:id="@+id/tv_pickup" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="18sp"/>
-              <TextView android:id="@+id/tv_drop" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="18sp" android:layout_marginBottom="15dp"/>
-              <Button android:id="@+id/btn_ok" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="OK" android:backgroundTint="#4CAF50"/>
-          </LinearLayout>
-          EOF
-
-          cat > app/src/main/assets/xposed_init << 'EOF'
-          com.danish.auto.MainHook
-          EOF
-
+          chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
