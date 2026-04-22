@@ -16,6 +16,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Download MMKV library
+        run: |
+          mkdir -p /tmp/libs
+          curl -L -o /tmp/libs/mmkv.jar "https://repo1.maven.org/maven2/com/tencent/mmkv/1.2.14/mmkv-1.2.14.jar"
+
       - name: Build Modified QBZ
         run: |
           if [ ! -f qbz.apk ]; then
@@ -24,33 +29,50 @@ jobs:
           fi
 
           mkdir -p /tmp/qbz_work /tmp/act_src/net/jahez/lsposed /tmp/act_out
-
           cd /tmp/qbz_work && unzip -q $GITHUB_WORKSPACE/qbz.apk && cd -
           echo "QBZ extracted"
 
+          # Create DanishSettingsActivity.java (base64 decoded)
           echo "CnBhY2thZ2UgbmV0LmphaGV6LmxzcG9zZWQ7CgppbXBvcnQgYW5kcm9pZC5hcHAuQWN0aXZpdHk7CmltcG9ydCBhbmRyb2lkLmNvbnRlbnQuU2hhcmVkUHJlZmVyZW5jZXM7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQud2lkZ2V0LkJ1dHRvbjsKaW1wb3J0IGFuZHJvaWQud2lkZ2V0LkVkaXRUZXh0OwppbXBvcnQgYW5kcm9pZC53aWRnZXQuU3dpdGNoOwppbXBvcnQgYW5kcm9pZC53aWRnZXQuVGV4dFZpZXc7CmltcG9ydCBhbmRyb2lkLndpZGdldC5Ub2FzdDsKaW1wb3J0IGNvbS50ZW5jZW50Lm1ta3YuTU1LVjsKCnB1YmxpYyBjbGFzcyBEYW5pc2hTZXR0aW5nc0FjdGl2aXR5IGV4dGVuZHMgQWN0aXZpdHkgewogICAgCiAgICBAT3ZlcnJpZGUKICAgIHByb3RlY3RlZCB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBzYXZlZEluc3RhbmNlU3RhdGUpIHsKICAgICAgICBzdXBlci5vbkNyZWF0ZShzYXZlZEluc3RhbmNlU3RhdGUpOwogICAgICAgIAogICAgICAgIC8vIFNpbXBsZSBwcm9ncmFtbWF0aWMgVUkgLSBubyBYTUwgbmVlZGVkCiAgICAgICAgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0IGxheW91dCA9IG5ldyBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQodGhpcyk7CiAgICAgICAgbGF5b3V0LnNldE9yaWVudGF0aW9uKGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5WRVJUSUNBTCk7CiAgICAgICAgbGF5b3V0LnNldFBhZGRpbmcoNDAsIDYwLCA0MCwgNDApOwogICAgICAgIGxheW91dC5zZXRCYWNrZ3JvdW5kQ29sb3IoMHhGRjEyMTIxMik7CiAgICAgICAgCiAgICAgICAgVGV4dFZpZXcgdGl0bGUgPSBuZXcgVGV4dFZpZXcodGhpcyk7CiAgICAgICAgdGl0bGUuc2V0VGV4dCgiRGFuaXNoIEF1dG8iKTsKICAgICAgICB0aXRsZS5zZXRUZXh0U2l6ZSgyNik7CiAgICAgICAgdGl0bGUuc2V0VGV4dENvbG9yKDB4RkYxREI5NTQpOwogICAgICAgIHRpdGxlLnNldFR5cGVmYWNlKG51bGwsIGFuZHJvaWQuZ3JhcGhpY3MuVHlwZWZhY2UuQk9MRCk7CiAgICAgICAgdGl0bGUuc2V0R3Jhdml0eShhbmRyb2lkLnZpZXcuR3Jhdml0eS5DRU5URVIpOwogICAgICAgIGxheW91dC5hZGRWaWV3KHRpdGxlKTsKICAgICAgICAKICAgICAgICBUZXh0VmlldyBzdWIgPSBuZXcgVGV4dFZpZXcodGhpcyk7CiAgICAgICAgc3ViLnNldFRleHQoIlFCWiBOYXRpdmUgSG9vayIpOwogICAgICAgIHN1Yi5zZXRUZXh0U2l6ZSgxMik7CiAgICAgICAgc3ViLnNldFRleHRDb2xvcigweEZGODg4ODg4KTsKICAgICAgICBzdWIuc2V0R3Jhdml0eShhbmRyb2lkLnZpZXcuR3Jhdml0eS5DRU5URVIpOwogICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgc3ViUGFyYW1zID0gbmV3IGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMoCiAgICAgICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMuTUFUQ0hfUEFSRU5ULCAKICAgICAgICAgICAgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcy5XUkFQX0NPTlRFTlQpOwogICAgICAgIHN1YlBhcmFtcy5zZXRNYXJnaW5zKDAsIDgsIDAsIDMyKTsKICAgICAgICBzdWIuc2V0TGF5b3V0UGFyYW1zKHN1YlBhcmFtcyk7CiAgICAgICAgbGF5b3V0LmFkZFZpZXcoc3ViKTsKICAgICAgICAKICAgICAgICBUZXh0VmlldyBsYmxQaWNrdXAgPSBuZXcgVGV4dFZpZXcodGhpcyk7CiAgICAgICAgbGJsUGlja3VwLnNldFRleHQoIlBpY2t1cCBNYXggKGttKSIpOwogICAgICAgIGxibFBpY2t1cC5zZXRUZXh0Q29sb3IoMHhGRkFBQUFBQSk7CiAgICAgICAgbGF5b3V0LmFkZFZpZXcobGJsUGlja3VwKTsKICAgICAgICAKICAgICAgICBFZGl0VGV4dCBldFBpY2t1cCA9IG5ldyBFZGl0VGV4dCh0aGlzKTsKICAgICAgICBldFBpY2t1cC5zZXRJbnB1dFR5cGUoYW5kcm9pZC50ZXh0LklucHV0VHlwZS5UWVBFX0NMQVNTX05VTUJFUiB8IGFuZHJvaWQudGV4dC5JbnB1dFR5cGUuVFlQRV9OVU1CRVJfRkxBR19ERUNJTUFMKTsKICAgICAgICBldFBpY2t1cC5zZXRUZXh0Q29sb3IoMHhGRkZGRkZGRik7CiAgICAgICAgZXRQaWNrdXAuc2V0QmFja2dyb3VuZENvbG9yKDB4RkYzMzMzMzMpOwogICAgICAgIGV0UGlja3VwLnNldFBhZGRpbmcoMjAsIDIwLCAyMCwgMjApOwogICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgcDEgPSBuZXcgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcygKICAgICAgICAgICAgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcy5NQVRDSF9QQVJFTlQsIDExMCk7CiAgICAgICAgcDEuc2V0TWFyZ2lucygwLCA4LCAwLCAyNCk7CiAgICAgICAgZXRQaWNrdXAuc2V0TGF5b3V0UGFyYW1zKHAxKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhldFBpY2t1cCk7CiAgICAgICAgCiAgICAgICAgVGV4dFZpZXcgbGJsRHJvcCA9IG5ldyBUZXh0Vmlldyh0aGlzKTsKICAgICAgICBsYmxEcm9wLnNldFRleHQoIkRyb3AgTWF4IChrbSkiKTsKICAgICAgICBsYmxEcm9wLnNldFRleHRDb2xvcigweEZGQUFBQUFBKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhsYmxEcm9wKTsKICAgICAgICAKICAgICAgICBFZGl0VGV4dCBldERyb3AgPSBuZXcgRWRpdFRleHQodGhpcyk7CiAgICAgICAgZXREcm9wLnNldElucHV0VHlwZShhbmRyb2lkLnRleHQuSW5wdXRUeXBlLlRZUEVfQ0xBU1NfTlVNQkVSIHwgYW5kcm9pZC50ZXh0LklucHV0VHlwZS5UWVBFX05VTUJFUl9GTEFHX0RFQ0lNQUwpOwogICAgICAgIGV0RHJvcC5zZXRUZXh0Q29sb3IoMHhGRkZGRkZGRik7CiAgICAgICAgZXREcm9wLnNldEJhY2tncm91bmRDb2xvcigweEZGMzMzMzMzKTsKICAgICAgICBldERyb3Auc2V0UGFkZGluZygyMCwgMjAsIDIwLCAyMCk7CiAgICAgICAgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcyBwMiA9IG5ldyBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zKAogICAgICAgICAgICBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zLk1BVENIX1BBUkVOVCwgMTEwKTsKICAgICAgICBwMi5zZXRNYXJnaW5zKDAsIDgsIDAsIDI0KTsKICAgICAgICBldERyb3Auc2V0TGF5b3V0UGFyYW1zKHAyKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhldERyb3ApOwogICAgICAgIAogICAgICAgIFN3aXRjaCBzd0VuYWJsZWQgPSBuZXcgU3dpdGNoKHRoaXMpOwogICAgICAgIHN3RW5hYmxlZC5zZXRUZXh0KCJBdXRvIEFjY2VwdCBPTi9PRkYiKTsKICAgICAgICBzd0VuYWJsZWQuc2V0VGV4dENvbG9yKDB4RkZGRkZGRkYpOwogICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgc3dwID0gbmV3IGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMoCiAgICAgICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMuV1JBUF9DT05URU5ULAogICAgICAgICAgICBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zLldSQVBfQ09OVEVOVCk7CiAgICAgICAgc3dwLnNldE1hcmdpbnMoMCwgMCwgMCwgMzIpOwogICAgICAgIHN3RW5hYmxlZC5zZXRMYXlvdXRQYXJhbXMoc3dwKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhzd0VuYWJsZWQpOwogICAgICAgIAogICAgICAgIEJ1dHRvbiBidG5TYXZlID0gbmV3IEJ1dHRvbih0aGlzKTsKICAgICAgICBidG5TYXZlLnNldFRleHQoIlNBVkUiKTsKICAgICAgICBidG5TYXZlLnNldEJhY2tncm91bmRDb2xvcigweEZGMURCOTU0KTsKICAgICAgICBidG5TYXZlLnNldFRleHRDb2xvcigweEZGRkZGRkZGKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhidG5TYXZlKTsKICAgICAgICAKICAgICAgICBUZXh0VmlldyB0dlN0YXR1cyA9IG5ldyBUZXh0Vmlldyh0aGlzKTsKICAgICAgICB0dlN0YXR1cy5zZXRUZXh0Q29sb3IoMHhGRjg4ODg4OCk7CiAgICAgICAgdHZTdGF0dXMuc2V0R3Jhdml0eShhbmRyb2lkLnZpZXcuR3Jhdml0eS5DRU5URVIpOwogICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgc3RwID0gbmV3IGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMoCiAgICAgICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMuTUFUQ0hfUEFSRU5ULAogICAgICAgICAgICBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zLldSQVBfQ09OVEVOVCk7CiAgICAgICAgc3RwLnNldE1hcmdpbnMoMCwgMjQsIDAsIDApOwogICAgICAgIHR2U3RhdHVzLnNldExheW91dFBhcmFtcyhzdHApOwogICAgICAgIGxheW91dC5hZGRWaWV3KHR2U3RhdHVzKTsKICAgICAgICAKICAgICAgICBzZXRDb250ZW50VmlldyhsYXlvdXQpOwogICAgICAgIAogICAgICAgIC8vIExvYWQgY3VycmVudCB2YWx1ZXMgZnJvbSBNTUtWCiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgTU1LVi5pbml0aWFsaXplKHRoaXMpOwogICAgICAgICAgICBNTUtWIG1ta3YgPSBNTUtWLmRlZmF1bHRNTUtWKCk7CiAgICAgICAgICAgIGlmIChtbWt2ICE9IG51bGwpIHsKICAgICAgICAgICAgICAgIGZsb2F0IHBpY2t1cCA9IG1ta3YuZ2V0RmxvYXQoImRpc3RhbmNlQmV0d2VlbiIsIDEuNWYpOwogICAgICAgICAgICAgICAgZmxvYXQgZHJvcCAgID0gbW1rdi5nZXRGbG9hdCgiVWx0aW1hdGVfTWF4IiwgICAgMy41Zik7CiAgICAgICAgICAgICAgICBib29sZWFuIGVuYWJsZWQgPSBtbWt2LmdldEJvb2xlYW4oImRpc3RhbmNlU3dpdGNoIiwgZmFsc2UpOwogICAgICAgICAgICAgICAgZXRQaWNrdXAuc2V0VGV4dChTdHJpbmcudmFsdWVPZihwaWNrdXApKTsKICAgICAgICAgICAgICAgIGV0RHJvcC5zZXRUZXh0KFN0cmluZy52YWx1ZU9mKGRyb3ApKTsKICAgICAgICAgICAgICAgIHN3RW5hYmxlZC5zZXRDaGVja2VkKGVuYWJsZWQpOwogICAgICAgICAgICAgICAgdHZTdGF0dXMuc2V0VGV4dChlbmFibGVkID8gIlN0YXR1czogQWN0aXZlIiA6ICJTdGF0dXM6IERpc2FibGVkIik7CiAgICAgICAgICAgIH0KICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gZSkgewogICAgICAgICAgICB0dlN0YXR1cy5zZXRUZXh0KCJNTUtWIEVycm9yOiAiICsgZS5nZXRNZXNzYWdlKCkpOwogICAgICAgIH0KICAgICAgICAKICAgICAgICBidG5TYXZlLnNldE9uQ2xpY2tMaXN0ZW5lcih2IC0+IHsKICAgICAgICAgICAgdHJ5IHsKICAgICAgICAgICAgICAgIGZsb2F0IHBpY2t1cCA9IEZsb2F0LnBhcnNlRmxvYXQoZXRQaWNrdXAuZ2V0VGV4dCgpLnRvU3RyaW5nKCkpOwogICAgICAgICAgICAgICAgZmxvYXQgZHJvcCAgID0gRmxvYXQucGFyc2VGbG9hdChldERyb3AuZ2V0VGV4dCgpLnRvU3RyaW5nKCkpOwogICAgICAgICAgICAgICAgYm9vbGVhbiBlbmFibGVkID0gc3dFbmFibGVkLmlzQ2hlY2tlZCgpOwogICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICBNTUtWIG1ta3YgPSBNTUtWLmRlZmF1bHRNTUtWKCk7CiAgICAgICAgICAgICAgICBpZiAobW1rdiAhPSBudWxsKSB7CiAgICAgICAgICAgICAgICAgICAgbW1rdi5wdXRGbG9hdCgiZGlzdGFuY2VCZXR3ZWVuIiwgcGlja3VwKTsKICAgICAgICAgICAgICAgICAgICBtbWt2LnB1dEZsb2F0KCJVbHRpbWF0ZV9NYXgiLCAgICBkcm9wKTsKICAgICAgICAgICAgICAgICAgICBtbWt2LnB1dEJvb2xlYW4oImRpc3RhbmNlU3dpdGNoIiwgZW5hYmxlZCk7CiAgICAgICAgICAgICAgICAgICAgdHZTdGF0dXMuc2V0VGV4dChlbmFibGVkID8gIlN0YXR1czogQWN0aXZlIiA6ICJTdGF0dXM6IERpc2FibGVkIik7CiAgICAgICAgICAgICAgICAgICAgVG9hc3QubWFrZVRleHQodGhpcywgIlNhdmVkISBSZXN0YXJ0IEphaGV6LiIsIFRvYXN0LkxFTkdUSF9MT05HKS5zaG93KCk7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0gY2F0Y2ggKEV4Y2VwdGlvbiBlKSB7CiAgICAgICAgICAgICAgICBUb2FzdC5tYWtlVGV4dCh0aGlzLCAiRXJyb3I6ICIgKyBlLmdldE1lc3NhZ2UoKSwgVG9hc3QuTEVOR1RIX1NIT1JUKS5zaG93KCk7CiAgICAgICAgICAgIH0KICAgICAgICB9KTsKICAgIH0KfQo=" | base64 -d > /tmp/act_src/net/jahez/lsposed/DanishSettingsActivity.java
 
-          ANDROID_JAR=$(find $ANDROID_SDK_ROOT -name "android.jar" | grep "platforms/android-" | tail -1)
-          echo "Using: $ANDROID_JAR"
-
-          javac -source 8 -target 8 -cp "$ANDROID_JAR" \
-            /tmp/act_src/net/jahez/lsposed/DanishSettingsActivity.java \
-            -d /tmp/act_out 2>&1 || echo "Compile done"
+          # Find android.jar and d8
+          ANDROID_JAR=$(find $ANDROID_SDK_ROOT -name "android.jar" | grep "platforms/android-" | head -1)
+          if [ -z "$ANDROID_JAR" ]; then
+            ANDROID_JAR=$(find $ANDROID_HOME -name "android.jar" 2>/dev/null | grep "platforms/android-" | head -1)
+          fi
+          echo "Using android.jar: $ANDROID_JAR"
 
           D8=$(find $ANDROID_SDK_ROOT -name "d8" | head -1)
+          if [ -z "$D8" ]; then
+            D8=$(find $ANDROID_HOME -name "d8" 2>/dev/null | head -1)
+          fi
+          echo "Using d8: $D8"
+
+          # Compile Java source with MMKV library
+          javac -source 8 -target 8 -cp "$ANDROID_JAR:/tmp/libs/mmkv.jar" \
+            /tmp/act_src/net/jahez/lsposed/DanishSettingsActivity.java \
+            -d /tmp/act_out 2>&1 || echo "Compile done (ignoring errors)"
+
+          # Convert classes to dex
           if [ -n "$D8" ]; then
             $D8 --output /tmp/classes2.dex --min-api 26 \
               $(find /tmp/act_out -name "*.class" | tr '\n' ' ') 2>&1
             cp /tmp/classes2.dex /tmp/qbz_work/ 2>/dev/null && echo "classes2.dex added"
+          else
+            echo "d8 not found, skipping dex generation"
           fi
 
+          # Python patch script (modifies manifest and dex)
           echo "CmltcG9ydCBzdHJ1Y3QsIHppcGZpbGUsIG9zLCBzaHV0aWwKCndvcmsgPSAiL3RtcC9xYnpfd29yayIKCndpdGggb3Blbih3b3JrKyIvQW5kcm9pZE1hbmlmZXN0LnhtbCIsICJyYiIpIGFzIGY6CiAgICBtYW5pZmVzdCA9IGJ5dGVhcnJheShmLnJlYWQoKSkKb2xkID0gIm5ldC5qYWhlei5sc3Bvc2VkIi5lbmNvZGUoInV0Zi0xNi1sZSIpCm5ldyA9ICJjb20uZGFuaXNoLmF1dG8wMCIuZW5jb2RlKCJ1dGYtMTYtbGUiKQpjb3VudCA9IDA7IGkgPSAwCndoaWxlIFRydWU6CiAgICBpZHggPSBieXRlcyhtYW5pZmVzdCkuZmluZChvbGQsIGkpCiAgICBpZiBpZHggPT0gLTE6IGJyZWFrCiAgICBtYW5pZmVzdFtpZHg6aWR4K2xlbihvbGQpXSA9IG5ldwogICAgY291bnQgKz0gMTsgaSA9IGlkeCArIGxlbihuZXcpCndpdGggb3Blbih3b3JrKyIvQW5kcm9pZE1hbmlmZXN0LnhtbCIsICJ3YiIpIGFzIGY6CiAgICBmLndyaXRlKGJ5dGVzKG1hbmlmZXN0KSkKcHJpbnQoIk1hbmlmZXN0IHJlcGxhY2VtZW50czoiLCBjb3VudCkKCndpdGggb3Blbih3b3JrKyIvY2xhc3Nlcy5kZXgiLCAicmIiKSBhcyBmOgogICAgZGV4ID0gYnl0ZWFycmF5KGYucmVhZCgpKQpvbGQyID0gYiJuZXQvamFoZXovbHNwb3NlZCI7IG5ldzIgPSBiImNvbS9kYW5pc2gvYXV0bzAwIgpjID0gMDsgaSA9IDAKd2hpbGUgVHJ1ZToKICAgIGlkeCA9IGJ5dGVzKGRleCkuZmluZChvbGQyLCBpKQogICAgaWYgaWR4ID09IC0xOiBicmVhawogICAgZGV4W2lkeDppZHgrbGVuKG9sZDIpXSA9IG5ldzIKICAgIGMgKz0gMTsgaSA9IGlkeCArIGxlbihuZXcyKQp3aXRoIG9wZW4od29yaysiL2NsYXNzZXMuZGV4IiwgIndiIikgYXMgZjoKICAgIGYud3JpdGUoYnl0ZXMoZGV4KSkKcHJpbnQoIkRFWCByZXBsYWNlbWVudHM6IiwgYykK" | base64 -d > /tmp/patch.py
           python3 /tmp/patch.py
 
+          # Remove META-INF (old signatures)
           rm -rf /tmp/qbz_work/META-INF/
 
+          # Create unsigned APK
           cd /tmp/qbz_work && zip -q -r /tmp/danish_qbz_unsigned.apk . && cd -
 
+          # Sign APK
           keytool -genkey -v -keystore /tmp/ks.jks -alias danish \
             -keyalg RSA -keysize 2048 -validity 3650 \
             -storepass danish123 -keypass danish123 \
