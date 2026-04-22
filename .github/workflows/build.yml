@@ -53,11 +53,17 @@ jobs:
             /tmp/act_src/net/jahez/lsposed/DanishSettingsActivity.java \
             -d /tmp/act_out 2>&1 || echo "Compile done (ignoring errors)"
 
-          # Convert classes to dex
+          # Convert classes to dex (output to directory)
           if [ -n "$D8" ]; then
-            $D8 --output /tmp/classes2.dex --min-api 26 \
+            mkdir -p /tmp/dex_out
+            $D8 --output /tmp/dex_out --min-api 26 \
               $(find /tmp/act_out -name "*.class" | tr '\n' ' ') 2>&1
-            cp /tmp/classes2.dex /tmp/qbz_work/ 2>/dev/null && echo "classes2.dex added"
+            if [ -f /tmp/dex_out/classes.dex ]; then
+              cp /tmp/dex_out/classes.dex /tmp/qbz_work/classes2.dex
+              echo "classes2.dex added"
+            else
+              echo "Warning: classes.dex not found"
+            fi
           else
             echo "d8 not found, skipping dex generation"
           fi
