@@ -78,6 +78,21 @@ jobs:
             -sigalg SHA256withRSA -digestalg SHA-256 \
             /tmp/danish_qbz.apk danish 2>&1 | tail -2
 
+          # --- ADD ALIGNMENT STEP ---
+          # Find zipalign from Android SDK build-tools
+          ZIPALIGN=$(find $ANDROID_SDK_ROOT -name "zipalign" | grep "build-tools" | head -1)
+          if [ -z "$ZIPALIGN" ]; then
+            echo "zipalign not found, trying to use a known path"
+            ZIPALIGN="$ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign"
+          fi
+          if [ -f "$ZIPALIGN" ]; then
+            echo "Aligning APK with $ZIPALIGN"
+            $ZIPALIGN -v -p 4 /tmp/danish_qbz.apk /tmp/danish_qbz_aligned.apk
+            mv /tmp/danish_qbz_aligned.apk /tmp/danish_qbz.apk
+          else
+            echo "WARNING: zipalign not found, APK may not be aligned"
+          fi
+
           ls -lh /tmp/danish_qbz.apk
           echo "BUILD COMPLETE!"
 
