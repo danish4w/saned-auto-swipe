@@ -19,94 +19,62 @@ jobs:
       - name: Build Modified QBZ
         run: |
           if [ ! -f qbz.apk ]; then
-            echo "ERROR: qbz.apk not found in repo!"
+            echo "ERROR: qbz.apk not found!"
             exit 1
           fi
 
-          mkdir -p /tmp/qbz_work
-          mkdir -p /tmp/act_src/net/jahez/lsposed
-          mkdir -p /tmp/act_out
-          mkdir -p /tmp/dex_out
+          wget -q https://github.com/iBotPeaches/Apktool/releases/download/v2.9.3/apktool_2.9.3.jar -O apktool.jar
+          echo "apktool ready"
 
-          cd /tmp/qbz_work && unzip -q $GITHUB_WORKSPACE/qbz.apk && cd -
-          echo "QBZ extracted OK"
+          java -jar apktool.jar d qbz.apk -o /tmp/qbz_decoded -f 2>&1 | tail -3
+          echo "Decoded!"
 
-          echo "CnBhY2thZ2UgbmV0LmphaGV6LmxzcG9zZWQ7CgppbXBvcnQgYW5kcm9pZC5hcHAuQWN0aXZpdHk7CmltcG9ydCBhbmRyb2lkLmNvbnRlbnQuU2hhcmVkUHJlZmVyZW5jZXM7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQud2lkZ2V0LkJ1dHRvbjsKaW1wb3J0IGFuZHJvaWQud2lkZ2V0LkVkaXRUZXh0OwppbXBvcnQgYW5kcm9pZC53aWRnZXQuU3dpdGNoOwppbXBvcnQgYW5kcm9pZC53aWRnZXQuVGV4dFZpZXc7CmltcG9ydCBhbmRyb2lkLndpZGdldC5Ub2FzdDsKaW1wb3J0IGNvbS50ZW5jZW50Lm1ta3YuTU1LVjsKCnB1YmxpYyBjbGFzcyBEYW5pc2hTZXR0aW5nc0FjdGl2aXR5IGV4dGVuZHMgQWN0aXZpdHkgewogICAgCiAgICBAT3ZlcnJpZGUKICAgIHByb3RlY3RlZCB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBzYXZlZEluc3RhbmNlU3RhdGUpIHsKICAgICAgICBzdXBlci5vbkNyZWF0ZShzYXZlZEluc3RhbmNlU3RhdGUpOwogICAgICAgIAogICAgICAgIC8vIFNpbXBsZSBwcm9ncmFtbWF0aWMgVUkgLSBubyBYTUwgbmVlZGVkCiAgICAgICAgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0IGxheW91dCA9IG5ldyBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQodGhpcyk7CiAgICAgICAgbGF5b3V0LnNldE9yaWVudGF0aW9uKGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5WRVJUSUNBTCk7CiAgICAgICAgbGF5b3V0LnNldFBhZGRpbmcoNDAsIDYwLCA0MCwgNDApOwogICAgICAgIGxheW91dC5zZXRCYWNrZ3JvdW5kQ29sb3IoMHhGRjEyMTIxMik7CiAgICAgICAgCiAgICAgICAgVGV4dFZpZXcgdGl0bGUgPSBuZXcgVGV4dFZpZXcodGhpcyk7CiAgICAgICAgdGl0bGUuc2V0VGV4dCgiRGFuaXNoIEF1dG8iKTsKICAgICAgICB0aXRsZS5zZXRUZXh0U2l6ZSgyNik7CiAgICAgICAgdGl0bGUuc2V0VGV4dENvbG9yKDB4RkYxREI5NTQpOwogICAgICAgIHRpdGxlLnNldFR5cGVmYWNlKG51bGwsIGFuZHJvaWQuZ3JhcGhpY3MuVHlwZWZhY2UuQk9MRCk7CiAgICAgICAgdGl0bGUuc2V0R3Jhdml0eShhbmRyb2lkLnZpZXcuR3Jhdml0eS5DRU5URVIpOwogICAgICAgIGxheW91dC5hZGRWaWV3KHRpdGxlKTsKICAgICAgICAKICAgICAgICBUZXh0VmlldyBzdWIgPSBuZXcgVGV4dFZpZXcodGhpcyk7CiAgICAgICAgc3ViLnNldFRleHQoIlFCWiBOYXRpdmUgSG9vayIpOwogICAgICAgIHN1Yi5zZXRUZXh0U2l6ZSgxMik7CiAgICAgICAgc3ViLnNldFRleHRDb2xvcigweEZGODg4ODg4KTsKICAgICAgICBzdWIuc2V0R3Jhdml0eShhbmRyb2lkLnZpZXcuR3Jhdml0eS5DRU5URVIpOwogICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgc3ViUGFyYW1zID0gbmV3IGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMoCiAgICAgICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMuTUFUQ0hfUEFSRU5ULCAKICAgICAgICAgICAgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcy5XUkFQX0NPTlRFTlQpOwogICAgICAgIHN1YlBhcmFtcy5zZXRNYXJnaW5zKDAsIDgsIDAsIDMyKTsKICAgICAgICBzdWIuc2V0TGF5b3V0UGFyYW1zKHN1YlBhcmFtcyk7CiAgICAgICAgbGF5b3V0LmFkZFZpZXcoc3ViKTsKICAgICAgICAKICAgICAgICBUZXh0VmlldyBsYmxQaWNrdXAgPSBuZXcgVGV4dFZpZXcodGhpcyk7CiAgICAgICAgbGJsUGlja3VwLnNldFRleHQoIlBpY2t1cCBNYXggKGttKSIpOwogICAgICAgIGxibFBpY2t1cC5zZXRUZXh0Q29sb3IoMHhGRkFBQUFBQSk7CiAgICAgICAgbGF5b3V0LmFkZFZpZXcobGJsUGlja3VwKTsKICAgICAgICAKICAgICAgICBFZGl0VGV4dCBldFBpY2t1cCA9IG5ldyBFZGl0VGV4dCh0aGlzKTsKICAgICAgICBldFBpY2t1cC5zZXRJbnB1dFR5cGUoYW5kcm9pZC50ZXh0LklucHV0VHlwZS5UWVBFX0NMQVNTX05VTUJFUiB8IGFuZHJvaWQudGV4dC5JbnB1dFR5cGUuVFlQRV9OVU1CRVJfRkxBR19ERUNJTUFMKTsKICAgICAgICBldFBpY2t1cC5zZXRUZXh0Q29sb3IoMHhGRkZGRkZGRik7CiAgICAgICAgZXRQaWNrdXAuc2V0QmFja2dyb3VuZENvbG9yKDB4RkYzMzMzMzMpOwogICAgICAgIGV0UGlja3VwLnNldFBhZGRpbmcoMjAsIDIwLCAyMCwgMjApOwogICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgcDEgPSBuZXcgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcygKICAgICAgICAgICAgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcy5NQVRDSF9QQVJFTlQsIDExMCk7CiAgICAgICAgcDEuc2V0TWFyZ2lucygwLCA4LCAwLCAyNCk7CiAgICAgICAgZXRQaWNrdXAuc2V0TGF5b3V0UGFyYW1zKHAxKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhldFBpY2t1cCk7CiAgICAgICAgCiAgICAgICAgVGV4dFZpZXcgbGJsRHJvcCA9IG5ldyBUZXh0Vmlldyh0aGlzKTsKICAgICAgICBsYmxEcm9wLnNldFRleHQoIkRyb3AgTWF4IChrbSkiKTsKICAgICAgICBsYmxEcm9wLnNldFRleHRDb2xvcigweEZGQUFBQUFBKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhsYmxEcm9wKTsKICAgICAgICAKICAgICAgICBFZGl0VGV4dCBldERyb3AgPSBuZXcgRWRpdFRleHQodGhpcyk7CiAgICAgICAgZXREcm9wLnNldElucHV0VHlwZShhbmRyb2lkLnRleHQuSW5wdXRUeXBlLlRZUEVfQ0xBU1NfTlVNQkVSIHwgYW5kcm9pZC50ZXh0LklucHV0VHlwZS5UWVBFX05VTUJFUl9GTEFHX0RFQ0lNQUwpOwogICAgICAgIGV0RHJvcC5zZXRUZXh0Q29sb3IoMHhGRkZGRkZGRik7CiAgICAgICAgZXREcm9wLnNldEJhY2tncm91bmRDb2xvcigweEZGMzMzMzMzKTsKICAgICAgICBldERyb3Auc2V0UGFkZGluZygyMCwgMjAsIDIwLCAyMCk7CiAgICAgICAgYW5kcm9pZC53aWRnZXQuTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcyBwMiA9IG5ldyBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zKAogICAgICAgICAgICBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zLk1BVENIX1BBUkVOVCwgMTEwKTsKICAgICAgICBwMi5zZXRNYXJnaW5zKDAsIDgsIDAsIDI0KTsKICAgICAgICBldERyb3Auc2V0TGF5b3V0UGFyYW1zKHAyKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhldERyb3ApOwogICAgICAgIAogICAgICAgIFN3aXRjaCBzd0VuYWJsZWQgPSBuZXcgU3dpdGNoKHRoaXMpOwogICAgICAgIHN3RW5hYmxlZC5zZXRUZXh0KCJBdXRvIEFjY2VwdCBPTi9PRkYiKTsKICAgICAgICBzd0VuYWJsZWQuc2V0VGV4dENvbG9yKDB4RkZGRkZGRkYpOwogICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgc3dwID0gbmV3IGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMoCiAgICAgICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMuV1JBUF9DT05URU5ULAogICAgICAgICAgICBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zLldSQVBfQ09OVEVOVCk7CiAgICAgICAgc3dwLnNldE1hcmdpbnMoMCwgMCwgMCwgMzIpOwogICAgICAgIHN3RW5hYmxlZC5zZXRMYXlvdXRQYXJhbXMoc3dwKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhzd0VuYWJsZWQpOwogICAgICAgIAogICAgICAgIEJ1dHRvbiBidG5TYXZlID0gbmV3IEJ1dHRvbih0aGlzKTsKICAgICAgICBidG5TYXZlLnNldFRleHQoIlNBVkUiKTsKICAgICAgICBidG5TYXZlLnNldEJhY2tncm91bmRDb2xvcigweEZGMURCOTU0KTsKICAgICAgICBidG5TYXZlLnNldFRleHRDb2xvcigweEZGRkZGRkZGKTsKICAgICAgICBsYXlvdXQuYWRkVmlldyhidG5TYXZlKTsKICAgICAgICAKICAgICAgICBUZXh0VmlldyB0dlN0YXR1cyA9IG5ldyBUZXh0Vmlldyh0aGlzKTsKICAgICAgICB0dlN0YXR1cy5zZXRUZXh0Q29sb3IoMHhGRjg4ODg4OCk7CiAgICAgICAgdHZTdGF0dXMuc2V0R3Jhdml0eShhbmRyb2lkLnZpZXcuR3Jhdml0eS5DRU5URVIpOwogICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgc3RwID0gbmV3IGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMoCiAgICAgICAgICAgIGFuZHJvaWQud2lkZ2V0LkxpbmVhckxheW91dC5MYXlvdXRQYXJhbXMuTUFUQ0hfUEFSRU5ULAogICAgICAgICAgICBhbmRyb2lkLndpZGdldC5MaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zLldSQVBfQ09OVEVOVCk7CiAgICAgICAgc3RwLnNldE1hcmdpbnMoMCwgMjQsIDAsIDApOwogICAgICAgIHR2U3RhdHVzLnNldExheW91dFBhcmFtcyhzdHApOwogICAgICAgIGxheW91dC5hZGRWaWV3KHR2U3RhdHVzKTsKICAgICAgICAKICAgICAgICBzZXRDb250ZW50VmlldyhsYXlvdXQpOwogICAgICAgIAogICAgICAgIC8vIExvYWQgY3VycmVudCB2YWx1ZXMgZnJvbSBNTUtWCiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgTU1LVi5pbml0aWFsaXplKHRoaXMpOwogICAgICAgICAgICBNTUtWIG1ta3YgPSBNTUtWLmRlZmF1bHRNTUtWKCk7CiAgICAgICAgICAgIGlmIChtbWt2ICE9IG51bGwpIHsKICAgICAgICAgICAgICAgIGZsb2F0IHBpY2t1cCA9IG1ta3YuZ2V0RmxvYXQoImRpc3RhbmNlQmV0d2VlbiIsIDEuNWYpOwogICAgICAgICAgICAgICAgZmxvYXQgZHJvcCAgID0gbW1rdi5nZXRGbG9hdCgiVWx0aW1hdGVfTWF4IiwgICAgMy41Zik7CiAgICAgICAgICAgICAgICBib29sZWFuIGVuYWJsZWQgPSBtbWt2LmdldEJvb2xlYW4oImRpc3RhbmNlU3dpdGNoIiwgZmFsc2UpOwogICAgICAgICAgICAgICAgZXRQaWNrdXAuc2V0VGV4dChTdHJpbmcudmFsdWVPZihwaWNrdXApKTsKICAgICAgICAgICAgICAgIGV0RHJvcC5zZXRUZXh0KFN0cmluZy52YWx1ZU9mKGRyb3ApKTsKICAgICAgICAgICAgICAgIHN3RW5hYmxlZC5zZXRDaGVja2VkKGVuYWJsZWQpOwogICAgICAgICAgICAgICAgdHZTdGF0dXMuc2V0VGV4dChlbmFibGVkID8gIlN0YXR1czogQWN0aXZlIiA6ICJTdGF0dXM6IERpc2FibGVkIik7CiAgICAgICAgICAgIH0KICAgICAgICB9IGNhdGNoIChFeGNlcHRpb24gZSkgewogICAgICAgICAgICB0dlN0YXR1cy5zZXRUZXh0KCJNTUtWIEVycm9yOiAiICsgZS5nZXRNZXNzYWdlKCkpOwogICAgICAgIH0KICAgICAgICAKICAgICAgICBidG5TYXZlLnNldE9uQ2xpY2tMaXN0ZW5lcih2IC0+IHsKICAgICAgICAgICAgdHJ5IHsKICAgICAgICAgICAgICAgIGZsb2F0IHBpY2t1cCA9IEZsb2F0LnBhcnNlRmxvYXQoZXRQaWNrdXAuZ2V0VGV4dCgpLnRvU3RyaW5nKCkpOwogICAgICAgICAgICAgICAgZmxvYXQgZHJvcCAgID0gRmxvYXQucGFyc2VGbG9hdChldERyb3AuZ2V0VGV4dCgpLnRvU3RyaW5nKCkpOwogICAgICAgICAgICAgICAgYm9vbGVhbiBlbmFibGVkID0gc3dFbmFibGVkLmlzQ2hlY2tlZCgpOwogICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICBNTUtWIG1ta3YgPSBNTUtWLmRlZmF1bHRNTUtWKCk7CiAgICAgICAgICAgICAgICBpZiAobW1rdiAhPSBudWxsKSB7CiAgICAgICAgICAgICAgICAgICAgbW1rdi5wdXRGbG9hdCgiZGlzdGFuY2VCZXR3ZWVuIiwgcGlja3VwKTsKICAgICAgICAgICAgICAgICAgICBtbWt2LnB1dEZsb2F0KCJVbHRpbWF0ZV9NYXgiLCAgICBkcm9wKTsKICAgICAgICAgICAgICAgICAgICBtbWt2LnB1dEJvb2xlYW4oImRpc3RhbmNlU3dpdGNoIiwgZW5hYmxlZCk7CiAgICAgICAgICAgICAgICAgICAgdHZTdGF0dXMuc2V0VGV4dChlbmFibGVkID8gIlN0YXR1czogQWN0aXZlIiA6ICJTdGF0dXM6IERpc2FibGVkIik7CiAgICAgICAgICAgICAgICAgICAgVG9hc3QubWFrZVRleHQodGhpcywgIlNhdmVkISBSZXN0YXJ0IEphaGV6LiIsIFRvYXN0LkxFTkdUSF9MT05HKS5zaG93KCk7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0gY2F0Y2ggKEV4Y2VwdGlvbiBlKSB7CiAgICAgICAgICAgICAgICBUb2FzdC5tYWtlVGV4dCh0aGlzLCAiRXJyb3I6ICIgKyBlLmdldE1lc3NhZ2UoKSwgVG9hc3QuTEVOR1RIX1NIT1JUKS5zaG93KCk7CiAgICAgICAgICAgIH0KICAgICAgICB9KTsKICAgIH0KfQo=" | base64 -d > /tmp/act_src/net/jahez/lsposed/DanishSettingsActivity.java
+          mkdir -p /tmp/act_src/net/jahez/lsposed /tmp/act_out /tmp/dex_out
+
+          echo "cGFja2FnZSBuZXQuamFoZXoubHNwb3NlZDsKaW1wb3J0IGFuZHJvaWQuYXBwLkFjdGl2aXR5OwppbXBvcnQgYW5kcm9pZC5jb250ZW50LlNoYXJlZFByZWZlcmVuY2VzOwppbXBvcnQgYW5kcm9pZC5ncmFwaGljcy5UeXBlZmFjZTsKaW1wb3J0IGFuZHJvaWQub3MuQnVuZGxlOwppbXBvcnQgYW5kcm9pZC52aWV3LkdyYXZpdHk7CmltcG9ydCBhbmRyb2lkLndpZGdldC4qOwpwdWJsaWMgY2xhc3MgRGFuaXNoQWN0aXZpdHkgZXh0ZW5kcyBBY3Rpdml0eSB7CiAgICBAT3ZlcnJpZGUKICAgIHByb3RlY3RlZCB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBzKSB7CiAgICAgICAgc3VwZXIub25DcmVhdGUocyk7CiAgICAgICAgTGluZWFyTGF5b3V0IGwgPSBuZXcgTGluZWFyTGF5b3V0KHRoaXMpOwogICAgICAgIGwuc2V0T3JpZW50YXRpb24oTGluZWFyTGF5b3V0LlZFUlRJQ0FMKTsKICAgICAgICBsLnNldFBhZGRpbmcoNDgsODAsNDgsNDgpOwogICAgICAgIGwuc2V0QmFja2dyb3VuZENvbG9yKDB4RkYxMjEyMTIpOwogICAgICAgIFRleHRWaWV3IHQxID0gbmV3IFRleHRWaWV3KHRoaXMpOwogICAgICAgIHQxLnNldFRleHQoIkRhbmlzaCBBdXRvIik7IHQxLnNldFRleHRTaXplKDI2KTsKICAgICAgICB0MS5zZXRUZXh0Q29sb3IoMHhGRjFEQjk1NCk7IHQxLnNldFR5cGVmYWNlKG51bGwsVHlwZWZhY2UuQk9MRCk7CiAgICAgICAgdDEuc2V0R3Jhdml0eShHcmF2aXR5LkNFTlRFUik7IGwuYWRkVmlldyh0MSk7CiAgICAgICAgVGV4dFZpZXcgdDIgPSBuZXcgVGV4dFZpZXcodGhpcyk7CiAgICAgICAgdDIuc2V0VGV4dCgiUUJaIE5hdGl2ZSBIb29rIik7IHQyLnNldFRleHRTaXplKDEyKTsKICAgICAgICB0Mi5zZXRUZXh0Q29sb3IoMHhGRjg4ODg4OCk7IHQyLnNldEdyYXZpdHkoR3Jhdml0eS5DRU5URVIpOwogICAgICAgIExpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgbHAwPW5ldyBMaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zKC0xLC0yKTsKICAgICAgICBscDAuc2V0TWFyZ2lucygwLDgsMCw0MCk7IHQyLnNldExheW91dFBhcmFtcyhscDApOyBsLmFkZFZpZXcodDIpOwogICAgICAgIFRleHRWaWV3IGxwPW5ldyBUZXh0Vmlldyh0aGlzKTsgbHAuc2V0VGV4dCgiUGlja3VwIE1heCAoa20pIik7IGxwLnNldFRleHRDb2xvcigweEZGQUFBQUFBKTsgbC5hZGRWaWV3KGxwKTsKICAgICAgICBFZGl0VGV4dCBlcD1uZXcgRWRpdFRleHQodGhpcyk7IGVwLnNldElucHV0VHlwZSgweDIwMDIpOyBlcC5zZXRUZXh0Q29sb3IoMHhGRkZGRkZGRik7IGVwLnNldEJhY2tncm91bmRDb2xvcigweEZGMzMzMzMzKTsgZXAuc2V0UGFkZGluZygyNCwyNCwyNCwyNCk7CiAgICAgICAgTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcyBscDE9bmV3IExpbmVhckxheW91dC5MYXlvdXRQYXJhbXMoLTEsMTIwKTsgbHAxLnNldE1hcmdpbnMoMCw4LDAsMjgpOyBlcC5zZXRMYXlvdXRQYXJhbXMobHAxKTsgbC5hZGRWaWV3KGVwKTsKICAgICAgICBUZXh0VmlldyBsZD1uZXcgVGV4dFZpZXcodGhpcyk7IGxkLnNldFRleHQoIkRyb3AgTWF4IChrbSkiKTsgbGQuc2V0VGV4dENvbG9yKDB4RkZBQUFBQUEpOyBsLmFkZFZpZXcobGQpOwogICAgICAgIEVkaXRUZXh0IGVkPW5ldyBFZGl0VGV4dCh0aGlzKTsgZWQuc2V0SW5wdXRUeXBlKDB4MjAwMik7IGVkLnNldFRleHRDb2xvcigweEZGRkZGRkZGKTsgZWQuc2V0QmFja2dyb3VuZENvbG9yKDB4RkYzMzMzMzMpOyBlZC5zZXRQYWRkaW5nKDI0LDI0LDI0LDI0KTsKICAgICAgICBMaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zIGxwMj1uZXcgTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcygtMSwxMjApOyBscDIuc2V0TWFyZ2lucygwLDgsMCwyOCk7IGVkLnNldExheW91dFBhcmFtcyhscDIpOyBsLmFkZFZpZXcoZWQpOwogICAgICAgIFN3aXRjaCBzdz1uZXcgU3dpdGNoKHRoaXMpOyBzdy5zZXRUZXh0KCJBdXRvIEFjY2VwdCBPTi9PRkYiKTsgc3cuc2V0VGV4dENvbG9yKDB4RkZGRkZGRkYpOwogICAgICAgIExpbmVhckxheW91dC5MYXlvdXRQYXJhbXMgbHBzdz1uZXcgTGluZWFyTGF5b3V0LkxheW91dFBhcmFtcygtMiwtMik7IGxwc3cuc2V0TWFyZ2lucygwLDAsMCw0MCk7IHN3LnNldExheW91dFBhcmFtcyhscHN3KTsgbC5hZGRWaWV3KHN3KTsKICAgICAgICBCdXR0b24gYnRuPW5ldyBCdXR0b24odGhpcyk7IGJ0bi5zZXRUZXh0KCJTQVZFIik7IGJ0bi5zZXRCYWNrZ3JvdW5kQ29sb3IoMHhGRjFEQjk1NCk7IGJ0bi5zZXRUZXh0Q29sb3IoMHhGRkZGRkZGRik7IGwuYWRkVmlldyhidG4pOwogICAgICAgIFRleHRWaWV3IHN0PW5ldyBUZXh0Vmlldyh0aGlzKTsgc3Quc2V0VGV4dENvbG9yKDB4RkY4ODg4ODgpOyBzdC5zZXRHcmF2aXR5KEdyYXZpdHkuQ0VOVEVSKTsKICAgICAgICBMaW5lYXJMYXlvdXQuTGF5b3V0UGFyYW1zIGxwc3Q9bmV3IExpbmVhckxheW91dC5MYXlvdXRQYXJhbXMoLTEsLTIpOyBscHN0LnNldE1hcmdpbnMoMCwyOCwwLDApOyBzdC5zZXRMYXlvdXRQYXJhbXMobHBzdCk7IGwuYWRkVmlldyhzdCk7CiAgICAgICAgc2V0Q29udGVudFZpZXcobCk7CiAgICAgICAgU2hhcmVkUHJlZmVyZW5jZXMgcHI9Z2V0U2hhcmVkUHJlZmVyZW5jZXMoImRhbmlzaF9wcmVmcyIsMCk7CiAgICAgICAgZXAuc2V0VGV4dChTdHJpbmcudmFsdWVPZihwci5nZXRGbG9hdCgicGlja3VwX21heCIsMS41ZikpKTsKICAgICAgICBlZC5zZXRUZXh0KFN0cmluZy52YWx1ZU9mKHByLmdldEZsb2F0KCJkcm9wX21heCIsMy41ZikpKTsKICAgICAgICBzdy5zZXRDaGVja2VkKHByLmdldEJvb2xlYW4oImVuYWJsZWQiLGZhbHNlKSk7CiAgICAgICAgc3Quc2V0VGV4dChzdy5pc0NoZWNrZWQoKT8iU3RhdHVzOiBBY3RpdmUiOiJTdGF0dXM6IERpc2FibGVkIik7CiAgICAgICAgYnRuLnNldE9uQ2xpY2tMaXN0ZW5lcih2LT57CiAgICAgICAgICAgIHRyeXsKICAgICAgICAgICAgICAgIGZsb2F0IHB1PUZsb2F0LnBhcnNlRmxvYXQoZXAuZ2V0VGV4dCgpLnRvU3RyaW5nKCkpOwogICAgICAgICAgICAgICAgZmxvYXQgZHI9RmxvYXQucGFyc2VGbG9hdChlZC5nZXRUZXh0KCkudG9TdHJpbmcoKSk7CiAgICAgICAgICAgICAgICBib29sZWFuIGVuPXN3LmlzQ2hlY2tlZCgpOwogICAgICAgICAgICAgICAgZ2V0U2hhcmVkUHJlZmVyZW5jZXMoImRhbmlzaF9wcmVmcyIsMCkuZWRpdCgpLnB1dEZsb2F0KCJwaWNrdXBfbWF4IixwdSkucHV0RmxvYXQoImRyb3BfbWF4IixkcikucHV0Qm9vbGVhbigiZW5hYmxlZCIsZW4pLmFwcGx5KCk7CiAgICAgICAgICAgICAgICBzdC5zZXRUZXh0KGVuPyJTdGF0dXM6IEFjdGl2ZSI6IlN0YXR1czogRGlzYWJsZWQiKTsKICAgICAgICAgICAgICAgIFRvYXN0Lm1ha2VUZXh0KHRoaXMsIlNhdmVkISBSZXN0YXJ0IEphaGV6LiIsVG9hc3QuTEVOR1RIX0xPTkcpLnNob3coKTsKICAgICAgICAgICAgfWNhdGNoKEV4Y2VwdGlvbiBlKXtUb2FzdC5tYWtlVGV4dCh0aGlzLCJFcnJvcjogIitlLmdldE1lc3NhZ2UoKSxUb2FzdC5MRU5HVEhfU0hPUlQpLnNob3coKTt9CiAgICAgICAgfSk7CiAgICB9Cn0K" | base64 -d > /tmp/act_src/net/jahez/lsposed/DanishActivity.java
+          grep -i "mmkv\|tencent" /tmp/act_src/net/jahez/lsposed/DanishActivity.java || echo "No MMKV - CLEAN"
 
           ANDROID_JAR=$(find $ANDROID_SDK_ROOT -name "android.jar" | grep "platforms/android-" | sort | tail -1)
-          echo "Android JAR: $ANDROID_JAR"
-
-          javac -source 8 -target 8 \
-            -cp "$ANDROID_JAR" \
-            /tmp/act_src/net/jahez/lsposed/DanishSettingsActivity.java \
+          javac -source 8 -target 8 -cp "$ANDROID_JAR" \
+            /tmp/act_src/net/jahez/lsposed/DanishActivity.java \
             -d /tmp/act_out 2>&1
-          echo "Compiled: $?"
+          echo "Compile: $?"
 
           D8=$(find $ANDROID_SDK_ROOT -name "d8" | head -1)
-          echo "d8: $D8"
-
-          $D8 --output /tmp/dex_out \
-            --min-api 26 \
+          $D8 --output /tmp/dex_out --min-api 26 \
             $(find /tmp/act_out -name "*.class" | tr '\n' ' ') 2>&1
 
-          if [ -f /tmp/dex_out/classes.dex ]; then
-            cp /tmp/dex_out/classes.dex /tmp/qbz_work/classes2.dex
-            echo "classes2.dex added!"
-          fi
+          [ -f /tmp/dex_out/classes.dex ] && cp /tmp/dex_out/classes.dex /tmp/qbz_decoded/classes2.dex && echo "DEX added!"
 
-          echo "CndvcmsgPSAiL3RtcC9xYnpfd29yayIKCndpdGggb3Blbih3b3JrKyIvQW5kcm9pZE1hbmlmZXN0LnhtbCIsICJyYiIpIGFzIGY6CiAgICBtYW5pZmVzdCA9IGJ5dGVhcnJheShmLnJlYWQoKSkKb2xkID0gIm5ldC5qYWhlei5sc3Bvc2VkIi5lbmNvZGUoInV0Zi0xNi1sZSIpCm5ldyA9ICJjb20uZGFuaXNoLmF1dG8wMCIuZW5jb2RlKCJ1dGYtMTYtbGUiKQpjb3VudCA9IDA7IGkgPSAwCndoaWxlIFRydWU6CiAgICBpZHggPSBieXRlcyhtYW5pZmVzdCkuZmluZChvbGQsIGkpCiAgICBpZiBpZHggPT0gLTE6IGJyZWFrCiAgICBtYW5pZmVzdFtpZHg6aWR4K2xlbihvbGQpXSA9IG5ldwogICAgY291bnQgKz0gMTsgaSA9IGlkeCArIGxlbihuZXcpCndpdGggb3Blbih3b3JrKyIvQW5kcm9pZE1hbmlmZXN0LnhtbCIsICJ3YiIpIGFzIGY6CiAgICBmLndyaXRlKGJ5dGVzKG1hbmlmZXN0KSkKcHJpbnQoIk1hbmlmZXN0IHJlcGxhY2VtZW50czoiLCBjb3VudCkKCndpdGggb3Blbih3b3JrKyIvY2xhc3Nlcy5kZXgiLCAicmIiKSBhcyBmOgogICAgZGV4ID0gYnl0ZWFycmF5KGYucmVhZCgpKQpmb3Igb2xkMixuZXcyIGluIFsoYiJuZXQvamFoZXovbHNwb3NlZCIsYiJjb20vZGFuaXNoL2F1dG8wMCIpLChiIm5ldC5qYWhlei5sc3Bvc2VkIixiImNvbS5kYW5pc2guYXV0bzAwIildOgogICAgYyA9IDA7IGkgPSAwCiAgICB3aGlsZSBUcnVlOgogICAgICAgIGlkeCA9IGJ5dGVzKGRleCkuZmluZChvbGQyLCBpKQogICAgICAgIGlmIGlkeCA9PSAtMTogYnJlYWsKICAgICAgICBkZXhbaWR4OmlkeCtsZW4ob2xkMildID0gbmV3MgogICAgICAgIGMgKz0gMTsgaSA9IGlkeCArIGxlbihuZXcyKQogICAgcHJpbnQoZiJERVgge29sZDJ9OiB7Y30iKQp3aXRoIG9wZW4od29yaysiL2NsYXNzZXMuZGV4IiwgIndiIikgYXMgZjoKICAgIGYud3JpdGUoYnl0ZXMoZGV4KSkKcHJpbnQoIkRvbmUhIikK" | base64 -d > /tmp/patch.py
-          python3 /tmp/patch.py
+          echo "CndpdGggb3BlbigiL3RtcC9xYnpfZGVjb2RlZC9BbmRyb2lkTWFuaWZlc3QueG1sIiwiciIpIGFzIGY6CiAgICB4bWwgPSBmLnJlYWQoKQoKeG1sID0geG1sLnJlcGxhY2UoCiAgICAnPGNhdGVnb3J5IGFuZHJvaWQ6bmFtZT0iYW5kcm9pZC5pbnRlbnQuY2F0ZWdvcnkuTEFVTkNIRVIiLz4nLAogICAgJycKKQoKbmV3X2FjdCA9ICc8YWN0aXZpdHkgYW5kcm9pZDpleHBvcnRlZD0idHJ1ZSIgYW5kcm9pZDpuYW1lPSJuZXQuamFoZXoubHNwb3NlZC5EYW5pc2hBY3Rpdml0eSI+PGludGVudC1maWx0ZXI+PGFjdGlvbiBhbmRyb2lkOm5hbWU9ImFuZHJvaWQuaW50ZW50LmFjdGlvbi5NQUlOIi8+PGNhdGVnb3J5IGFuZHJvaWQ6bmFtZT0iYW5kcm9pZC5pbnRlbnQuY2F0ZWdvcnkuTEFVTkNIRVIiLz48L2ludGVudC1maWx0ZXI+PC9hY3Rpdml0eT4nCnhtbCA9IHhtbC5yZXBsYWNlKCc8L2FwcGxpY2F0aW9uPicsIG5ld19hY3QgKyAnPC9hcHBsaWNhdGlvbj4nKQp4bWwgPSB4bWwucmVwbGFjZSgncGFja2FnZT0ibmV0LmphaGV6LmxzcG9zZWQiJywgJ3BhY2thZ2U9ImNvbS5kYW5pc2guYXV0bzAwIicpCnhtbCA9IHhtbC5yZXBsYWNlKCduZXQuamFoZXoubHNwb3NlZC5EWU5BTUlDJywgJ2NvbS5kYW5pc2guYXV0bzAwLkRZTkFNSUMnKQoKd2l0aCBvcGVuKCIvdG1wL3Fiel9kZWNvZGVkL0FuZHJvaWRNYW5pZmVzdC54bWwiLCJ3IikgYXMgZjoKICAgIGYud3JpdGUoeG1sKQoKcHJpbnQoIk1hbmlmZXN0IGRvbmUhIikKcHJpbnQoIkxhdW5jaGVyOiBEYW5pc2hBY3Rpdml0eSIpCg==" | base64 -d > /tmp/mpatch.py
+          python3 /tmp/mpatch.py
 
-          rm -rf /tmp/qbz_work/META-INF/
+          echo "=== Manifest check ==="
+          grep -i "DanishActivity\|LAUNCHER\|package=" /tmp/qbz_decoded/AndroidManifest.xml
 
-          # Pack APK - resources.arsc and .so MUST be uncompressed + aligned
-          cd /tmp/qbz_work
+          java -jar apktool.jar b /tmp/qbz_decoded -o /tmp/danish_unsigned.apk 2>&1 | tail -5
+          echo "Built: $?"
+          ls -lh /tmp/danish_unsigned.apk
 
-          # Step 1: Create APK with resources.arsc and .so uncompressed
-          zip -q -Z store danish_qbz_temp.apk resources.arsc
-          
-          # Step 2: Add .so files uncompressed
-          find lib -name "*.so" | while read f; do
-            zip -q -Z store danish_qbz_temp.apk "$f"
-          done
-
-          # Step 3: Add everything else compressed
-          find . -not -name "danish_qbz_temp.apk" \
-            -not -name "resources.arsc" \
-            -not -path "./lib/*.so" \
-            -not -path "./META-INF/*" \
-            -type f | zip -q danish_qbz_temp.apk -@
-
-          mv danish_qbz_temp.apk /tmp/danish_qbz_unaligned.apk
-          cd -
-
-          # Step 4: zipalign 4 bytes
           ZIPALIGN=$(find $ANDROID_SDK_ROOT -name "zipalign" | head -1)
-          echo "zipalign: $ZIPALIGN"
-          $ZIPALIGN -p -f 4 /tmp/danish_qbz_unaligned.apk /tmp/danish_qbz_aligned.apk
+          $ZIPALIGN -p -f 4 /tmp/danish_unsigned.apk /tmp/danish_aligned.apk
           echo "Aligned!"
 
-          # Step 5: Sign with apksigner (v1+v2)
-          APKSIGNER=$(find $ANDROID_SDK_ROOT -name "apksigner" | head -1)
-          echo "apksigner: $APKSIGNER"
-
+          APKSIGNER=$(find $ANDROID_SDK_ROOT -name "apksigner" | grep -v ".jar" | head -1)
           keytool -genkey -v -keystore /tmp/ks.jks -alias danish \
             -keyalg RSA -keysize 2048 -validity 3650 \
             -storepass danish123 -keypass danish123 \
             -dname "CN=Danish,OU=Auto,O=Danish,L=SA,S=SA,C=SA" 2>/dev/null
 
           $APKSIGNER sign \
-            --ks /tmp/ks.jks \
-            --ks-pass pass:danish123 \
-            --key-pass pass:danish123 \
-            --out /tmp/danish_qbz_final.apk \
-            /tmp/danish_qbz_aligned.apk 2>&1
+            --ks /tmp/ks.jks --ks-pass pass:danish123 --key-pass pass:danish123 \
+            --out /tmp/danish_final.apk /tmp/danish_aligned.apk
 
-          ls -lh /tmp/danish_qbz_final.apk
+          ls -lh /tmp/danish_final.apk
           echo "BUILD COMPLETE!"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Danish-Auto-QBZ
-          path: /tmp/danish_qbz_final.apk
+          path: /tmp/danish_final.apk
