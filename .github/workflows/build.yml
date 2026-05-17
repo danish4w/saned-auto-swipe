@@ -146,6 +146,7 @@ jobs:
           import android.os.Build;
           import android.os.Bundle;
           import android.provider.Settings;
+          import android.view.inputmethod.InputMethodManager;
           import android.widget.*;
           public class MainActivity extends Activity {
             SharedPreferences prefs;
@@ -185,6 +186,10 @@ jobs:
                 float dk = parseFloat(etDrop.getText().toString(), 5.0f);
                 prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
                 Toast.makeText(this, "Saved! Pickup<=" + pk + "km Drop<=" + dk + "km", Toast.LENGTH_LONG).show();
+                // Keyboard band karo
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null && getCurrentFocus() != null)
+                  imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
               });
               btnAcc.setOnClickListener(v ->
                 startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -230,6 +235,11 @@ jobs:
           import android.util.Log;
           import android.view.accessibility.AccessibilityEvent;
           import android.view.accessibility.AccessibilityNodeInfo;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.os.Handler;
+          import android.os.Looper;
           import java.util.LinkedList;
           import java.util.Queue;
           import java.util.Random;
@@ -244,6 +254,20 @@ jobs:
             @Override public void onServiceConnected() {
               prefs = getSharedPreferences("cfg", MODE_PRIVATE);
               log("Service connected");
+              showServiceNotification();
+            }
+            void showServiceNotification() {
+              NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+              NotificationChannel ch = new NotificationChannel("jahez_svc", "Jahez Auto Service", NotificationManager.IMPORTANCE_LOW);
+              ch.setDescription("Service chalu hai");
+              nm.createNotificationChannel(ch);
+              Notification notif = new Notification.Builder(this, "jahez_svc")
+                .setContentTitle("Jahez Auto — Service Running")
+                .setContentText("Accessibility service active hai")
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setOngoing(true)
+                .build();
+              nm.notify(1, notif);
             }
             @Override public void onAccessibilityEvent(AccessibilityEvent event) {
               if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
@@ -270,8 +294,13 @@ jobs:
                   prefs.edit().putBoolean("enabled", false).apply();
                   sendBroadcast(new android.content.Intent("JAHEZ_AUTO_OFF"));
                   log("Auto-accept OFF");
+                  toast("✅ ACCEPTED!\nPickup: " + fmt(dist[0]) + " km | Drop: " + fmt(dist[1]) + " km");
                 } else {
-                  log("REJECTED - out of range");
+                  String reason = "";
+                  if (!pickupOk) reason += "Pickup " + fmt(dist[0]) + "km > max " + fmt(maxPickup) + "km";
+                  if (!dropOk)   reason += (!reason.isEmpty() ? "\n" : "") + "Drop " + fmt(dist[1]) + "km > max " + fmt(maxDrop) + "km";
+                  log("REJECTED - " + reason);
+                  toast("❌ REJECTED\n" + reason);
                 }
               } finally {
                 root.recycle();
@@ -335,6 +364,14 @@ jobs:
             }
             float safeFloat(String s) {
               try { return Float.parseFloat(s.trim()); } catch (Exception e) { return -1f; }
+            }
+            void toast(final String msg) {
+              new Handler(Looper.getMainLooper()).post(() ->
+                android.widget.Toast.makeText(getApplicationContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+              );
+            }
+            String fmt(float v) {
+              return v < 0 ? "?" : String.format("%.1f", v);
             }
             void log(String msg) { Log.d(TAG, msg); }
             @Override public void onInterrupt() {}
@@ -430,23 +467,10 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Danish,O=JahezAuto,C=SA" \
             -storepass danish123 -keypass danish123 2>/dev/null
-          
           APK=$(find app/build -name "*release-unsigned*.apk" | head -1)
           if [ -z "$APK" ]; then APK=$(find app/build -name "*release*.apk" | head -1); fi
           echo "Signing: $APK"
-          
-          # Fix: Locate apksigner dynamically from Android SDK Build Tools
-          ANDROID_BUILD_TOOLS_DIR="${ANDROID_HOME}/build-tools"
-          APKSIGNER=$(find $ANDROID_BUILD_TOOLS_DIR -name "apksigner" | sort -V | tail -n 1)
-          
-          if [ -z "$APKSIGNER" ]; then
-            echo "Error: apksigner not found in SDK build-tools."
-            exit 1
-          fi
-          
-          echo "Using apksigner path: $APKSIGNER"
-          
-          $APKSIGNER sign --ks /tmp/key.keystore --ks-key-alias jahez \
+          apksigner sign --ks /tmp/key.keystore --ks-key-alias jahez \
             --ks-pass pass:danish123 --key-pass pass:danish123 \
             --out app/build/JahezAutoAccept.apk "$APK"
 
