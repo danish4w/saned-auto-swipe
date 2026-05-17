@@ -35,6 +35,8 @@ jobs:
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-anydpi-v26
 
       - name: Write Gradle Files
         run: |
@@ -85,6 +87,44 @@ jobs:
           }
           ABEOF
 
+      - name: Write Icon
+        run: |
+          cat > app/src/main/res/drawable/ic_launcher_background.xml << 'BGEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp" android:height="108dp"
+            android:viewportWidth="108" android:viewportHeight="108">
+            <path android:fillColor="#1B5E20"
+              android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
+          </vector>
+          BGEOF
+
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml << 'FGEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp" android:height="108dp"
+            android:viewportWidth="108" android:viewportHeight="108">
+            <path android:fillColor="#FFFFFF"
+              android:pathData="M25,54 L35,44 L47,60 L73,30 L83,40 L47,82 Z"/>
+          </vector>
+          FGEOF
+
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'ICEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@drawable/ic_launcher_background"/>
+            <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+          </adaptive-icon>
+          ICEOF
+
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml << 'RNDEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@drawable/ic_launcher_background"/>
+            <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+          </adaptive-icon>
+          RNDEOF
+
       - name: Write Manifest
         run: |
           cat > app/src/main/AndroidManifest.xml << 'MEOF'
@@ -93,14 +133,18 @@ jobs:
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
             <application
               android:label="Jahez Auto"
+              android:icon="@mipmap/ic_launcher"
+              android:roundIcon="@mipmap/ic_launcher_round"
               android:theme="@style/AppTheme"
               android:allowBackup="false">
-              <activity android:name=".MainActivity" android:exported="true">
+              <activity android:name=".MainActivity" android:exported="true"
+                android:windowSoftInputMode="stateHidden|adjustPan">
                 <intent-filter>
                   <action android:name="android.intent.action.MAIN"/>
                   <category android:name="android.intent.category.LAUNCHER"/>
                 </intent-filter>
               </activity>
+              <activity android:name=".LogActivity" android:exported="false"/>
               <service
                 android:name=".AutoService"
                 android:label="Jahez Auto Accept"
@@ -188,13 +232,17 @@ jobs:
                 float dk = parseFloat(etDrop.getText().toString(), 5.0f);
                 prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
                 Toast.makeText(this, "Saved! Pickup<=" + pk + "km Drop<=" + dk + "km", Toast.LENGTH_LONG).show();
-                // Keyboard band karo
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                if (imm != null && getCurrentFocus() != null)
-                  imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+                if (imm != null)
+                  imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
+                etPickup.clearFocus();
+                etDrop.clearFocus();
               });
               btnAcc.setOnClickListener(v ->
                 startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+              );
+              findViewById(R.id.btn_logs).setOnClickListener(v ->
+                startActivity(new Intent(this, LogActivity.class))
               );
             }
             @Override protected void onResume() {
@@ -251,7 +299,7 @@ jobs:
             static final String TAG = "JahezAuto";
             static final String PKG = "net.jahez.fleets";
             SharedPreferences prefs;
-            long lastAccept = 0;
+            long lastEvent = 0;
             final Random rng = new Random();
             @Override public void onServiceConnected() {
               prefs = getSharedPreferences("cfg", MODE_PRIVATE);
@@ -277,12 +325,14 @@ jobs:
               String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
               if (!PKG.equals(pkg)) return;
               long now = System.currentTimeMillis();
-              if (now - lastAccept < 1500) return;
+              if (now - lastEvent < 1500) return;
               AccessibilityNodeInfo root = getRootInActiveWindow();
               if (root == null) return;
               try {
                 String screen = flattenTree(root);
                 if (!isOrderScreen(screen)) return;
+                lastEvent = now;
+                toast("🔍 Order detected!");
                 float[] dist = parseDistances(screen);
                 float maxPickup = prefs.getFloat("max_pickup", 2.0f);
                 float maxDrop   = prefs.getFloat("max_drop",   5.0f);
@@ -290,27 +340,32 @@ jobs:
                 boolean pickupOk = dist[0] < 0 || dist[0] <= maxPickup;
                 boolean dropOk   = dist[1] < 0 || dist[1] <= maxDrop;
                 if (pickupOk && dropOk) {
-                  lastAccept = now;
                   log("ACCEPTING - swiping");
                   swipeAccept();
                   prefs.edit().putBoolean("enabled", false).apply();
                   sendBroadcast(new android.content.Intent("JAHEZ_AUTO_OFF"));
                   log("Auto-accept OFF");
-                  toast("✅ ACCEPTED!\nPickup: " + fmt(dist[0]) + " km | Drop: " + fmt(dist[1]) + " km");
+                  String msg = "✅ ACCEPTED — Pickup " + fmt(dist[0]) + "km | Drop " + fmt(dist[1]) + "km";
+                  toast(msg);
+                  saveLog(msg);
                 } else {
                   String reason = "";
                   if (!pickupOk) reason += "Pickup " + fmt(dist[0]) + "km > max " + fmt(maxPickup) + "km";
-                  if (!dropOk)   reason += (!reason.isEmpty() ? "\n" : "") + "Drop " + fmt(dist[1]) + "km > max " + fmt(maxDrop) + "km";
+                  if (!dropOk)   reason += (!reason.isEmpty() ? " | " : "") + "Drop " + fmt(dist[1]) + "km > max " + fmt(maxDrop) + "km";
                   log("REJECTED - " + reason);
-                  toast("❌ REJECTED\n" + reason);
+                  String msg = "❌ SKIP — " + reason;
+                  toast(msg);
+                  saveLog(msg);
                 }
               } finally {
                 root.recycle();
               }
             }
             boolean isOrderScreen(String screen) {
-              return (screen.contains("New Order") || screen.contains("\u0637\u0644\u0628 \u062c\u062f\u064a\u062f"))
-                  && (screen.contains("Accept")    || screen.contains("\u0642\u0628\u0648\u0644"));
+              String s = screen.toLowerCase();
+              boolean hasOrder = s.contains("new order") || s.contains("طلب جديد") || s.contains("reject") || s.contains("رفض");
+              boolean hasAccept = s.contains("accept") || s.contains("قبول");
+              return hasOrder && hasAccept;
             }
             float[] parseDistances(String txt) {
               float[] r = {-1f, -1f};
@@ -339,8 +394,8 @@ jobs:
                 int H = getResources().getDisplayMetrics().heightPixels;
                 int duration = 100 + rng.nextInt(151);
                 Path path = new Path();
-                path.moveTo(W * 0.15f, H * 0.82f);
-                path.lineTo(W * 0.85f, H * 0.82f);
+                path.moveTo(W * 0.15f, H * 0.87f);
+                path.lineTo(W * 0.85f, H * 0.87f);
                 GestureDescription.Builder b = new GestureDescription.Builder();
                 b.addStroke(new GestureDescription.StrokeDescription(path, 0, duration));
                 dispatchGesture(b.build(), null, null);
@@ -367,6 +422,17 @@ jobs:
             float safeFloat(String s) {
               try { return Float.parseFloat(s.trim()); } catch (Exception e) { return -1f; }
             }
+            void saveLog(String msg) {
+              java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault());
+              String entry = "[" + sdf.format(new java.util.Date()) + "]  " + msg;
+              String existing = prefs.getString("logs", "");
+              String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
+              StringBuilder sb = new StringBuilder(entry);
+              int max = 100; // max 100 entries
+              for (int i = 0; i < lines.length && i < max - 1; i++)
+                sb.append("\n").append(lines[i]);
+              prefs.edit().putString("logs", sb.toString()).apply();
+            }
             void toast(final String msg) {
               new Handler(Looper.getMainLooper()).post(() ->
                 android.widget.Toast.makeText(getApplicationContext(), msg, android.widget.Toast.LENGTH_LONG).show()
@@ -379,6 +445,36 @@ jobs:
             @Override public void onInterrupt() {}
           }
           SEOF
+
+      - name: Write LogActivity
+        run: |
+          cat > app/src/main/java/com/danish/jahez/LogActivity.java << 'LEOF'
+          package com.danish.jahez;
+          import android.app.Activity;
+          import android.content.SharedPreferences;
+          import android.os.Bundle;
+          import android.widget.*;
+          public class LogActivity extends Activity {
+            @Override protected void onCreate(Bundle saved) {
+              super.onCreate(saved);
+              setContentView(R.layout.activity_log);
+              SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
+              TextView tvLog = findViewById(R.id.tv_log);
+              Button btnClear = findViewById(R.id.btn_clear);
+              Button btnBack = findViewById(R.id.btn_back);
+              loadLogs(tvLog, prefs);
+              btnClear.setOnClickListener(v -> {
+                prefs.edit().remove("logs").apply();
+                tvLog.setText("Log saaf ho gaya.");
+              });
+              btnBack.setOnClickListener(v -> finish());
+            }
+            void loadLogs(TextView tv, SharedPreferences prefs) {
+              String logs = prefs.getString("logs", "");
+              tv.setText(logs.isEmpty() ? "Abhi koi log nahi hai.\nJahez Fleets mein order aane do." : logs);
+            }
+          }
+          LEOF
 
       - name: Write Layout
         run: |
@@ -430,6 +526,10 @@ jobs:
               <Button android:id="@+id/btn_acc" android:layout_width="match_parent"
                 android:layout_height="58dp" android:text="Open Accessibility Settings"
                 android:backgroundTint="#FF9800" android:textColor="#000"
+                android:textStyle="bold" android:layout_marginBottom="12dp"/>
+              <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
+                android:layout_height="54dp" android:text="📋  View Logs"
+                android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="1. Open Accessibility Settings\n2. Find Jahez Auto and enable\n3. Set distances, Save, toggle ON\n4. Open Jahez Fleets - orders auto accept!"
@@ -438,6 +538,35 @@ jobs:
             </LinearLayout>
           </ScrollView>
           LEOF
+
+          cat > app/src/main/res/layout/activity_log.xml << 'LOGEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent" android:layout_height="match_parent"
+            android:orientation="vertical" android:background="#0A0A0A" android:padding="16dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:text="Activity Log" android:textSize="22sp" android:textColor="#4CAF50"
+              android:textStyle="bold" android:layout_marginBottom="12dp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:orientation="horizontal" android:layout_marginBottom="12dp">
+              <Button android:id="@+id/btn_back" android:layout_width="0dp"
+                android:layout_height="46dp" android:layout_weight="1"
+                android:text="Back" android:backgroundTint="#333"
+                android:textColor="#FFF" android:layout_marginEnd="8dp"/>
+              <Button android:id="@+id/btn_clear" android:layout_width="0dp"
+                android:layout_height="46dp" android:layout_weight="1"
+                android:text="Clear" android:backgroundTint="#B71C1C"
+                android:textColor="#FFF"/>
+            </LinearLayout>
+            <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
+              <TextView android:id="@+id/tv_log" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="Loading..."
+                android:textColor="#CCC" android:textSize="13sp"
+                android:fontFamily="monospace" android:lineSpacingExtra="6dp"
+                android:padding="8dp" android:background="#111"/>
+            </ScrollView>
+          </LinearLayout>
+          LOGEOF
 
       - name: Write Resources
         run: |
