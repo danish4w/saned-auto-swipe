@@ -90,7 +90,6 @@ jobs:
           cat > app/src/main/AndroidManifest.xml << 'MEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
             <application
               android:label="Jahez Auto"
@@ -172,6 +171,9 @@ jobs:
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
               swEnable.setChecked(prefs.getBoolean("enabled", false));
+              // Android 13+ notification permission
+              if (Build.VERSION.SDK_INT >= 33)
+                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
               IntentFilter filter = new IntentFilter("JAHEZ_AUTO_OFF");
               if (Build.VERSION.SDK_INT >= 33)
                 registerReceiver(offReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
@@ -470,7 +472,10 @@ jobs:
           APK=$(find app/build -name "*release-unsigned*.apk" | head -1)
           if [ -z "$APK" ]; then APK=$(find app/build -name "*release*.apk" | head -1); fi
           echo "Signing: $APK"
-          apksigner sign --ks /tmp/key.keystore --ks-key-alias jahez \
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name "apksigner" -type f | sort -V | tail -1)
+          if [ -z "$APKSIGNER" ]; then echo "apksigner not found!"; exit 1; fi
+          echo "Using: $APKSIGNER"
+          $APKSIGNER sign --ks /tmp/key.keystore --ks-key-alias jahez \
             --ks-pass pass:danish123 --key-pass pass:danish123 \
             --out app/build/JahezAutoAccept.apk "$APK"
 
