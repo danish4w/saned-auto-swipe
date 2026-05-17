@@ -430,10 +430,23 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Danish,O=JahezAuto,C=SA" \
             -storepass danish123 -keypass danish123 2>/dev/null
+          
           APK=$(find app/build -name "*release-unsigned*.apk" | head -1)
           if [ -z "$APK" ]; then APK=$(find app/build -name "*release*.apk" | head -1); fi
           echo "Signing: $APK"
-          apksigner sign --ks /tmp/key.keystore --ks-key-alias jahez \
+          
+          # Fix: Locate apksigner dynamically from Android SDK Build Tools
+          ANDROID_BUILD_TOOLS_DIR="${ANDROID_HOME}/build-tools"
+          APKSIGNER=$(find $ANDROID_BUILD_TOOLS_DIR -name "apksigner" | sort -V | tail -n 1)
+          
+          if [ -z "$APKSIGNER" ]; then
+            echo "Error: apksigner not found in SDK build-tools."
+            exit 1
+          fi
+          
+          echo "Using apksigner path: $APKSIGNER"
+          
+          $APKSIGNER sign --ks /tmp/key.keystore --ks-key-alias jahez \
             --ks-pass pass:danish123 --key-pass pass:danish123 \
             --out app/build/JahezAutoAccept.apk "$APK"
 
