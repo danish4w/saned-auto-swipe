@@ -330,6 +330,7 @@ jobs:
               if (root == null) return;
               try {
                 String screen = flattenTree(root);
+                saveLog("📡 Event: " + screen.substring(0, Math.min(60, screen.length())));
                 if (!isOrderScreen(screen)) return;
                 lastEvent = now;
                 toast("🔍 Order detected!");
