@@ -230,6 +230,7 @@ jobs:
                 registerReceiver(offReceiver, filter);
               swEnable.setOnCheckedChangeListener((btn, checked) -> {
                 prefs.edit().putBoolean("enabled", checked).apply();
+                sendBroadcast(new Intent("JAHEZ_STATE_CHANGED"));
                 refreshStatus(tvStatus, tvAcc);
               });
               btnSave.setOnClickListener(v -> {
@@ -315,16 +316,20 @@ jobs:
             final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-                boolean current = prefs.getBoolean("enabled", false);
-                prefs.edit().putBoolean("enabled", !current).apply();
+                String action = intent.getAction();
+                if ("JAHEZ_TOGGLE".equals(action)) {
+                  boolean current = prefs.getBoolean("enabled", false);
+                  prefs.edit().putBoolean("enabled", !current).apply();
+                  sendBroadcast(new Intent(!current ? "JAHEZ_AUTO_ON" : "JAHEZ_AUTO_OFF"));
+                  log("Toggle: " + (!current ? "ON" : "OFF"));
+                }
                 showServiceNotification();
-                sendBroadcast(new Intent(!current ? "JAHEZ_AUTO_ON" : "JAHEZ_AUTO_OFF"));
-                log("Toggle: " + (!current ? "ON" : "OFF"));
               }
             };
             @Override public void onServiceConnected() {
               prefs = getSharedPreferences("cfg", MODE_PRIVATE);
               IntentFilter f = new IntentFilter("JAHEZ_TOGGLE");
+              f.addAction("JAHEZ_STATE_CHANGED");
               if (Build.VERSION.SDK_INT >= 33)
                 registerReceiver(toggleReceiver, f, Context.RECEIVER_NOT_EXPORTED);
               else
@@ -363,6 +368,16 @@ jobs:
               long now = System.currentTimeMillis();
               if (now - lastEvent < 1500) return;
               AccessibilityNodeInfo root = getRootInActiveWindow();
+              if (root == null) {
+                for (android.view.accessibility.AccessibilityWindowInfo w : getWindows()) {
+                  AccessibilityNodeInfo r = w.getRoot();
+                  if (r != null) {
+                    String p = r.getPackageName() != null ? r.getPackageName().toString() : "";
+                    if (PKG.equals(p)) { root = r; break; }
+                    r.recycle();
+                  }
+                }
+              }
               if (root == null) { saveLog("⚠️ root null"); return; }
               try {
                 String screen = flattenTree(root);
