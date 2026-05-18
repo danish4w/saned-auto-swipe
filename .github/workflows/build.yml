@@ -172,7 +172,8 @@ jobs:
             android:canRetrieveWindowContent="true"
             android:canPerformGestures="true"
             android:description="@string/acc_desc"
-            android:notificationTimeout="50"/>
+            android:notificationTimeout="50"
+            android:packageNames="net.jahez.fleets"/>
           XEOF
 
       - name: Write MainActivity
@@ -322,8 +323,7 @@ jobs:
               if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
               if (!prefs.getBoolean("enabled", false)) return;
               String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
-              saveLog("📡 pkg: " + pkg);
-              // if (!PKG.equals(pkg)) return;
+              if (!PKG.equals(pkg)) return;
               long now = System.currentTimeMillis();
               if (now - lastEvent < 1500) return;
               AccessibilityNodeInfo root = getRootInActiveWindow();
