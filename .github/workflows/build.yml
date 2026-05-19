@@ -395,6 +395,7 @@ jobs:
               saveLog("📡 [" + screen.length() + "] " + screen.substring(0, Math.min(80, screen.length())));
               if (screen.isEmpty()) { saveLog("⚠️ screen empty"); return; }
               if (!isOrderScreen(screen)) return;
+              long now = System.currentTimeMillis();
               lastEvent = now;
               toast("🔍 Order detected!");
               float[] dist = parseDistances(screen);
