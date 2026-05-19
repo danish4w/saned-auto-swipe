@@ -267,6 +267,11 @@ jobs:
               tva.setTextColor(acc ? 0xFF4CAF50 : 0xFFFF9800);
               tvs.setText(acc && en ? "AUTO ACCEPT: ON" : "AUTO ACCEPT: OFF");
               tvs.setTextColor(acc && en ? 0xFF4CAF50 : 0xFFFF5555);
+              // Smart button: accessibility OFF → show orange button, ON → show switch
+              if (swEnable != null && findViewById(R.id.btn_acc) != null) {
+                swEnable.setVisibility(acc ? android.view.View.VISIBLE : android.view.View.GONE);
+                findViewById(R.id.btn_acc).setVisibility(acc ? android.view.View.GONE : android.view.View.VISIBLE);
+              }
             }
             boolean isAccEnabled() {
               try {
@@ -312,6 +317,7 @@ jobs:
             static final String PKG = "net.jahez.fleets";
             SharedPreferences prefs;
             long lastEvent = 0;
+            long lastScan  = 0;
             final Random rng = new Random();
             final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
@@ -364,26 +370,31 @@ jobs:
               if (!prefs.getBoolean("enabled", false)) return;
               String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
               if (!PKG.equals(pkg)) return;
-              saveLog("📡 Jahez event recd");
               long now = System.currentTimeMillis();
-              if (now - lastEvent < 1500) return;
-              // MIUI fix: use event source directly, no root needed
+              if (now - lastScan < 1500) return;
+              lastScan = now;
+              saveLog("📡 Jahez event recd");
+              scanScreen();
+            }
+
+            void scanScreen() {
+              if (prefs == null || !prefs.getBoolean("enabled", false)) return;
               String screen = "";
-              AccessibilityNodeInfo src = event.getSource();
-              if (src != null) {
-                screen = flattenTree(src);
-                src.recycle();
-              }
+              AccessibilityNodeInfo root = getRootInActiveWindow();
+              if (root != null) { screen = flattenTree(root); root.recycle(); }
               if (screen.isEmpty()) {
-                AccessibilityNodeInfo root = getRootInActiveWindow();
-                if (root != null) {
-                  screen = flattenTree(root);
-                  root.recycle();
+                for (android.view.accessibility.AccessibilityWindowInfo w : getWindows()) {
+                  AccessibilityNodeInfo r = w.getRoot();
+                  if (r != null) {
+                    String p = r.getPackageName() != null ? r.getPackageName().toString() : "";
+                    if (PKG.equals(p)) { screen = flattenTree(r); r.recycle(); break; }
+                    r.recycle();
+                  }
                 }
               }
+              saveLog("📡 [" + screen.length() + "] " + screen.substring(0, Math.min(80, screen.length())));
               if (screen.isEmpty()) { saveLog("⚠️ screen empty"); return; }
-              saveLog("📡 Screen: " + screen.substring(0, Math.min(80, screen.length())));
-                if (!isOrderScreen(screen)) return;
+              if (!isOrderScreen(screen)) return;
               lastEvent = now;
               toast("🔍 Order detected!");
               float[] dist = parseDistances(screen);
@@ -400,16 +411,14 @@ jobs:
                 showServiceNotification();
                 log("Auto-accept OFF");
                 String msg = "✅ ACCEPTED — Pickup " + fmt(dist[0]) + "km | Drop " + fmt(dist[1]) + "km";
-                toast(msg);
-                saveLog(msg);
+                toast(msg); saveLog(msg);
               } else {
                 String reason = "";
                 if (!pickupOk) reason += "Pickup " + fmt(dist[0]) + "km > max " + fmt(maxPickup) + "km";
                 if (!dropOk)   reason += (!reason.isEmpty() ? " | " : "") + "Drop " + fmt(dist[1]) + "km > max " + fmt(maxDrop) + "km";
                 log("REJECTED - " + reason);
                 String msg = "❌ SKIP — " + reason;
-                toast(msg);
-                saveLog(msg);
+                toast(msg); saveLog(msg);
               }
             }
             boolean isOrderScreen(String screen) {
@@ -474,7 +483,7 @@ jobs:
               try { return Float.parseFloat(s.trim()); } catch (Exception e) { return -1f; }
             }
             void saveLog(String msg) {
-              java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault());
+              java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
               String entry = "[" + sdf.format(new java.util.Date()) + "]  " + msg;
               String existing = prefs.getString("logs", "");
               String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
@@ -494,6 +503,12 @@ jobs:
             }
             void log(String msg) { Log.d(TAG, msg); }
             @Override public void onInterrupt() {}
+            @Override public void onDestroy() {
+              super.onDestroy();
+              try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
+              NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+              if (nm != null) nm.cancel(1);
+            }
             @Override public boolean onUnbind(Intent intent) {
               try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
               NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -575,13 +590,15 @@ jobs:
               <Button android:id="@+id/btn_save" android:layout_width="match_parent"
                 android:layout_height="54dp" android:text="Save Settings"
                 android:backgroundTint="#2196F3" android:textColor="#FFF"
-                android:textStyle="bold" android:layout_marginBottom="12dp"/>
-              <Switch android:id="@+id/sw_enable" android:layout_width="wrap_content"
-                android:layout_height="wrap_content" android:text="  Enable Auto Accept"
+                android:textStyle="bold" android:layout_marginBottom="16dp"/>
+              <Switch android:id="@+id/sw_enable" android:layout_width="match_parent"
+                android:layout_height="58dp" android:text="  Enable Auto Accept"
                 android:textColor="#FFF" android:textSize="16sp"
-                android:layout_gravity="center_horizontal" android:layout_marginBottom="20dp"/>
+                android:background="#1A1A1A" android:padding="16dp"
+                android:layout_gravity="center_horizontal" android:layout_marginBottom="12dp"
+                android:visibility="gone"/>
               <Button android:id="@+id/btn_acc" android:layout_width="match_parent"
-                android:layout_height="58dp" android:text="Open Accessibility Settings"
+                android:layout_height="58dp" android:text="⚙️  Tap to Enable Accessibility First"
                 android:backgroundTint="#FF9800" android:textColor="#000"
                 android:textStyle="bold" android:layout_marginBottom="12dp"/>
               <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
