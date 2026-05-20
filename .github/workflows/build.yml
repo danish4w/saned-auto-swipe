@@ -37,6 +37,7 @@ jobs:
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/mipmap-anydpi-v26
+          mkdir -p app/src/main/assets
 
       - name: Write Gradle Files
         run: |
@@ -45,7 +46,10 @@ jobs:
             repositories { google(); mavenCentral(); gradlePluginPortal() }
           }
           dependencyResolutionManagement {
-            repositories { google(); mavenCentral() }
+            repositories {
+              google(); mavenCentral()
+              maven { url 'https://api.xposed.info/' }
+            }
           }
           rootProject.name = "JahezAutoAccept"
           include ':app'
@@ -84,6 +88,7 @@ jobs:
           dependencies {
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.google.android.material:material:1.12.0'
+            compileOnly 'de.robv.android.xposed:api:82'
           }
           ABEOF
 
@@ -125,6 +130,10 @@ jobs:
           </adaptive-icon>
           RNDEOF
 
+      - name: Write Xposed Files
+        run: |
+          echo "com.danish.jahez.SanedHook" > app/src/main/assets/xposed_init
+
       - name: Write Manifest
         run: |
           cat > app/src/main/AndroidManifest.xml << 'MEOF'
@@ -137,6 +146,9 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round"
               android:theme="@style/AppTheme"
               android:allowBackup="false">
+              <meta-data android:name="xposedmodule" android:value="true"/>
+              <meta-data android:name="xposeddescription" android:value="Jahez order hook"/>
+              <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
                 <intent-filter>
@@ -285,6 +297,58 @@ jobs:
           }
           JEOF
 
+      - name: Write SanedHook
+        run: |
+          cat > app/src/main/java/com/danish/jahez/SanedHook.java << 'HEOF'
+          package com.danish.jahez;
+          import de.robv.android.xposed.IXposedHookLoadPackage;
+          import de.robv.android.xposed.XposedHelpers;
+          import de.robv.android.xposed.XC_MethodHook;
+          import de.robv.android.xposed.callbacks.XC_LoadPackage;
+          import android.content.Intent;
+          public class SanedHook implements IXposedHookLoadPackage {
+            static final String TARGET  = "net.jahez.fleets";
+            static final String OUR_PKG = "com.danish.jahez";
+            final StringBuilder buf = new StringBuilder();
+            long lastText = 0;
+            long lastBcast = 0;
+            @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
+              if (!TARGET.equals(lp.packageName)) return;
+              XposedHelpers.findAndHookMethod(
+                "android.widget.TextView", lp.classLoader,
+                "setText", CharSequence.class,
+                new XC_MethodHook() {
+                  @Override protected void afterHookedMethod(MethodHookParam p) {
+                    if (p.args[0] == null) return;
+                    String t = p.args[0].toString().trim();
+                    if (t.isEmpty()) return;
+                    long now = System.currentTimeMillis();
+                    // Reset buffer if last text was >2sec ago (new screen)
+                    if (now - lastText > 2000) buf.setLength(0);
+                    lastText = now;
+                    buf.append(t).append(" ");
+                    String s = buf.toString().toLowerCase();
+                    // Order screen detected
+                    if ((s.contains("new order") || s.contains("طلب جديد"))
+                        && (s.contains("accept") || s.contains("قبول") || s.contains("km from"))) {
+                      if (now - lastBcast < 2000) return;
+                      lastBcast = now;
+                      Intent intent = new Intent("JAHEZ_ORDER_DATA");
+                      intent.setPackage(OUR_PKG);
+                      intent.putExtra("screen", buf.toString());
+                      try {
+                        android.view.View v = (android.view.View) p.thisObject;
+                        v.getContext().sendBroadcast(intent);
+                      } catch (Exception ignored) {}
+                      buf.setLength(0);
+                    }
+                  }
+                }
+              );
+            }
+          }
+          HEOF
+
       - name: Write AutoService
         run: |
           cat > app/src/main/java/com/danish/jahez/AutoService.java << 'SEOF'
@@ -294,6 +358,9 @@ jobs:
           import android.content.SharedPreferences;
           import android.graphics.Path;
           import android.util.Log;
+          import java.io.BufferedReader;
+          import java.io.File;
+          import java.io.FileReader;
           import android.view.accessibility.AccessibilityEvent;
           import android.view.accessibility.AccessibilityNodeInfo;
           import android.app.Notification;
@@ -319,6 +386,15 @@ jobs:
             long lastEvent = 0;
             long lastScan  = 0;
             final Random rng = new Random();
+            final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
+              @Override public void onReceive(Context ctx, Intent intent) {
+                String screen = intent.getStringExtra("screen");
+                if (screen != null && !screen.isEmpty()) {
+                  saveLog("🪝 Hook: " + screen.substring(0, Math.min(80, screen.length())));
+                  processOrder(screen);
+                }
+              }
+            };
             final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
@@ -342,6 +418,12 @@ jobs:
                 registerReceiver(toggleReceiver, f);
               log("Service connected");
               showServiceNotification();
+              // Register Xposed hook receiver (EXPORTED — Saned process se aata hai)
+              IntentFilter of = new IntentFilter("JAHEZ_ORDER_DATA");
+              if (Build.VERSION.SDK_INT >= 33)
+                registerReceiver(orderReceiver, of, Context.RECEIVER_EXPORTED);
+              else
+                registerReceiver(orderReceiver, of);
             }
             void showServiceNotification() {
               boolean enabled = prefs != null && prefs.getBoolean("enabled", false);
@@ -370,31 +452,55 @@ jobs:
               if (!prefs.getBoolean("enabled", false)) return;
               String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
               if (!PKG.equals(pkg)) return;
+              // Sirf new window/dialog events — map updates ignore karo
+              if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
               long now = System.currentTimeMillis();
               if (now - lastScan < 1500) return;
               lastScan = now;
-              saveLog("📡 Jahez event recd");
+              String cls = event.getClassName() != null ? event.getClassName().toString() : "";
+              saveLog("📡 Window: " + cls);
               scanScreen();
             }
 
             void scanScreen() {
               if (prefs == null || !prefs.getBoolean("enabled", false)) return;
               String screen = "";
-              AccessibilityNodeInfo root = getRootInActiveWindow();
-              if (root != null) { screen = flattenTree(root); root.recycle(); }
-              if (screen.isEmpty()) {
-                for (android.view.accessibility.AccessibilityWindowInfo w : getWindows()) {
-                  AccessibilityNodeInfo r = w.getRoot();
-                  if (r != null) {
-                    String p = r.getPackageName() != null ? r.getPackageName().toString() : "";
-                    if (PKG.equals(p)) { screen = flattenTree(r); r.recycle(); break; }
-                    r.recycle();
+              try {
+                Process p = Runtime.getRuntime().exec(new String[]{
+                  "su", "-c", "uiautomator dump /sdcard/jahez_ui.xml 2>/dev/null"
+                });
+                p.waitFor(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
+                java.io.File f = new java.io.File("/sdcard/jahez_ui.xml");
+                if (f.exists()) {
+                  BufferedReader br = new BufferedReader(new FileReader(f));
+                  StringBuilder sb = new StringBuilder();
+                  String line;
+                  while ((line = br.readLine()) != null) sb.append(line);
+                  br.close(); f.delete();
+                  java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("text=\"([^\"]+)\"").matcher(sb.toString());
+                  StringBuilder txt = new StringBuilder();
+                  while (m.find()) {
+                    String t = m.group(1).trim();
+                    if (!t.isEmpty()) txt.append(t).append(" ");
                   }
+                  screen = txt.toString().trim();
                 }
+              } catch (Exception e) { saveLog("⚠️ root: " + e.getMessage()); }
+              if (screen.isEmpty()) {
+                AccessibilityNodeInfo root = getRootInActiveWindow();
+                if (root != null) { screen = flattenTree(root); root.recycle(); }
               }
               saveLog("📡 [" + screen.length() + "] " + screen.substring(0, Math.min(80, screen.length())));
               if (screen.isEmpty()) { saveLog("⚠️ screen empty"); return; }
-              if (!isOrderScreen(screen)) return;
+              processOrder(screen);
+            }
+
+            void processOrder(String screen) {
+              if (prefs == null || !prefs.getBoolean("enabled", false)) return;
+              long now = System.currentTimeMillis();
+              if (now - lastEvent < 1500) return;
+              if (!isOrderScreen(screen)) { saveLog("ℹ️ not order"); return; }
               long now = System.currentTimeMillis();
               lastEvent = now;
               toast("🔍 Order detected!");
@@ -507,11 +613,13 @@ jobs:
             @Override public void onDestroy() {
               super.onDestroy();
               try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
+              try { unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
               NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
               if (nm != null) nm.cancel(1);
             }
             @Override public boolean onUnbind(Intent intent) {
               try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
+              try { unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
               NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
               if (nm != null) nm.cancel(1);
               return super.onUnbind(intent);
