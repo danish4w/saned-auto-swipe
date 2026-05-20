@@ -328,9 +328,8 @@ jobs:
                     lastText = now;
                     buf.append(t).append(" ");
                     String s = buf.toString().toLowerCase();
-                    // Order screen detected
-                    if ((s.contains("new order") || s.contains("طلب جديد"))
-                        && (s.contains("accept") || s.contains("قبول") || s.contains("km from"))) {
+                    // New Order = order screen, bas itna kaafi hai
+                    if (s.contains("new order") || s.contains("طلب جديد")) {
                       if (now - lastBcast < 2000) return;
                       lastBcast = now;
                       Intent intent = new Intent("JAHEZ_ORDER_DATA");
@@ -358,9 +357,6 @@ jobs:
           import android.content.SharedPreferences;
           import android.graphics.Path;
           import android.util.Log;
-          import java.io.BufferedReader;
-          import java.io.File;
-          import java.io.FileReader;
           import android.view.accessibility.AccessibilityEvent;
           import android.view.accessibility.AccessibilityNodeInfo;
           import android.app.Notification;
@@ -465,32 +461,8 @@ jobs:
             void scanScreen() {
               if (prefs == null || !prefs.getBoolean("enabled", false)) return;
               String screen = "";
-              try {
-                Process p = Runtime.getRuntime().exec(new String[]{
-                  "su", "-c", "uiautomator dump /sdcard/jahez_ui.xml 2>/dev/null"
-                });
-                p.waitFor(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
-                java.io.File f = new java.io.File("/sdcard/jahez_ui.xml");
-                if (f.exists()) {
-                  BufferedReader br = new BufferedReader(new FileReader(f));
-                  StringBuilder sb = new StringBuilder();
-                  String line;
-                  while ((line = br.readLine()) != null) sb.append(line);
-                  br.close(); f.delete();
-                  java.util.regex.Matcher m = java.util.regex.Pattern
-                    .compile("text=\"([^\"]+)\"").matcher(sb.toString());
-                  StringBuilder txt = new StringBuilder();
-                  while (m.find()) {
-                    String t = m.group(1).trim();
-                    if (!t.isEmpty()) txt.append(t).append(" ");
-                  }
-                  screen = txt.toString().trim();
-                }
-              } catch (Exception e) { saveLog("⚠️ root: " + e.getMessage()); }
-              if (screen.isEmpty()) {
-                AccessibilityNodeInfo root = getRootInActiveWindow();
-                if (root != null) { screen = flattenTree(root); root.recycle(); }
-              }
+              AccessibilityNodeInfo root = getRootInActiveWindow();
+              if (root != null) { screen = flattenTree(root); root.recycle(); }
               saveLog("📡 [" + screen.length() + "] " + screen.substring(0, Math.min(80, screen.length())));
               if (screen.isEmpty()) { saveLog("⚠️ screen empty"); return; }
               processOrder(screen);
