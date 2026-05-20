@@ -501,7 +501,6 @@ jobs:
               long now = System.currentTimeMillis();
               if (now - lastEvent < 1500) return;
               if (!isOrderScreen(screen)) { saveLog("ℹ️ not order"); return; }
-              long now = System.currentTimeMillis();
               lastEvent = now;
               toast("🔍 Order detected!");
               float[] dist = parseDistances(screen);
