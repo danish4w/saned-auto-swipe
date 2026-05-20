@@ -198,20 +198,16 @@ jobs:
           import android.content.Intent;
           import android.content.IntentFilter;
           import android.content.SharedPreferences;
-          import android.content.pm.PackageManager;
           import android.os.Build;
           import android.os.Bundle;
           import android.provider.Settings;
           import android.view.inputmethod.InputMethodManager;
           import android.widget.*;
-          import androidx.core.app.ActivityCompat;
-          import androidx.core.content.ContextCompat;
+          import android.widget.SeekBar;
           public class MainActivity extends Activity {
-            private static final int NOTIFY_PERM_CODE = 100;
             SharedPreferences prefs;
             Switch swEnable;
-            TextView tvStatus, tvAcc, tvDelayValue;
-            SeekBar seekDelay;
+            TextView tvStatus, tvAcc;
             final BroadcastReceiver offReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 String action = intent.getAction();
@@ -227,35 +223,32 @@ jobs:
               prefs = getSharedPreferences("cfg", MODE_PRIVATE);
               EditText etPickup = findViewById(R.id.et_pickup);
               EditText etDrop   = findViewById(R.id.et_drop);
+              SeekBar sbDelay   = findViewById(R.id.sb_delay);
+              TextView tvDelay  = findViewById(R.id.tv_delay);
               swEnable = findViewById(R.id.sw_enable);
               tvStatus = findViewById(R.id.tv_status);
               tvAcc    = findViewById(R.id.tv_acc);
-              seekDelay = findViewById(R.id.seek_delay);
-              tvDelayValue = findViewById(R.id.tv_delay_value);
               Button btnSave = findViewById(R.id.btn_save);
               Button btnAcc  = findViewById(R.id.btn_acc);
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
-              swEnable.setChecked(prefs.getBoolean("enabled", false));
-              int delayMs = prefs.getInt("delay_ms", 500);
-              seekDelay.setProgress(delayMs);
-              tvDelayValue.setText(delayMs + " ms");
-              seekDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                  if (fromUser) {
-                    int val = Math.max(10, Math.min(1500, progress));
-                    tvDelayValue.setText(val + " ms");
-                    prefs.edit().putInt("delay_ms", val).apply();
-                  }
+              int savedDelay = prefs.getInt("scan_delay", 200);
+              sbDelay.setProgress(savedDelay - 50);
+              tvDelay.setText(savedDelay + "ms");
+              sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                public void onProgressChanged(SeekBar sb, int progress, boolean user) {
+                  int ms = progress + 50;
+                  tvDelay.setText(ms + "ms");
                 }
-                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-                @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+                public void onStartTrackingTouch(SeekBar sb) {}
+                public void onStopTrackingTouch(SeekBar sb) {
+                  prefs.edit().putInt("scan_delay", sb.getProgress() + 50).apply();
+                }
               });
-              if (Build.VERSION.SDK_INT >= 33) {
-                if (ContextCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
-                  ActivityCompat.requestPermissions(this, new String[]{"android.permission.POST_NOTIFICATIONS"}, NOTIFY_PERM_CODE);
-                }
-              }
+              swEnable.setChecked(prefs.getBoolean("enabled", false));
+              // Android 13+ notification permission
+              if (Build.VERSION.SDK_INT >= 33)
+                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
               IntentFilter filter = new IntentFilter();
               filter.addAction("JAHEZ_AUTO_OFF");
               filter.addAction("JAHEZ_AUTO_ON");
@@ -286,18 +279,13 @@ jobs:
                 startActivity(new Intent(this, LogActivity.class))
               );
             }
-            @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-              if (requestCode == NOTIFY_PERM_CODE && grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "Notification permission denied – you won't see status updates.", Toast.LENGTH_LONG).show();
-              }
-            }
             @Override protected void onResume() {
               super.onResume();
               refreshStatus(tvStatus, tvAcc);
             }
             @Override protected void onDestroy() {
               super.onDestroy();
-              try { unregisterReceiver(offReceiver); } catch (Exception e) {}
+              unregisterReceiver(offReceiver);
             }
             void refreshStatus(TextView tvs, TextView tva) {
               if (tvs == null || tva == null) return;
@@ -307,6 +295,7 @@ jobs:
               tva.setTextColor(acc ? 0xFF4CAF50 : 0xFFFF9800);
               tvs.setText(acc && en ? "AUTO ACCEPT: ON" : "AUTO ACCEPT: OFF");
               tvs.setTextColor(acc && en ? 0xFF4CAF50 : 0xFFFF5555);
+              // Smart button: accessibility OFF → show orange button, ON → show switch
               if (swEnable != null && findViewById(R.id.btn_acc) != null) {
                 swEnable.setVisibility(acc ? android.view.View.VISIBLE : android.view.View.GONE);
                 findViewById(R.id.btn_acc).setVisibility(acc ? android.view.View.GONE : android.view.View.VISIBLE);
@@ -333,14 +322,74 @@ jobs:
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
           import android.content.Intent;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.TextView;
           public class SanedHook implements IXposedHookLoadPackage {
             static final String TARGET  = "net.jahez.fleets";
             static final String OUR_PKG = "com.danish.jahez";
-            final StringBuilder buf = new StringBuilder();
-            long lastText = 0;
+            static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
             long lastBcast = 0;
             @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
               if (!TARGET.equals(lp.packageName)) return;
+              // Hook IncomingDispatchActivity.onResume() — fires when order screen fully visible
+              try {
+                XposedHelpers.findAndHookMethod(
+                  ORDER_ACTIVITY, lp.classLoader, "onResume",
+                  new XC_MethodHook() {
+                    @Override protected void afterHookedMethod(MethodHookParam p) {
+                      try {
+                        long now = System.currentTimeMillis();
+                        if (now - lastBcast < 2000) return;
+                        android.app.Activity act = (android.app.Activity) p.thisObject;
+                        // Read delay from our prefs
+                        int delay = 200;
+                        try {
+                          android.content.Context ctx = act.createPackageContext(OUR_PKG, android.content.Context.CONTEXT_IGNORE_SECURITY);
+                          delay = ctx.getSharedPreferences("cfg", android.content.Context.MODE_PRIVATE).getInt("scan_delay", 200);
+                        } catch (Exception ignored) {}
+                        final int finalDelay = delay;
+                        final android.app.Activity finalAct = act;
+                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                          try {
+                            View root = finalAct.getWindow().getDecorView();
+                            String screen = extractText(root);
+                            if (screen.isEmpty()) return;
+                            lastBcast = System.currentTimeMillis();
+                            Intent intent = new Intent("JAHEZ_ORDER_DATA");
+                            intent.setPackage(OUR_PKG);
+                            intent.putExtra("screen", screen);
+                            finalAct.sendBroadcast(intent);
+                          } catch (Exception ignored) {}
+                        }, finalDelay);
+                      } catch (Exception ignored) {}
+                    }
+                  }
+                );
+              } catch (Exception e) {
+                // Fallback: TextView hook
+                hookTextView(lp);
+              }
+            }
+            // Read all TextView text recursively from view hierarchy
+            String extractText(View view) {
+              if (view == null) return "";
+              StringBuilder sb = new StringBuilder();
+              if (view instanceof TextView) {
+                CharSequence t = ((TextView) view).getText();
+                if (t != null && t.length() > 0) sb.append(t).append(" ");
+              }
+              if (view instanceof ViewGroup) {
+                ViewGroup vg = (ViewGroup) view;
+                for (int i = 0; i < vg.getChildCount(); i++)
+                  sb.append(extractText(vg.getChildAt(i)));
+              }
+              return sb.toString();
+            }
+            // Fallback: hook all TextViews
+            void hookTextView(XC_LoadPackage.LoadPackageParam lp) {
+              final StringBuilder buf = new StringBuilder();
+              final long[] lastText = {0};
               XposedHelpers.findAndHookMethod(
                 "android.widget.TextView", lp.classLoader,
                 "setText", CharSequence.class,
@@ -350,8 +399,8 @@ jobs:
                     String t = p.args[0].toString().trim();
                     if (t.isEmpty()) return;
                     long now = System.currentTimeMillis();
-                    if (now - lastText > 2000) buf.setLength(0);
-                    lastText = now;
+                    if (now - lastText[0] > 2000) buf.setLength(0);
+                    lastText[0] = now;
                     buf.append(t).append(" ");
                     String s = buf.toString().toLowerCase();
                     if (s.contains("new order") || s.contains("طلب جديد")) {
@@ -361,7 +410,7 @@ jobs:
                       intent.setPackage(OUR_PKG);
                       intent.putExtra("screen", buf.toString());
                       try {
-                        android.view.View v = (android.view.View) p.thisObject;
+                        View v = (View) p.thisObject;
                         v.getContext().sendBroadcast(intent);
                       } catch (Exception ignored) {}
                       buf.setLength(0);
@@ -407,12 +456,11 @@ jobs:
             long lastEvent = 0;
             long lastScan  = 0;
             final Random rng = new Random();
-            Handler handler = new Handler(Looper.getMainLooper());
             final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 String screen = intent.getStringExtra("screen");
                 if (screen != null && !screen.isEmpty()) {
-                  saveLog("🪝 Hook: " + trimStr(screen, 80));
+                  saveLog("🪝 Hook: " + screen.substring(0, Math.min(80, screen.length())));
                   processOrder(screen);
                 }
               }
@@ -440,6 +488,7 @@ jobs:
                 registerReceiver(toggleReceiver, f);
               log("Service connected");
               showServiceNotification();
+              // Register Xposed hook receiver (EXPORTED — Saned process se aata hai)
               IntentFilter of = new IntentFilter("JAHEZ_ORDER_DATA");
               if (Build.VERSION.SDK_INT >= 33)
                 registerReceiver(orderReceiver, of, Context.RECEIVER_EXPORTED);
@@ -447,8 +496,7 @@ jobs:
                 registerReceiver(orderReceiver, of);
             }
             void showServiceNotification() {
-              if (prefs == null) return;
-              boolean enabled = prefs.getBoolean("enabled", false);
+              boolean enabled = prefs != null && prefs.getBoolean("enabled", false);
               NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
               NotificationChannel ch = new NotificationChannel("jahez_svc", "Jahez Auto Service", NotificationManager.IMPORTANCE_LOW);
               ch.setDescription("Service chalu hai");
@@ -474,33 +522,26 @@ jobs:
               if (!prefs.getBoolean("enabled", false)) return;
               String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
               if (!PKG.equals(pkg)) return;
-              if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-                String cls = event.getClassName() != null ? event.getClassName().toString() : "";
-                if (cls.contains("IncomingDispatchActivity")) {
-                  handler.removeCallbacksAndMessages(null);
-                  int delayMs = prefs.getInt("delay_ms", 500);
-                  delayMs = Math.max(10, Math.min(1500, delayMs));
-                  saveLog("⏱️ IncomingDispatchActivity, waiting " + delayMs + " ms");
-                  handler.postDelayed(() -> {
-                    if (prefs.getBoolean("enabled", false)) {
-                      scanScreen();
-                    }
-                  }, delayMs);
-                }
-              }
-            }
-            void scanScreen() {
-              if (prefs == null || !prefs.getBoolean("enabled", false)) return;
+              // Sirf new window/dialog events — map updates ignore karo
+              if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
               long now = System.currentTimeMillis();
               if (now - lastScan < 1500) return;
               lastScan = now;
+              String cls = event.getClassName() != null ? event.getClassName().toString() : "";
+              saveLog("📡 Window: " + cls);
+              scanScreen();
+            }
+
+            void scanScreen() {
+              if (prefs == null || !prefs.getBoolean("enabled", false)) return;
               String screen = "";
               AccessibilityNodeInfo root = getRootInActiveWindow();
               if (root != null) { screen = flattenTree(root); root.recycle(); }
-              saveLog("📡 [" + screen.length() + "] " + trimStr(screen, 80));
+              saveLog("📡 [" + screen.length() + "] " + screen.substring(0, Math.min(80, screen.length())));
               if (screen.isEmpty()) { saveLog("⚠️ screen empty"); return; }
               processOrder(screen);
             }
+
             void processOrder(String screen) {
               if (prefs == null || !prefs.getBoolean("enabled", false)) return;
               long now = System.currentTimeMillis();
@@ -518,7 +559,7 @@ jobs:
                 log("ACCEPTING - swiping");
                 swipeAccept();
                 prefs.edit().putBoolean("enabled", false).apply();
-                sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
+                sendBroadcast(new android.content.Intent("JAHEZ_AUTO_OFF"));
                 showServiceNotification();
                 log("Auto-accept OFF");
                 String msg = "✅ ACCEPTED — Pickup " + fmt(dist[0]) + "km | Drop " + fmt(dist[1]) + "km";
@@ -593,17 +634,13 @@ jobs:
             float safeFloat(String s) {
               try { return Float.parseFloat(s.trim()); } catch (Exception e) { return -1f; }
             }
-            String trimStr(String s, int max) {
-              return s.length() <= max ? s : s.substring(0, max) + "...";
-            }
             void saveLog(String msg) {
-              if (prefs == null) return;
               java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
-              String entry = "[" + sdf.format(new java.util.Date()) + "]  " + trimStr(msg, 200);
+              String entry = "[" + sdf.format(new java.util.Date()) + "]  " + msg;
               String existing = prefs.getString("logs", "");
               String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
               StringBuilder sb = new StringBuilder(entry);
-              int max = 100;
+              int max = 100; // max 100 entries
               for (int i = 0; i < lines.length && i < max - 1; i++)
                 sb.append("\n").append(lines[i]);
               prefs.edit().putString("logs", sb.toString()).apply();
@@ -704,22 +741,30 @@ jobs:
                 android:layout_height="56dp" android:inputType="numberDecimal" android:text="5.0"
                 android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
                 android:padding="12dp" android:layout_marginBottom="20dp"/>
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Delay before scanning (ms)" android:textColor="#AAA"
-                android:textSize="13sp" android:layout_marginBottom="8dp"/>
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="horizontal" android:gravity="center_vertical">
-                <TextView android:text="10ms" android:textColor="#777" android:textSize="12sp"/>
-                <SeekBar android:id="@+id/seek_delay" android:layout_width="0dp"
-                  android:layout_height="wrap_content" android:layout_weight="1"
-                  android:max="1500" android:progress="500" android:min="10"
-                  android:layout_marginStart="8dp" android:layout_marginEnd="8dp"/>
-                <TextView android:text="1500ms" android:textColor="#777" android:textSize="12sp"/>
+                android:orientation="horizontal" android:layout_marginBottom="4dp">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                  android:layout_weight="1" android:text="Scan Delay (order screen ke baad)"
+                  android:textColor="#AAA" android:textSize="13sp"/>
+                <TextView android:id="@+id/tv_delay" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:text="200ms"
+                  android:textColor="#4CAF50" android:textSize="14sp" android:textStyle="bold"/>
               </LinearLayout>
-              <TextView android:id="@+id/tv_delay_value" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:text="500 ms"
-                android:textColor="#4CAF50" android:textSize="14sp"
-                android:gravity="center" android:layout_marginTop="4dp" android:layout_marginBottom="16dp"/>
+              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:max="1450" android:progress="150"
+                android:progressTint="#4CAF50" android:thumbTint="#4CAF50"
+                android:layout_marginBottom="6dp"/>
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginBottom="20dp">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                  android:layout_weight="1" android:text="50ms" android:textColor="#555" android:textSize="11sp"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                  android:layout_weight="1" android:text="750ms" android:textColor="#555"
+                  android:textSize="11sp" android:gravity="center"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                  android:layout_weight="1" android:text="1500ms" android:textColor="#555"
+                  android:textSize="11sp" android:gravity="end"/>
+              </LinearLayout>
               <Button android:id="@+id/btn_save" android:layout_width="match_parent"
                 android:layout_height="54dp" android:text="Save Settings"
                 android:backgroundTint="#2196F3" android:textColor="#FFF"
@@ -739,7 +784,7 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="1. Open Accessibility Settings\n2. Find Jahez Auto and enable\n3. Set distances, delay, Save, toggle ON\n4. Open Jahez Fleets - orders auto accept!"
+                android:text="1. Open Accessibility Settings\n2. Find Jahez Auto and enable\n3. Set distances, Save, toggle ON\n4. Open Jahez Fleets - orders auto accept!"
                 android:textColor="#555" android:textSize="12sp"
                 android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
@@ -819,4 +864,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: JahezAutoAccept
-          path: app/build/JahezAutoAccept.apk
+          path: |
+            app/build/JahezAutoAccept.apk
+            app/build/outputs/apk/**/*.apk
