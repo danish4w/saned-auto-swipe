@@ -188,7 +188,7 @@ jobs:
             android:packageNames="net.jahez.fleets"/>
           XEOF
 
-      - name: Write MainActivity (with SeekBar + permission fallback)
+      - name: Write MainActivity (with SeekBar for delay)
         run: |
           cat > app/src/main/java/com/danish/jahez/MainActivity.java << 'JEOF'
           package com.danish.jahez;
@@ -198,16 +198,13 @@ jobs:
           import android.content.Intent;
           import android.content.IntentFilter;
           import android.content.SharedPreferences;
-          import android.content.pm.PackageManager;
           import android.os.Build;
           import android.os.Bundle;
           import android.provider.Settings;
           import android.view.inputmethod.InputMethodManager;
           import android.widget.*;
-          import androidx.core.app.ActivityCompat;
-          import androidx.core.content.ContextCompat;
+          import androidx.appcompat.app.AppCompatActivity;
           public class MainActivity extends Activity {
-            private static final int NOTIFY_PERM_CODE = 100;
             SharedPreferences prefs;
             Switch swEnable;
             TextView tvStatus, tvAcc, tvDelayValue;
@@ -237,6 +234,7 @@ jobs:
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
               swEnable.setChecked(prefs.getBoolean("enabled", false));
+              // Load delay (ms) from prefs, default 500ms
               int delayMs = prefs.getInt("delay_ms", 500);
               seekDelay.setProgress(delayMs);
               tvDelayValue.setText(delayMs + " ms");
@@ -251,12 +249,9 @@ jobs:
                 @Override public void onStartTrackingTouch(SeekBar seekBar) {}
                 @Override public void onStopTrackingTouch(SeekBar seekBar) {}
               });
-              // Android 13+ notification permission with fallback toast
-              if (Build.VERSION.SDK_INT >= 33) {
-                if (ContextCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
-                  ActivityCompat.requestPermissions(this, new String[]{"android.permission.POST_NOTIFICATIONS"}, NOTIFY_PERM_CODE);
-                }
-              }
+              // Android 13+ notification permission
+              if (Build.VERSION.SDK_INT >= 33)
+                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
               IntentFilter filter = new IntentFilter();
               filter.addAction("JAHEZ_AUTO_OFF");
               filter.addAction("JAHEZ_AUTO_ON");
@@ -287,18 +282,13 @@ jobs:
                 startActivity(new Intent(this, LogActivity.class))
               );
             }
-            @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-              if (requestCode == NOTIFY_PERM_CODE && grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "Notification permission denied – you won't see status updates.", Toast.LENGTH_LONG).show();
-              }
-            }
             @Override protected void onResume() {
               super.onResume();
               refreshStatus(tvStatus, tvAcc);
             }
             @Override protected void onDestroy() {
               super.onDestroy();
-              try { unregisterReceiver(offReceiver); } catch (Exception e) {}
+              unregisterReceiver(offReceiver);
             }
             void refreshStatus(TextView tvs, TextView tva) {
               if (tvs == null || tva == null) return;
@@ -374,7 +364,7 @@ jobs:
           }
           HEOF
 
-      - name: Write AutoService (with handler cancel + lastScan)
+      - name: Write AutoService (with user-defined delay)
         run: |
           cat > app/src/main/java/com/danish/jahez/AutoService.java << 'SEOF'
           package com.danish.jahez;
@@ -413,7 +403,7 @@ jobs:
               @Override public void onReceive(Context ctx, Intent intent) {
                 String screen = intent.getStringExtra("screen");
                 if (screen != null && !screen.isEmpty()) {
-                  saveLog("🪝 Hook: " + trimStr(screen, 80));
+                  saveLog("🪝 Hook: " + screen.substring(0, Math.min(80, screen.length())));
                   processOrder(screen);
                 }
               }
@@ -448,8 +438,7 @@ jobs:
                 registerReceiver(orderReceiver, of);
             }
             void showServiceNotification() {
-              if (prefs == null) return;
-              boolean enabled = prefs.getBoolean("enabled", false);
+              boolean enabled = prefs != null && prefs.getBoolean("enabled", false);
               NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
               NotificationChannel ch = new NotificationChannel("jahez_svc", "Jahez Auto Service", NotificationManager.IMPORTANCE_LOW);
               ch.setDescription("Service chalu hai");
@@ -475,14 +464,13 @@ jobs:
               if (!prefs.getBoolean("enabled", false)) return;
               String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
               if (!PKG.equals(pkg)) return;
+              // Check if it's the incoming dispatch activity
               if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
                 String cls = event.getClassName() != null ? event.getClassName().toString() : "";
                 if (cls.contains("IncomingDispatchActivity")) {
-                  // Cancel any previous pending scan to avoid duplicates
-                  handler.removeCallbacksAndMessages(null);
                   int delayMs = prefs.getInt("delay_ms", 500);
                   delayMs = Math.max(10, Math.min(1500, delayMs));
-                  saveLog("⏱️ IncomingDispatchActivity, waiting " + delayMs + " ms");
+                  saveLog("⏱️ IncomingDispatchActivity detected, waiting " + delayMs + " ms");
                   handler.postDelayed(() -> {
                     if (prefs.getBoolean("enabled", false)) {
                       scanScreen();
@@ -493,13 +481,10 @@ jobs:
             }
             void scanScreen() {
               if (prefs == null || !prefs.getBoolean("enabled", false)) return;
-              long now = System.currentTimeMillis();
-              if (now - lastScan < 1500) return; // avoid rapid scanning
-              lastScan = now;
               String screen = "";
               AccessibilityNodeInfo root = getRootInActiveWindow();
               if (root != null) { screen = flattenTree(root); root.recycle(); }
-              saveLog("📡 [" + screen.length() + "] " + trimStr(screen, 80));
+              saveLog("📡 [" + screen.length() + "] " + screen.substring(0, Math.min(80, screen.length())));
               if (screen.isEmpty()) { saveLog("⚠️ screen empty"); return; }
               processOrder(screen);
             }
@@ -520,7 +505,7 @@ jobs:
                 log("ACCEPTING - swiping");
                 swipeAccept();
                 prefs.edit().putBoolean("enabled", false).apply();
-                sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
+                sendBroadcast(new android.content.Intent("JAHEZ_AUTO_OFF"));
                 showServiceNotification();
                 log("Auto-accept OFF");
                 String msg = "✅ ACCEPTED — Pickup " + fmt(dist[0]) + "km | Drop " + fmt(dist[1]) + "km";
@@ -595,13 +580,9 @@ jobs:
             float safeFloat(String s) {
               try { return Float.parseFloat(s.trim()); } catch (Exception e) { return -1f; }
             }
-            String trimStr(String s, int max) {
-              return s.length() <= max ? s : s.substring(0, max) + "...";
-            }
             void saveLog(String msg) {
-              if (prefs == null) return;
               java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
-              String entry = "[" + sdf.format(new java.util.Date()) + "]  " + trimStr(msg, 200);
+              String entry = "[" + sdf.format(new java.util.Date()) + "]  " + msg;
               String existing = prefs.getString("logs", "");
               String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
               StringBuilder sb = new StringBuilder(entry);
