@@ -140,6 +140,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+            <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
             <application
               android:label="Jahez Auto"
               android:icon="@mipmap/ic_launcher"
@@ -157,36 +159,16 @@ jobs:
                 </intent-filter>
               </activity>
               <activity android:name=".LogActivity" android:exported="false"/>
-              <service
-                android:name=".AutoService"
-                android:label="Jahez Auto Accept"
-                android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-                android:exported="true">
+              <service android:name=".AutoService" android:exported="false"/>
+              <receiver android:name=".BootReceiver" android:exported="true">
                 <intent-filter>
-                  <action android:name="android.accessibilityservice.AccessibilityService"/>
+                  <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 </intent-filter>
-                <meta-data
-                  android:name="android.accessibilityservice"
-                  android:resource="@xml/acc_config"/>
-              </service>
+              </receiver>
             </application>
           </manifest>
           MEOF
 
-      - name: Write Accessibility Config
-        run: |
-          cat > app/src/main/res/xml/acc_config.xml << 'XEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-            android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
-            android:accessibilityFeedbackType="feedbackGeneric"
-            android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
-            android:canRetrieveWindowContent="true"
-            android:canPerformGestures="true"
-            android:description="@string/acc_desc"
-            android:notificationTimeout="50"
-            android:packageNames="net.jahez.fleets"/>
-          XEOF
 
       - name: Write MainActivity
         run: |
@@ -332,17 +314,18 @@ jobs:
             long lastBcast = 0;
             @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
               if (!TARGET.equals(lp.packageName)) return;
-              // Hook IncomingDispatchActivity.onResume() — fires when order screen fully visible
+              // Hook Activity.onResume() — IncomingDispatchActivity override nahi karta
               try {
                 XposedHelpers.findAndHookMethod(
-                  ORDER_ACTIVITY, lp.classLoader, "onResume",
+                  "android.app.Activity", lp.classLoader, "onResume",
                   new XC_MethodHook() {
                     @Override protected void afterHookedMethod(MethodHookParam p) {
+                      // Sirf IncomingDispatchActivity ke liye
+                      if (!ORDER_ACTIVITY.equals(p.thisObject.getClass().getName())) return;
                       try {
                         long now = System.currentTimeMillis();
                         if (now - lastBcast < 2000) return;
                         android.app.Activity act = (android.app.Activity) p.thisObject;
-                        // Read delay from our prefs
                         int delay = 200;
                         try {
                           android.content.Context ctx = act.createPackageContext(OUR_PKG, android.content.Context.CONTEXT_IGNORE_SECURITY);
@@ -352,6 +335,7 @@ jobs:
                         final android.app.Activity finalAct = act;
                         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
                           try {
+                            if (finalAct.isFinishing() || finalAct.isDestroyed()) return;
                             View root = finalAct.getWindow().getDecorView();
                             String screen = extractText(root);
                             if (screen.isEmpty()) return;
@@ -359,6 +343,7 @@ jobs:
                             Intent intent = new Intent("JAHEZ_ORDER_DATA");
                             intent.setPackage(OUR_PKG);
                             intent.putExtra("screen", screen);
+                            intent.putExtra("is_order", true);
                             finalAct.sendBroadcast(intent);
                           } catch (Exception ignored) {}
                         }, finalDelay);
@@ -367,7 +352,6 @@ jobs:
                   }
                 );
               } catch (Exception e) {
-                // Fallback: TextView hook
                 hookTextView(lp);
               }
             }
@@ -426,42 +410,38 @@ jobs:
         run: |
           cat > app/src/main/java/com/danish/jahez/AutoService.java << 'SEOF'
           package com.danish.jahez;
-          import android.accessibilityservice.AccessibilityService;
-          import android.accessibilityservice.GestureDescription;
-          import android.content.SharedPreferences;
-          import android.graphics.Path;
-          import android.util.Log;
-          import android.view.accessibility.AccessibilityEvent;
-          import android.view.accessibility.AccessibilityNodeInfo;
           import android.app.Notification;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
           import android.app.PendingIntent;
+          import android.app.Service;
           import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
           import android.content.IntentFilter;
+          import android.content.SharedPreferences;
           import android.os.Build;
           import android.os.Handler;
+          import android.os.IBinder;
           import android.os.Looper;
-          import java.util.LinkedList;
-          import java.util.Queue;
+          import android.util.DisplayMetrics;
+          import android.util.Log;
+          import android.view.WindowManager;
           import java.util.Random;
           import java.util.regex.Matcher;
           import java.util.regex.Pattern;
-          public class AutoService extends AccessibilityService {
+          public class AutoService extends Service {
             static final String TAG = "JahezAuto";
-            static final String PKG = "net.jahez.fleets";
             SharedPreferences prefs;
             long lastEvent = 0;
-            long lastScan  = 0;
             final Random rng = new Random();
             final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 String screen = intent.getStringExtra("screen");
+                boolean isOrder = intent.getBooleanExtra("is_order", false);
                 if (screen != null && !screen.isEmpty()) {
                   saveLog("🪝 Hook: " + screen.substring(0, Math.min(80, screen.length())));
-                  processOrder(screen);
+                  processOrder(screen, isOrder);
                 }
               }
             };
@@ -478,7 +458,8 @@ jobs:
                 showServiceNotification();
               }
             };
-            @Override public void onServiceConnected() {
+            @Override public void onCreate() {
+              super.onCreate();
               prefs = getSharedPreferences("cfg", MODE_PRIVATE);
               IntentFilter f = new IntentFilter("JAHEZ_TOGGLE");
               f.addAction("JAHEZ_STATE_CHANGED");
@@ -486,20 +467,22 @@ jobs:
                 registerReceiver(toggleReceiver, f, Context.RECEIVER_NOT_EXPORTED);
               else
                 registerReceiver(toggleReceiver, f);
-              log("Service connected");
-              showServiceNotification();
-              // Register Xposed hook receiver (EXPORTED — Saned process se aata hai)
               IntentFilter of = new IntentFilter("JAHEZ_ORDER_DATA");
               if (Build.VERSION.SDK_INT >= 33)
                 registerReceiver(orderReceiver, of, Context.RECEIVER_EXPORTED);
               else
                 registerReceiver(orderReceiver, of);
+              showServiceNotification();
+              log("Service started");
             }
+            @Override public int onStartCommand(Intent intent, int flags, int startId) {
+              return START_STICKY;
+            }
+            @Override public IBinder onBind(Intent intent) { return null; }
             void showServiceNotification() {
               boolean enabled = prefs != null && prefs.getBoolean("enabled", false);
               NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
               NotificationChannel ch = new NotificationChannel("jahez_svc", "Jahez Auto Service", NotificationManager.IMPORTANCE_LOW);
-              ch.setDescription("Service chalu hai");
               nm.createNotificationChannel(ch);
               Intent toggleIntent = new Intent("JAHEZ_TOGGLE").setPackage(getPackageName());
               PendingIntent togglePending = PendingIntent.getBroadcast(this, 0, toggleIntent,
@@ -515,38 +498,14 @@ jobs:
                 .setOngoing(true)
                 .addAction(action)
                 .build();
+              startForeground(1, notif);
               nm.notify(1, notif);
             }
-            @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-              if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              if (!prefs.getBoolean("enabled", false)) return;
-              String pkg = event.getPackageName() != null ? event.getPackageName().toString() : "";
-              if (!PKG.equals(pkg)) return;
-              // Sirf new window/dialog events — map updates ignore karo
-              if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
-              long now = System.currentTimeMillis();
-              if (now - lastScan < 1500) return;
-              lastScan = now;
-              String cls = event.getClassName() != null ? event.getClassName().toString() : "";
-              saveLog("📡 Window: " + cls);
-              scanScreen();
-            }
-
-            void scanScreen() {
-              if (prefs == null || !prefs.getBoolean("enabled", false)) return;
-              String screen = "";
-              AccessibilityNodeInfo root = getRootInActiveWindow();
-              if (root != null) { screen = flattenTree(root); root.recycle(); }
-              saveLog("📡 [" + screen.length() + "] " + screen.substring(0, Math.min(80, screen.length())));
-              if (screen.isEmpty()) { saveLog("⚠️ screen empty"); return; }
-              processOrder(screen);
-            }
-
-            void processOrder(String screen) {
+            void processOrder(String screen, boolean fromHook) {
               if (prefs == null || !prefs.getBoolean("enabled", false)) return;
               long now = System.currentTimeMillis();
               if (now - lastEvent < 1500) return;
-              if (!isOrderScreen(screen)) { saveLog("ℹ️ not order"); return; }
+              if (!fromHook && !isOrderScreen(screen)) { saveLog("ℹ️ not order"); return; }
               lastEvent = now;
               toast("🔍 Order detected!");
               float[] dist = parseDistances(screen);
@@ -559,25 +518,22 @@ jobs:
                 log("ACCEPTING - swiping");
                 swipeAccept();
                 prefs.edit().putBoolean("enabled", false).apply();
-                sendBroadcast(new android.content.Intent("JAHEZ_AUTO_OFF"));
+                sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
                 showServiceNotification();
-                log("Auto-accept OFF");
                 String msg = "✅ ACCEPTED — Pickup " + fmt(dist[0]) + "km | Drop " + fmt(dist[1]) + "km";
                 toast(msg); saveLog(msg);
               } else {
                 String reason = "";
                 if (!pickupOk) reason += "Pickup " + fmt(dist[0]) + "km > max " + fmt(maxPickup) + "km";
                 if (!dropOk)   reason += (!reason.isEmpty() ? " | " : "") + "Drop " + fmt(dist[1]) + "km > max " + fmt(maxDrop) + "km";
-                log("REJECTED - " + reason);
                 String msg = "❌ SKIP — " + reason;
                 toast(msg); saveLog(msg);
               }
             }
             boolean isOrderScreen(String screen) {
               String s = screen.toLowerCase();
-              boolean hasOrder = s.contains("new order") || s.contains("طلب جديد") || s.contains("reject") || s.contains("رفض");
-              boolean hasAccept = s.contains("accept") || s.contains("قبول");
-              return hasOrder && hasAccept;
+              return (s.contains("new order") || s.contains("طلب جديد"))
+                  && (s.contains("accept") || s.contains("قبول"));
             }
             float[] parseDistances(String txt) {
               float[] r = {-1f, -1f};
@@ -585,14 +541,6 @@ jobs:
               if (m.find()) r[0] = safeFloat(m.group(1));
               m = Pattern.compile("([\\d.]+)\\s*[Kk][Mm]\\s+[Ff]rom\\s+[Pp]ickup").matcher(txt);
               if (m.find()) r[1] = safeFloat(m.group(1));
-              if (r[0] < 0) {
-                m = Pattern.compile("([\\d.]+)\\s*\u0643\u0645\\s+\u0645\u0646\u0643").matcher(txt);
-                if (m.find()) r[0] = safeFloat(m.group(1));
-              }
-              if (r[1] < 0) {
-                m = Pattern.compile("([\\d.]+)\\s*\u0643\u0645\\s+\u0645\u0646\\s+\u0646\u0642\u0637\u0629").matcher(txt);
-                if (m.find()) r[1] = safeFloat(m.group(1));
-              }
               if (r[0] < 0 || r[1] < 0) {
                 Matcher km = Pattern.compile("([\\d.]+)\\s*[Kk][Mm]").matcher(txt);
                 if (km.find() && r[0] < 0) r[0] = safeFloat(km.group(1));
@@ -602,34 +550,19 @@ jobs:
             }
             void swipeAccept() {
               try {
-                int W = getResources().getDisplayMetrics().widthPixels;
-                int H = getResources().getDisplayMetrics().heightPixels;
+                WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+                DisplayMetrics dm = new DisplayMetrics();
+                wm.getDefaultDisplay().getMetrics(dm);
+                int W = dm.widthPixels;
+                int H = dm.heightPixels;
                 int duration = 100 + rng.nextInt(151);
-                Path path = new Path();
-                path.moveTo(W * 0.15f, H * 0.87f);
-                path.lineTo(W * 0.85f, H * 0.87f);
-                GestureDescription.Builder b = new GestureDescription.Builder();
-                b.addStroke(new GestureDescription.StrokeDescription(path, 0, duration));
-                dispatchGesture(b.build(), null, null);
-                log("Swipe done - duration: " + duration + "ms");
-              } catch (Exception e) { log("Swipe error: " + e.getMessage()); }
-            }
-            String flattenTree(AccessibilityNodeInfo node) {
-              if (node == null) return "";
-              StringBuilder sb = new StringBuilder();
-              Queue<AccessibilityNodeInfo> q = new LinkedList<>();
-              q.add(node);
-              while (!q.isEmpty()) {
-                AccessibilityNodeInfo n = q.poll();
-                if (n == null) continue;
-                if (n.getText() != null) sb.append(n.getText()).append(" ");
-                if (n.getContentDescription() != null) sb.append(n.getContentDescription()).append(" ");
-                for (int i = 0; i < n.getChildCount(); i++) {
-                  AccessibilityNodeInfo c = n.getChild(i);
-                  if (c != null) q.add(c);
-                }
-              }
-              return sb.toString();
+                int x1 = (int)(W * 0.15f);
+                int y1 = (int)(H * 0.87f);
+                int x2 = (int)(W * 0.85f);
+                String cmd = String.format("input swipe %d %d %d %d %d", x1, y1, x2, y1, duration);
+                Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+                saveLog("⚡ Swipe: " + cmd);
+              } catch (Exception e) { saveLog("Swipe error: " + e.getMessage()); }
             }
             float safeFloat(String s) {
               try { return Float.parseFloat(s.trim()); } catch (Exception e) { return -1f; }
@@ -640,9 +573,7 @@ jobs:
               String existing = prefs.getString("logs", "");
               String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
               StringBuilder sb = new StringBuilder(entry);
-              int max = 100; // max 100 entries
-              for (int i = 0; i < lines.length && i < max - 1; i++)
-                sb.append("\n").append(lines[i]);
+              for (int i = 0; i < lines.length && i < 99; i++) sb.append("\n").append(lines[i]);
               prefs.edit().putString("logs", sb.toString()).apply();
             }
             void toast(final String msg) {
@@ -650,24 +581,12 @@ jobs:
                 android.widget.Toast.makeText(getApplicationContext(), msg, android.widget.Toast.LENGTH_LONG).show()
               );
             }
-            String fmt(float v) {
-              return v < 0 ? "?" : String.format("%.1f", v);
-            }
+            String fmt(float v) { return v < 0 ? "?" : String.format("%.1f", v); }
             void log(String msg) { Log.d(TAG, msg); }
-            @Override public void onInterrupt() {}
             @Override public void onDestroy() {
               super.onDestroy();
               try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
               try { unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
-              NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-              if (nm != null) nm.cancel(1);
-            }
-            @Override public boolean onUnbind(Intent intent) {
-              try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
-              try { unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
-              NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-              if (nm != null) nm.cancel(1);
-              return super.onUnbind(intent);
             }
           }
           SEOF
