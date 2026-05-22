@@ -34,7 +34,6 @@ jobs:
           mkdir -p app/src/main/java/com/danish/jahez
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/mipmap-anydpi-v26
           mkdir -p app/src/main/assets
@@ -141,6 +140,7 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
             <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
             <application
               android:label="Jahez Auto"
@@ -159,7 +159,8 @@ jobs:
                 </intent-filter>
               </activity>
               <activity android:name=".LogActivity" android:exported="false"/>
-              <service android:name=".AutoService" android:exported="false"/>
+              <service android:name=".AutoService" android:exported="false"
+                android:foregroundServiceType="dataSync"/>
               <receiver android:name=".BootReceiver" android:exported="true">
                 <intent-filter>
                   <action android:name="android.intent.action.BOOT_COMPLETED"/>
@@ -182,21 +183,18 @@ jobs:
           import android.content.SharedPreferences;
           import android.os.Build;
           import android.os.Bundle;
-          import android.provider.Settings;
           import android.view.inputmethod.InputMethodManager;
           import android.widget.*;
           import android.widget.SeekBar;
           public class MainActivity extends Activity {
             SharedPreferences prefs;
             Switch swEnable;
-            TextView tvStatus, tvAcc;
+            TextView tvStatus;
             final BroadcastReceiver offReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
-                String action = intent.getAction();
-                if (swEnable != null) {
-                  swEnable.setChecked("JAHEZ_AUTO_ON".equals(action));
-                }
-                refreshStatus(tvStatus, tvAcc);
+                if (swEnable != null)
+                  swEnable.setChecked("JAHEZ_AUTO_ON".equals(intent.getAction()));
+                refreshStatus();
               }
             };
             @Override protected void onCreate(Bundle saved) {
@@ -209,26 +207,20 @@ jobs:
               TextView tvDelay  = findViewById(R.id.tv_delay);
               swEnable = findViewById(R.id.sw_enable);
               tvStatus = findViewById(R.id.tv_status);
-              tvAcc    = findViewById(R.id.tv_acc);
               Button btnSave = findViewById(R.id.btn_save);
-              Button btnAcc  = findViewById(R.id.btn_acc);
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
               int savedDelay = prefs.getInt("scan_delay", 200);
               sbDelay.setProgress(savedDelay - 50);
               tvDelay.setText(savedDelay + "ms");
               sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                public void onProgressChanged(SeekBar sb, int progress, boolean user) {
-                  int ms = progress + 50;
-                  tvDelay.setText(ms + "ms");
-                }
+                public void onProgressChanged(SeekBar sb, int p, boolean u) { tvDelay.setText((p + 50) + "ms"); }
                 public void onStartTrackingTouch(SeekBar sb) {}
                 public void onStopTrackingTouch(SeekBar sb) {
                   prefs.edit().putInt("scan_delay", sb.getProgress() + 50).apply();
                 }
               });
               swEnable.setChecked(prefs.getBoolean("enabled", false));
-              // Android 13+ notification permission
               if (Build.VERSION.SDK_INT >= 33)
                 requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
               IntentFilter filter = new IntentFilter();
@@ -241,7 +233,7 @@ jobs:
               swEnable.setOnCheckedChangeListener((btn, checked) -> {
                 prefs.edit().putBoolean("enabled", checked).apply();
                 sendBroadcast(new Intent("JAHEZ_STATE_CHANGED"));
-                refreshStatus(tvStatus, tvAcc);
+                refreshStatus();
               });
               btnSave.setOnClickListener(v -> {
                 float pk = parseFloat(etPickup.getText().toString(), 2.0f);
@@ -249,45 +241,31 @@ jobs:
                 prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
                 Toast.makeText(this, "Saved! Pickup<=" + pk + "km Drop<=" + dk + "km", Toast.LENGTH_LONG).show();
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                if (imm != null)
-                  imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
-                etPickup.clearFocus();
-                etDrop.clearFocus();
+                if (imm != null) imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
+                etPickup.clearFocus(); etDrop.clearFocus();
               });
-              btnAcc.setOnClickListener(v ->
-                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-              );
               findViewById(R.id.btn_logs).setOnClickListener(v ->
                 startActivity(new Intent(this, LogActivity.class))
               );
+              // Service start karo
+              Intent svc = new Intent(this, AutoService.class);
+              if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
+              else startService(svc);
             }
             @Override protected void onResume() {
               super.onResume();
-              refreshStatus(tvStatus, tvAcc);
+              refreshStatus();
             }
             @Override protected void onDestroy() {
               super.onDestroy();
               unregisterReceiver(offReceiver);
             }
-            void refreshStatus(TextView tvs, TextView tva) {
-              if (tvs == null || tva == null) return;
-              boolean acc = isAccEnabled();
-              boolean en  = prefs.getBoolean("enabled", false);
-              tva.setText(acc ? "Accessibility: ON" : "Accessibility: OFF - tap below");
-              tva.setTextColor(acc ? 0xFF4CAF50 : 0xFFFF9800);
-              tvs.setText(acc && en ? "AUTO ACCEPT: ON" : "AUTO ACCEPT: OFF");
-              tvs.setTextColor(acc && en ? 0xFF4CAF50 : 0xFFFF5555);
-              // Smart button: accessibility OFF → show orange button, ON → show switch
-              if (swEnable != null && findViewById(R.id.btn_acc) != null) {
-                swEnable.setVisibility(acc ? android.view.View.VISIBLE : android.view.View.GONE);
-                findViewById(R.id.btn_acc).setVisibility(acc ? android.view.View.GONE : android.view.View.VISIBLE);
-              }
-            }
-            boolean isAccEnabled() {
-              try {
-                String s = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-                return s != null && s.contains(getPackageName());
-              } catch (Exception e) { return false; }
+            void refreshStatus() {
+              if (tvStatus == null) return;
+              boolean en = prefs.getBoolean("enabled", false);
+              tvStatus.setText(en ? "AUTO ACCEPT: ON" : "AUTO ACCEPT: OFF");
+              tvStatus.setTextColor(en ? 0xFF4CAF50 : 0xFFFF5555);
+              if (swEnable != null) swEnable.setVisibility(android.view.View.VISIBLE);
             }
             float parseFloat(String s, float def) {
               try { return Float.parseFloat(s.trim()); } catch (Exception e) { return def; }
@@ -591,6 +569,26 @@ jobs:
           }
           SEOF
 
+      - name: Write BootReceiver
+        run: |
+          cat > app/src/main/java/com/danish/jahez/BootReceiver.java << 'BEOF'
+          package com.danish.jahez;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          public class BootReceiver extends BroadcastReceiver {
+            @Override public void onReceive(Context ctx, Intent intent) {
+              if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+                Intent svc = new Intent(ctx, AutoService.class);
+                if (android.os.Build.VERSION.SDK_INT >= 26)
+                  ctx.startForegroundService(svc);
+                else
+                  ctx.startService(svc);
+              }
+            }
+          }
+          BEOF
+
       - name: Write LogActivity
         run: |
           cat > app/src/main/java/com/danish/jahez/LogActivity.java << 'LEOF'
@@ -636,13 +634,9 @@ jobs:
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Auto Accept Orders" android:textSize="12sp"
                 android:textColor="#666" android:gravity="center" android:layout_marginBottom="20dp"/>
-              <TextView android:id="@+id/tv_acc" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:text="Accessibility: OFF"
-                android:textSize="14sp" android:textColor="#FF9800"
-                android:gravity="center" android:layout_marginBottom="6dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
-                android:textSize="20sp" android:textColor="#FF5555"
+                android:textSize="24sp" android:textColor="#FF5555"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="28dp"/>
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="20dp"/>
@@ -692,18 +686,13 @@ jobs:
                 android:layout_height="58dp" android:text="  Enable Auto Accept"
                 android:textColor="#FFF" android:textSize="16sp"
                 android:background="#1A1A1A" android:padding="16dp"
-                android:layout_gravity="center_horizontal" android:layout_marginBottom="12dp"
-                android:visibility="gone"/>
-              <Button android:id="@+id/btn_acc" android:layout_width="match_parent"
-                android:layout_height="58dp" android:text="⚙️  Tap to Enable Accessibility First"
-                android:backgroundTint="#FF9800" android:textColor="#000"
-                android:textStyle="bold" android:layout_marginBottom="12dp"/>
+                android:layout_gravity="center_horizontal" android:layout_marginBottom="12dp"/>
               <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
                 android:layout_height="54dp" android:text="📋  View Logs"
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="1. Open Accessibility Settings\n2. Find Jahez Auto and enable\n3. Set distances, Save, toggle ON\n4. Open Jahez Fleets - orders auto accept!"
+                android:text="Setup:\n1. LSPosed mein Jahez Auto enable karo (scope: net.jahez.fleets)\n2. Distance set karo → Save\n3. Toggle ON karo\n4. Saned kholo — orders auto accept!"
                 android:textColor="#555" android:textSize="12sp"
                 android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
@@ -745,7 +734,6 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
             <string name="app_name">Jahez Auto</string>
-            <string name="acc_desc">Auto accepts Jahez Fleets orders by distance filters</string>
           </resources>
           REOF
 
