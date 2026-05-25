@@ -304,6 +304,10 @@ jobs:
                         long now = System.currentTimeMillis();
                         if (now - lastBcast < 2000) return;
                         android.app.Activity act = (android.app.Activity) p.thisObject;
+                        // Debug toast
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                          android.widget.Toast.makeText(act, "🪝 Hook fired!", android.widget.Toast.LENGTH_SHORT).show()
+                        );
                         int delay = 200;
                         try {
                           android.content.Context ctx = act.createPackageContext(OUR_PKG, android.content.Context.CONTEXT_IGNORE_SECURITY);
@@ -316,12 +320,12 @@ jobs:
                             if (finalAct.isFinishing() || finalAct.isDestroyed()) return;
                             View root = finalAct.getWindow().getDecorView();
                             String screen = extractText(root);
-                            if (screen.isEmpty()) return;
                             lastBcast = System.currentTimeMillis();
+                            // Debug: screen empty hone par bhi broadcast bhejo
                             Intent intent = new Intent("JAHEZ_ORDER_DATA");
                             intent.setPackage(OUR_PKG);
-                            intent.putExtra("screen", screen);
-                            intent.putExtra("is_order", true);
+                            intent.putExtra("screen", screen.isEmpty() ? "EMPTY_SCREEN" : screen);
+                            intent.putExtra("is_order", !screen.isEmpty());
                             finalAct.sendBroadcast(intent);
                           } catch (Exception ignored) {}
                         }, finalDelay);
@@ -483,6 +487,8 @@ jobs:
               if (prefs == null || !prefs.getBoolean("enabled", false)) return;
               long now = System.currentTimeMillis();
               if (now - lastEvent < 1500) return;
+              saveLog("📩 Broadcast received: " + screen.substring(0, Math.min(60, screen.length())));
+              if ("EMPTY_SCREEN".equals(screen)) { saveLog("⚠️ extractText empty — scan_delay badhao"); return; }
               if (!fromHook && !isOrderScreen(screen)) { saveLog("ℹ️ not order"); return; }
               lastEvent = now;
               toast("🔍 Order detected!");
