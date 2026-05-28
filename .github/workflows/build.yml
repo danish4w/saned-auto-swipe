@@ -306,24 +306,20 @@ jobs:
                       );
                       // Intent extras padho — push notification ka data yahan hoga
                       android.content.Intent actIntent = act.getIntent();
-                      StringBuilder sb = new StringBuilder();
-                      // 1: Intent extras
                       Bundle extras = actIntent != null ? actIntent.getExtras() : null;
+                      StringBuilder sb = new StringBuilder();
                       if (extras != null) {
                         for (String key : extras.keySet()) {
                           Object val = extras.get(key);
-                          if (val != null) sb.append(key).append("=").append(val).append(" | ");
+                          if (val != null) sb.append(key).append("=").append(val).append("\n");
                         }
                       }
-                      // 2: Intent data string
-                      if (actIntent != null && actIntent.getDataString() != null)
-                        sb.append("data=").append(actIntent.getDataString());
                       String screen = sb.toString().trim();
-                      // Send to our app for logging
+                      // Har extra alag broadcast mein bhejo
                       Intent intent = new Intent("JAHEZ_ORDER_DATA");
                       intent.setPackage(OUR_PKG);
                       intent.putExtra("screen", screen.isEmpty() ? "NO_EXTRAS" : screen);
-                      intent.putExtra("is_order", false); // Pehle log karo, parse baad mein
+                      intent.putExtra("is_order", false);
                       act.sendBroadcast(intent);
                     } catch (Exception e) {
                       // Error bhi log karo
@@ -374,7 +370,7 @@ jobs:
                 String screen = intent.getStringExtra("screen");
                 boolean isOrder = intent.getBooleanExtra("is_order", false);
                 if (screen != null && !screen.isEmpty()) {
-                  saveLog("🪝 Hook: " + screen.substring(0, Math.min(80, screen.length())));
+                  saveLog("🪝 Hook data received");
                   processOrder(screen, isOrder);
                 }
               }
@@ -439,7 +435,8 @@ jobs:
               if (prefs == null || !prefs.getBoolean("enabled", false)) return;
               long now = System.currentTimeMillis();
               if (now - lastEvent < 1500) return;
-              saveLog("📩 Broadcast received: " + screen.substring(0, Math.min(60, screen.length())));
+              // Full log — truncate nahi karo
+              saveLog("📩 Extras:\n" + screen);
               if ("EMPTY_SCREEN".equals(screen)) { saveLog("⚠️ extractText empty — scan_delay badhao"); return; }
               if (!fromHook && !isOrderScreen(screen)) { saveLog("ℹ️ not order"); return; }
               lastEvent = now;
