@@ -142,6 +142,8 @@ jobs:
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
             <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
             <application
               android:label="Jahez Auto"
               android:icon="@mipmap/ic_launcher"
@@ -223,6 +225,9 @@ jobs:
               swEnable.setChecked(prefs.getBoolean("enabled", false));
               if (Build.VERSION.SDK_INT >= 33)
                 requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
+              requestPermissions(new String[]{
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_COARSE_LOCATION"}, 1);
               IntentFilter filter = new IntentFilter();
               filter.addAction("JAHEZ_AUTO_OFF");
               filter.addAction("JAHEZ_AUTO_ON");
@@ -300,38 +305,44 @@ jobs:
                     lastBcast = now;
                     try {
                       android.app.Activity act = (android.app.Activity) p.thisObject;
-                      // Toast
-                      new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
-                        android.widget.Toast.makeText(act, "🪝 Hook fired!", android.widget.Toast.LENGTH_SHORT).show()
-                      );
-                      // Intent extras padho — push notification ka data yahan hoga
                       android.content.Intent actIntent = act.getIntent();
                       Bundle extras = actIntent != null ? actIntent.getExtras() : null;
-                      StringBuilder sb = new StringBuilder();
-                      if (extras != null) {
-                        for (String key : extras.keySet()) {
-                          Object val = extras.get(key);
-                          if (val != null) sb.append(key).append("=").append(val).append("\n");
-                        }
-                      }
-                      String screen = sb.toString().trim();
-                      // Har extra alag broadcast mein bhejo
+                      if (extras == null) return;
+                      // Extract values directly
+                      double pickupLat  = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
+                      double pickupLon  = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
+                      double destLat    = getDouble(extras, "EXTRA_DISPATCH_DEST_LATITUDE");
+                      double destLon    = getDouble(extras, "EXTRA_DISPATCH_DEST_LONGITUDE");
+                      double dropDist   = getDouble(extras, "EXTRA_DISTANCE");
+                      double price      = getDouble(extras, "EXTRA_DELIVERY_PRICE");
+                      double bonus      = getDouble(extras, "EXTRA_BONUS_AMOUNT");
+                      // Send to AutoService
                       Intent intent = new Intent("JAHEZ_ORDER_DATA");
                       intent.setPackage(OUR_PKG);
-                      intent.putExtra("screen", screen.isEmpty() ? "NO_EXTRAS" : screen);
-                      intent.putExtra("is_order", false);
+                      intent.putExtra("pickup_lat",  pickupLat);
+                      intent.putExtra("pickup_lon",  pickupLon);
+                      intent.putExtra("dest_lat",    destLat);
+                      intent.putExtra("dest_lon",    destLon);
+                      intent.putExtra("drop_dist",   dropDist);
+                      intent.putExtra("price",       price);
+                      intent.putExtra("bonus",       bonus);
+                      intent.putExtra("is_order",    true);
                       act.sendBroadcast(intent);
                     } catch (Exception e) {
-                      // Error bhi log karo
-                      Intent err = new Intent("JAHEZ_ORDER_DATA");
-                      err.setPackage(OUR_PKG);
-                      err.putExtra("screen", "ERROR: " + e.getMessage());
-                      err.putExtra("is_order", false);
-                      try { ((android.app.Activity)p.thisObject).sendBroadcast(err); } catch (Exception ignored) {}
+                      android.util.Log.e("JahezHook", "Error: " + e.getMessage());
                     }
                   }
                 }
               );
+            }
+            double getDouble(Bundle b, String key) {
+              try {
+                Object v = b.get(key);
+                if (v instanceof Double) return (Double) v;
+                if (v instanceof Float)  return (Float) v;
+                if (v instanceof String) return Double.parseDouble((String) v);
+              } catch (Exception ignored) {}
+              return -1;
             }
           }
           HEOF
@@ -358,8 +369,8 @@ jobs:
           import android.util.Log;
           import android.view.WindowManager;
           import java.util.Random;
-          import java.util.regex.Matcher;
-          import java.util.regex.Pattern;
+
+
           public class AutoService extends Service {
             static final String TAG = "JahezAuto";
             SharedPreferences prefs;
@@ -367,12 +378,20 @@ jobs:
             final Random rng = new Random();
             final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
-                String screen = intent.getStringExtra("screen");
                 boolean isOrder = intent.getBooleanExtra("is_order", false);
-                if (screen != null && !screen.isEmpty()) {
-                  saveLog("🪝 Hook data received");
-                  processOrder(screen, isOrder);
+                if (!isOrder) {
+                  // Debug/log only
+                  String screen = intent.getStringExtra("screen");
+                  if (screen != null) saveLog("📩 Extras:\n" + screen);
+                  return;
                 }
+                double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
+                double pickupLon = intent.getDoubleExtra("pickup_lon", -1);
+                double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
+                double price     = intent.getDoubleExtra("price",       0);
+                double bonus     = intent.getDoubleExtra("bonus",       0);
+                saveLog("🪝 Order! drop=" + String.format("%.2f", dropDist) + "km price=" + price + " bonus=" + bonus);
+                processOrderGps(pickupLat, pickupLon, dropDist);
               }
             };
             final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
@@ -431,55 +450,44 @@ jobs:
               startForeground(1, notif);
               nm.notify(1, notif);
             }
-            void processOrder(String screen, boolean fromHook) {
+            void processOrderGps(double pickupLat, double pickupLon, double dropDist) {
               if (prefs == null || !prefs.getBoolean("enabled", false)) return;
               long now = System.currentTimeMillis();
               if (now - lastEvent < 1500) return;
-              // Full log — truncate nahi karo
-              saveLog("📩 Extras:\n" + screen);
-              if ("EMPTY_SCREEN".equals(screen)) { saveLog("⚠️ extractText empty — scan_delay badhao"); return; }
-              if (!fromHook && !isOrderScreen(screen)) { saveLog("ℹ️ not order"); return; }
               lastEvent = now;
-              toast("🔍 Order detected!");
-              float[] dist = parseDistances(screen);
+              // Driver ki location lo
+              float pickupDistKm = -1;
+              try {
+                android.location.LocationManager lm = (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
+                android.location.Location loc = null;
+                try { loc = lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER); } catch (Exception ignored) {}
+                if (loc == null) { try { loc = lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER); } catch (Exception ignored) {} }
+                if (loc != null && pickupLat > 0 && pickupLon > 0) {
+                  float[] res = new float[1];
+                  android.location.Location.distanceBetween(loc.getLatitude(), loc.getLongitude(), pickupLat, pickupLon, res);
+                  pickupDistKm = res[0] / 1000f;
+                }
+              } catch (Exception e) { saveLog("GPS error: " + e.getMessage()); }
               float maxPickup = prefs.getFloat("max_pickup", 2.0f);
               float maxDrop   = prefs.getFloat("max_drop",   5.0f);
-              log(String.format("Order: pickup=%.1f drop=%.1f | limit: pickup<=%.1f drop<=%.1f", dist[0], dist[1], maxPickup, maxDrop));
-              boolean pickupOk = dist[0] < 0 || dist[0] <= maxPickup;
-              boolean dropOk   = dist[1] < 0 || dist[1] <= maxDrop;
+              float dropKm    = (float) dropDist;
+              saveLog(String.format("Pickup=%.2fkm(max%.1f) Drop=%.2fkm(max%.1f)", pickupDistKm, maxPickup, dropKm, maxDrop));
+              boolean pickupOk = pickupDistKm < 0 || pickupDistKm <= maxPickup;
+              boolean dropOk   = dropKm < 0      || dropKm      <= maxDrop;
               if (pickupOk && dropOk) {
-                log("ACCEPTING - swiping");
                 swipeAccept();
                 prefs.edit().putBoolean("enabled", false).apply();
                 sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
                 showServiceNotification();
-                String msg = "✅ ACCEPTED — Pickup " + fmt(dist[0]) + "km | Drop " + fmt(dist[1]) + "km";
+                String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
                 toast(msg); saveLog(msg);
               } else {
                 String reason = "";
-                if (!pickupOk) reason += "Pickup " + fmt(dist[0]) + "km > max " + fmt(maxPickup) + "km";
-                if (!dropOk)   reason += (!reason.isEmpty() ? " | " : "") + "Drop " + fmt(dist[1]) + "km > max " + fmt(maxDrop) + "km";
+                if (!pickupOk) reason += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
+                if (!dropOk)   reason += (!reason.isEmpty() ? " | " : "") + "Drop " + fmt(dropKm) + "km > max " + fmt(maxDrop) + "km";
                 String msg = "❌ SKIP — " + reason;
                 toast(msg); saveLog(msg);
               }
-            }
-            boolean isOrderScreen(String screen) {
-              String s = screen.toLowerCase();
-              return (s.contains("new order") || s.contains("طلب جديد"))
-                  && (s.contains("accept") || s.contains("قبول"));
-            }
-            float[] parseDistances(String txt) {
-              float[] r = {-1f, -1f};
-              Matcher m = Pattern.compile("([\\d.]+)\\s*[Kk][Mm]\\s+[Ff]rom\\s+[Yy]ou").matcher(txt);
-              if (m.find()) r[0] = safeFloat(m.group(1));
-              m = Pattern.compile("([\\d.]+)\\s*[Kk][Mm]\\s+[Ff]rom\\s+[Pp]ickup").matcher(txt);
-              if (m.find()) r[1] = safeFloat(m.group(1));
-              if (r[0] < 0 || r[1] < 0) {
-                Matcher km = Pattern.compile("([\\d.]+)\\s*[Kk][Mm]").matcher(txt);
-                if (km.find() && r[0] < 0) r[0] = safeFloat(km.group(1));
-                if (km.find() && r[1] < 0) r[1] = safeFloat(km.group(1));
-              }
-              return r;
             }
             void swipeAccept() {
               try {
@@ -496,9 +504,6 @@ jobs:
                 Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
                 saveLog("⚡ Swipe: " + cmd);
               } catch (Exception e) { saveLog("Swipe error: " + e.getMessage()); }
-            }
-            float safeFloat(String s) {
-              try { return Float.parseFloat(s.trim()); } catch (Exception e) { return -1f; }
             }
             void saveLog(String msg) {
               java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
