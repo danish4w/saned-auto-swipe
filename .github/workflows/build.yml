@@ -286,15 +286,25 @@ jobs:
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
           import android.content.Intent;
+          import android.content.IntentFilter;
           import android.os.Bundle;
+          import android.os.SystemClock;
+          import android.util.DisplayMetrics;
+          import android.view.MotionEvent;
+          import android.view.View;
+          import android.view.WindowManager;
           public class SanedHook implements IXposedHookLoadPackage {
             static final String TARGET  = "net.jahez.fleets";
             static final String OUR_PKG = "com.danish.jahez";
             static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
             long lastBcast = 0;
+            volatile android.app.Activity currentActivity = null;
             @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
               if (!TARGET.equals(lp.packageName)) return;
+              // Hook 1: Activity.onResume — order detect + store reference
               XposedHelpers.findAndHookMethod(
                 "android.app.Activity", lp.classLoader, "onResume",
                 new XC_MethodHook() {
@@ -303,30 +313,35 @@ jobs:
                     long now = System.currentTimeMillis();
                     if (now - lastBcast < 2000) return;
                     lastBcast = now;
+                    android.app.Activity act = (android.app.Activity) p.thisObject;
+                    currentActivity = act;
+                    // Register accept receiver in Saned process
                     try {
-                      android.app.Activity act = (android.app.Activity) p.thisObject;
+                      IntentFilter f = new IntentFilter("JAHEZ_DO_ACCEPT");
+                      act.registerReceiver(new BroadcastReceiver() {
+                        @Override public void onReceive(Context ctx, Intent intent) {
+                          doSwipe();
+                        }
+                      }, f);
+                    } catch (Exception ignored) {}
+                    // Send order data to AutoService
+                    try {
                       android.content.Intent actIntent = act.getIntent();
                       Bundle extras = actIntent != null ? actIntent.getExtras() : null;
                       if (extras == null) return;
-                      // Extract values directly
-                      double pickupLat  = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
-                      double pickupLon  = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
-                      double destLat    = getDouble(extras, "EXTRA_DISPATCH_DEST_LATITUDE");
-                      double destLon    = getDouble(extras, "EXTRA_DISPATCH_DEST_LONGITUDE");
-                      double dropDist   = getDouble(extras, "EXTRA_DISTANCE");
-                      double price      = getDouble(extras, "EXTRA_DELIVERY_PRICE");
-                      double bonus      = getDouble(extras, "EXTRA_BONUS_AMOUNT");
-                      // Send to AutoService
+                      double pickupLat = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
+                      double pickupLon = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
+                      double dropDist  = getDouble(extras, "EXTRA_DISTANCE");
+                      double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
+                      double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
                       Intent intent = new Intent("JAHEZ_ORDER_DATA");
                       intent.setPackage(OUR_PKG);
-                      intent.putExtra("pickup_lat",  pickupLat);
-                      intent.putExtra("pickup_lon",  pickupLon);
-                      intent.putExtra("dest_lat",    destLat);
-                      intent.putExtra("dest_lon",    destLon);
-                      intent.putExtra("drop_dist",   dropDist);
-                      intent.putExtra("price",       price);
-                      intent.putExtra("bonus",       bonus);
-                      intent.putExtra("is_order",    true);
+                      intent.putExtra("pickup_lat", pickupLat);
+                      intent.putExtra("pickup_lon", pickupLon);
+                      intent.putExtra("drop_dist",  dropDist);
+                      intent.putExtra("price",      price);
+                      intent.putExtra("bonus",      bonus);
+                      intent.putExtra("is_order",   true);
                       act.sendBroadcast(intent);
                     } catch (Exception e) {
                       android.util.Log.e("JahezHook", "Error: " + e.getMessage());
@@ -334,6 +349,34 @@ jobs:
                   }
                 }
               );
+            }
+            void doSwipe() {
+              android.app.Activity act = currentActivity;
+              if (act == null || act.isFinishing()) return;
+              new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                try {
+                  View root = act.getWindow().getDecorView();
+                  WindowManager wm = act.getWindowManager();
+                  DisplayMetrics dm = new DisplayMetrics();
+                  wm.getDefaultDisplay().getMetrics(dm);
+                  int W = dm.widthPixels;
+                  int H = dm.heightPixels;
+                  float x1 = W * 0.15f, x2 = W * 0.85f, y = H * 0.87f;
+                  long t = SystemClock.uptimeMillis();
+                  // ACTION_DOWN
+                  root.dispatchTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x1, y, 0));
+                  // ACTION_MOVE steps
+                  for (int i = 1; i <= 5; i++) {
+                    float xi = x1 + (x2 - x1) * i / 5f;
+                    root.dispatchTouchEvent(MotionEvent.obtain(t, t + i * 30, MotionEvent.ACTION_MOVE, xi, y, 0));
+                  }
+                  // ACTION_UP
+                  root.dispatchTouchEvent(MotionEvent.obtain(t, t + 200, MotionEvent.ACTION_UP, x2, y, 0));
+                  android.util.Log.d("JahezHook", "MotionEvent swipe done");
+                } catch (Exception e) {
+                  android.util.Log.e("JahezHook", "Swipe error: " + e.getMessage());
+                }
+              });
             }
             double getDouble(Bundle b, String key) {
               try {
@@ -368,14 +411,12 @@ jobs:
           import android.util.DisplayMetrics;
           import android.util.Log;
           import android.view.WindowManager;
-          import java.util.Random;
 
 
           public class AutoService extends Service {
             static final String TAG = "JahezAuto";
             SharedPreferences prefs;
             long lastEvent = 0;
-            final Random rng = new Random();
             final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 boolean isOrder = intent.getBooleanExtra("is_order", false);
@@ -475,7 +516,10 @@ jobs:
               boolean pickupOk = pickupDistKm < 0 || pickupDistKm <= maxPickup;
               boolean dropOk   = dropKm < 0      || dropKm      <= maxDrop;
               if (pickupOk && dropOk) {
-                swipeAccept();
+                // SanedHook ko bolo accept karo — MotionEvent via Saned process
+                Intent acceptIntent = new Intent("JAHEZ_DO_ACCEPT");
+                acceptIntent.setPackage("net.jahez.fleets");
+                sendBroadcast(acceptIntent);
                 prefs.edit().putBoolean("enabled", false).apply();
                 sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
                 showServiceNotification();
@@ -488,22 +532,6 @@ jobs:
                 String msg = "❌ SKIP — " + reason;
                 toast(msg); saveLog(msg);
               }
-            }
-            void swipeAccept() {
-              try {
-                WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-                DisplayMetrics dm = new DisplayMetrics();
-                wm.getDefaultDisplay().getMetrics(dm);
-                int W = dm.widthPixels;
-                int H = dm.heightPixels;
-                int duration = 100 + rng.nextInt(151);
-                int x1 = (int)(W * 0.15f);
-                int y1 = (int)(H * 0.87f);
-                int x2 = (int)(W * 0.85f);
-                String cmd = String.format("input swipe %d %d %d %d %d", x1, y1, x2, y1, duration);
-                Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
-                saveLog("⚡ Swipe: " + cmd);
-              } catch (Exception e) { saveLog("Swipe error: " + e.getMessage()); }
             }
             void saveLog(String msg) {
               java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
