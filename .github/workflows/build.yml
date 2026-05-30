@@ -199,12 +199,11 @@ jobs:
               @Override public void onReceive(Context ctx, Intent intent) {
                 String action = intent.getAction();
                 if ("JAHEZ_AUTO_ON".equals(action) || "JAHEZ_AUTO_OFF".equals(action)) {
-                  if (swEnable != null)
-                    swEnable.setChecked("JAHEZ_AUTO_ON".equals(action));
+                  if (swEnable != null) swEnable.setChecked("JAHEZ_AUTO_ON".equals(action));
                   refreshStatus();
                 } else if ("JAHEZ_SWIPE_SAVED".equals(action)) {
                   refreshSwipeLabels();
-                  Toast.makeText(MainActivity.this, "Swipe points save ho gaye!", Toast.LENGTH_SHORT).show();
+                  Toast.makeText(MainActivity.this, "✅ Swipe points save ho gaye!", Toast.LENGTH_SHORT).show();
                 }
               }
             };
@@ -212,26 +211,26 @@ jobs:
               super.onCreate(saved);
               setContentView(R.layout.activity_main);
               prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              EditText etPickup = findViewById(R.id.et_pickup);
-              EditText etDrop   = findViewById(R.id.et_drop);
-              SeekBar sbDelay   = findViewById(R.id.sb_delay);
-              TextView tvDelay  = findViewById(R.id.tv_delay);
-              swEnable  = findViewById(R.id.sw_enable);
-              tvStatus  = findViewById(R.id.tv_status);
-              tvPointA  = findViewById(R.id.tv_point_a);
-              tvPointB  = findViewById(R.id.tv_point_b);
-              Button btnSave        = findViewById(R.id.btn_save);
-              Button btnSetSwipe    = findViewById(R.id.btn_set_swipe);
+              EditText etPickup   = findViewById(R.id.et_pickup);
+              EditText etDrop     = findViewById(R.id.et_drop);
+              SeekBar sbSwipeDur  = findViewById(R.id.sb_swipe_dur);
+              TextView tvSwipeDur = findViewById(R.id.tv_swipe_dur);
+              swEnable = findViewById(R.id.sw_enable);
+              tvStatus = findViewById(R.id.tv_status);
+              tvPointA = findViewById(R.id.tv_point_a);
+              tvPointB = findViewById(R.id.tv_point_b);
+              Button btnSave     = findViewById(R.id.btn_save);
+              Button btnSetSwipe = findViewById(R.id.btn_set_swipe);
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
-              int savedDelay = prefs.getInt("scan_delay", 200);
-              sbDelay.setProgress(savedDelay - 50);
-              tvDelay.setText(savedDelay + "ms");
-              sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                public void onProgressChanged(SeekBar sb, int p, boolean u) { tvDelay.setText((p+50)+"ms"); }
+              int savedSwipeDur = prefs.getInt("swipe_dur", 200);
+              sbSwipeDur.setProgress(savedSwipeDur);
+              tvSwipeDur.setText(savedSwipeDur + "ms");
+              sbSwipeDur.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                public void onProgressChanged(SeekBar sb, int p, boolean u) { tvSwipeDur.setText(p + "ms"); }
                 public void onStartTrackingTouch(SeekBar sb) {}
                 public void onStopTrackingTouch(SeekBar sb) {
-                  prefs.edit().putInt("scan_delay", sb.getProgress()+50).apply();
+                  prefs.edit().putInt("swipe_dur", sb.getProgress()).apply();
                 }
               });
               swEnable.setChecked(prefs.getBoolean("enabled", false));
@@ -271,38 +270,35 @@ jobs:
             void launchOverlay() {
               if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "Pehle 'Display over other apps' permission do", Toast.LENGTH_LONG).show();
-                Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                  Uri.parse("package:" + getPackageName()));
-                startActivityForResult(i, REQ_OVERLAY);
+                startActivityForResult(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                  Uri.parse("package:" + getPackageName())), REQ_OVERLAY);
               } else {
-                startOverlayService();
+                startService(new Intent(this, SwipeOverlayService.class));
+                Toast.makeText(this, "🟠A aur 🔵B drag karo, phir ✅ dabao", Toast.LENGTH_LONG).show();
+                moveTaskToBack(true);
               }
             }
             @Override protected void onActivityResult(int req, int res, Intent data) {
               if (req == REQ_OVERLAY) {
-                if (Settings.canDrawOverlays(this)) startOverlayService();
-                else Toast.makeText(this, "Permission nahi mili, overlay nahi chalega", Toast.LENGTH_SHORT).show();
+                if (Settings.canDrawOverlays(this)) {
+                  startService(new Intent(this, SwipeOverlayService.class));
+                  moveTaskToBack(true);
+                } else Toast.makeText(this, "Permission nahi mili", Toast.LENGTH_SHORT).show();
               }
-            }
-            void startOverlayService() {
-              Intent i = new Intent(this, SwipeOverlayService.class);
-              startService(i);
-              Toast.makeText(this, "Overlay open hua — kisi bhi screen par jao aur points drag karo", Toast.LENGTH_LONG).show();
-              // App minimize karo taake peeche wali screen dikhe
-              moveTaskToBack(true);
             }
             void refreshSwipeLabels() {
               float x1 = prefs.getFloat("swipe_x1", -1);
               float y1 = prefs.getFloat("swipe_y1", -1);
               float x2 = prefs.getFloat("swipe_x2", -1);
               float y2 = prefs.getFloat("swipe_y2", -1);
-              if (tvPointA != null)
-                tvPointA.setText(x1 < 0 ? "A: default (left)" : "A: x=" + fp(x1) + " y=" + fp(y1));
-              if (tvPointB != null)
-                tvPointB.setText(x2 < 0 ? "B: default (right)" : "B: x=" + fp(x2) + " y=" + fp(y2));
+              if (tvPointA != null) tvPointA.setText(x1 < 0 ? "A: default" : "A: x=" + fp(x1) + " y=" + fp(y1));
+              if (tvPointB != null) tvPointB.setText(x2 < 0 ? "B: default" : "B: x=" + fp(x2) + " y=" + fp(y2));
             }
             @Override protected void onResume() { super.onResume(); refreshStatus(); refreshSwipeLabels(); }
-            @Override protected void onDestroy() { super.onDestroy(); try { unregisterReceiver(uiReceiver); } catch (Exception ignored) {} }
+            @Override protected void onDestroy() {
+              super.onDestroy();
+              try { unregisterReceiver(uiReceiver); } catch (Exception ignored) {}
+            }
             void refreshStatus() {
               if (tvStatus == null) return;
               boolean en = prefs.getBoolean("enabled", false);
@@ -327,26 +323,24 @@ jobs:
           import android.graphics.Color;
           import android.graphics.Paint;
           import android.graphics.PixelFormat;
+          import android.os.Handler;
           import android.os.IBinder;
+          import android.os.Looper;
           import android.util.DisplayMetrics;
           import android.view.Gravity;
           import android.view.MotionEvent;
           import android.view.View;
           import android.view.WindowManager;
           import android.widget.Button;
-          import android.widget.FrameLayout;
           import android.widget.LinearLayout;
           import android.widget.TextView;
           public class SwipeOverlayService extends Service {
             WindowManager wm;
-            View rootView;
+            View viewA, viewB, lineView, barView;
             int screenW, screenH;
-            // Point A (orange circle)
-            float ax, ay;
-            // Point B (blue circle)
-            float bx, by;
-            int dragging = 0; // 0=none 1=A 2=B
-            static final int CIRCLE_R = 60; // px radius of drag handle
+            float ax, ay, bx, by;
+            static final int CIRCLE_SIZE = 120;
+            static final int BAR_HEIGHT  = 150;
             @Override public void onCreate() {
               super.onCreate();
               wm = (WindowManager) getSystemService(WINDOW_SERVICE);
@@ -354,133 +348,114 @@ jobs:
               wm.getDefaultDisplay().getMetrics(dm);
               screenW = dm.widthPixels;
               screenH = dm.heightPixels;
-              // Default positions
               SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
               float sx1 = prefs.getFloat("swipe_x1", -1);
               float sy1 = prefs.getFloat("swipe_y1", -1);
               float sx2 = prefs.getFloat("swipe_x2", -1);
               float sy2 = prefs.getFloat("swipe_y2", -1);
               ax = sx1 < 0 ? screenW * 0.15f : screenW * sx1;
-              ay = sy1 < 0 ? screenH * 0.87f : screenH * sy1;
+              ay = sy1 < 0 ? screenH * 0.75f : screenH * sy1;
               bx = sx2 < 0 ? screenW * 0.85f : screenW * sx2;
-              by = sy2 < 0 ? screenH * 0.87f : screenH * sy2;
-              buildOverlay();
+              by = sy2 < 0 ? screenH * 0.75f : screenH * sy2;
+              addLineView();
+              addCircle(true);
+              addCircle(false);
+              addBar();
             }
-            void buildOverlay() {
-              // Main frame
-              FrameLayout frame = new FrameLayout(this);
-              // Canvas view for drawing line + circles
-              View canvas = new View(this) {
+            void addLineView() {
+              lineView = new View(this) {
                 @Override protected void onDraw(Canvas c) {
-                  // Semi-transparent dark bg
-                  c.drawARGB(120, 0, 0, 0);
-                  Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  linePaint.setColor(Color.WHITE);
-                  linePaint.setStrokeWidth(4);
-                  linePaint.setAlpha(180);
-                  c.drawLine(ax, ay, bx, by, linePaint);
-                  // Arrow head at B
-                  double angle = Math.atan2(by - ay, bx - ax);
-                  float arrowLen = 40;
-                  float arrowAngle = (float) Math.toRadians(25);
-                  Paint arrowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  arrowPaint.setColor(Color.WHITE);
-                  arrowPaint.setStrokeWidth(4);
-                  arrowPaint.setAlpha(180);
-                  c.drawLine(bx, by,
-                    bx - arrowLen * (float)Math.cos(angle - arrowAngle),
-                    by - arrowLen * (float)Math.sin(angle - arrowAngle), arrowPaint);
-                  c.drawLine(bx, by,
-                    bx - arrowLen * (float)Math.cos(angle + arrowAngle),
-                    by - arrowLen * (float)Math.sin(angle + arrowAngle), arrowPaint);
-                  // Circle A — orange
-                  Paint paintA = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  paintA.setColor(0xFFFF9800);
-                  paintA.setAlpha(220);
-                  c.drawCircle(ax, ay, CIRCLE_R, paintA);
-                  Paint strokeA = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  strokeA.setColor(Color.WHITE);
-                  strokeA.setStyle(Paint.Style.STROKE);
-                  strokeA.setStrokeWidth(3);
-                  c.drawCircle(ax, ay, CIRCLE_R, strokeA);
-                  Paint textA = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  textA.setColor(Color.WHITE);
-                  textA.setTextSize(32);
-                  textA.setTextAlign(Paint.Align.CENTER);
-                  textA.setFakeBoldText(true);
-                  c.drawText("A", ax, ay + 12, textA);
-                  // Circle B — blue
-                  Paint paintB = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  paintB.setColor(0xFF2196F3);
-                  paintB.setAlpha(220);
-                  c.drawCircle(bx, by, CIRCLE_R, paintB);
-                  Paint strokeB = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  strokeB.setColor(Color.WHITE);
-                  strokeB.setStyle(Paint.Style.STROKE);
-                  strokeB.setStrokeWidth(3);
-                  c.drawCircle(bx, by, CIRCLE_R, strokeB);
-                  Paint textB = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  textB.setColor(Color.WHITE);
-                  textB.setTextSize(32);
-                  textB.setTextAlign(Paint.Align.CENTER);
-                  textB.setFakeBoldText(true);
-                  c.drawText("B", bx, by + 12, textB);
-                  // Instruction text
-                  Paint instrPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  instrPaint.setColor(Color.WHITE);
-                  instrPaint.setTextSize(36);
-                  instrPaint.setTextAlign(Paint.Align.CENTER);
-                  c.drawText("A aur B ko drag karke set karo", screenW / 2f, 80, instrPaint);
+                  Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  p.setColor(0xCCFFFFFF);
+                  p.setStrokeWidth(5);
+                  c.drawLine(ax, ay, bx, by, p);
+                  double ang = Math.atan2(by - ay, bx - ax);
+                  float al = 36, aa = (float) Math.toRadians(28);
+                  c.drawLine(bx, by, bx - (float)(al * Math.cos(ang - aa)), by - (float)(al * Math.sin(ang - aa)), p);
+                  c.drawLine(bx, by, bx - (float)(al * Math.cos(ang + aa)), by - (float)(al * Math.sin(ang + aa)), p);
+                }
+              };
+              WindowManager.LayoutParams lp = makeParams(screenW, screenH,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+              lp.gravity = Gravity.TOP | Gravity.START;
+              lp.x = 0; lp.y = 0;
+              wm.addView(lineView, lp);
+            }
+            void addCircle(boolean isA) {
+              View circle = new View(this) {
+                @Override protected void onDraw(Canvas c) {
+                  int r = CIRCLE_SIZE / 2;
+                  Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  fill.setColor(isA ? 0xEEFF9800 : 0xEE2196F3);
+                  c.drawCircle(r, r, r - 4, fill);
+                  Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  border.setColor(Color.WHITE);
+                  border.setStyle(Paint.Style.STROKE);
+                  border.setStrokeWidth(4);
+                  c.drawCircle(r, r, r - 4, border);
+                  Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  txt.setColor(Color.WHITE);
+                  txt.setTextSize(44);
+                  txt.setTextAlign(Paint.Align.CENTER);
+                  txt.setFakeBoldText(true);
+                  c.drawText(isA ? "A" : "B", r, r + 16, txt);
                 }
                 @Override public boolean onTouchEvent(MotionEvent e) {
-                  float tx = e.getX(), ty = e.getY();
-                  switch (e.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                      if (dist(tx, ty, ax, ay) < CIRCLE_R + 20) dragging = 1;
-                      else if (dist(tx, ty, bx, by) < CIRCLE_R + 20) dragging = 2;
-                      break;
-                    case MotionEvent.ACTION_MOVE:
-                      if (dragging == 1) { ax = tx; ay = ty; }
-                      else if (dragging == 2) { bx = tx; by = ty; }
-                      invalidate();
-                      break;
-                    case MotionEvent.ACTION_UP:
-                      dragging = 0;
-                      break;
+                  WindowManager.LayoutParams lp = (WindowManager.LayoutParams) getLayoutParams();
+                  if (e.getAction() == MotionEvent.ACTION_MOVE) {
+                    lp.x = Math.max(0, Math.min(screenW - CIRCLE_SIZE,
+                      (int)(lp.x + e.getX() - CIRCLE_SIZE / 2)));
+                    lp.y = Math.max(0, Math.min(screenH - CIRCLE_SIZE - BAR_HEIGHT,
+                      (int)(lp.y + e.getY() - CIRCLE_SIZE / 2)));
+                    wm.updateViewLayout(this, lp);
+                    if (isA) { ax = lp.x + CIRCLE_SIZE / 2f; ay = lp.y + CIRCLE_SIZE / 2f; }
+                    else     { bx = lp.x + CIRCLE_SIZE / 2f; by = lp.y + CIRCLE_SIZE / 2f; }
+                    lineView.invalidate();
                   }
                   return true;
                 }
               };
-              canvas.setLayoutParams(new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT));
-              frame.addView(canvas);
-              // Bottom button bar
-              LinearLayout btnBar = new LinearLayout(this);
-              btnBar.setOrientation(LinearLayout.HORIZONTAL);
-              btnBar.setBackgroundColor(0xDD111111);
-              btnBar.setPadding(24, 16, 24, 16);
-              FrameLayout.LayoutParams barParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, 160);
-              barParams.gravity = Gravity.BOTTOM;
-              btnBar.setLayoutParams(barParams);
-              // Cancel button
-              Button btnCancel = new Button(this);
-              btnCancel.setText("Cancel");
-              btnCancel.setTextColor(Color.WHITE);
-              btnCancel.setBackgroundColor(0xFF444444);
-              LinearLayout.LayoutParams lpCancel = new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-              lpCancel.setMargins(0, 0, 16, 0);
-              btnCancel.setLayoutParams(lpCancel);
-              btnCancel.setOnClickListener(v -> stopSelf());
-              // Save button
-              Button btnSave = new Button(this);
-              btnSave.setText("Save Points");
-              btnSave.setTextColor(Color.WHITE);
-              btnSave.setBackgroundColor(0xFF4CAF50);
-              btnSave.setLayoutParams(new LinearLayout.LayoutParams(0,
+              WindowManager.LayoutParams lp = makeParams(CIRCLE_SIZE, CIRCLE_SIZE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+              lp.gravity = Gravity.TOP | Gravity.START;
+              lp.x = (int)(isA ? ax - CIRCLE_SIZE / 2 : bx - CIRCLE_SIZE / 2);
+              lp.y = (int)(isA ? ay - CIRCLE_SIZE / 2 : by - CIRCLE_SIZE / 2);
+              wm.addView(circle, lp);
+              if (isA) viewA = circle; else viewB = circle;
+            }
+            void addBar() {
+              LinearLayout bar = new LinearLayout(this);
+              bar.setOrientation(LinearLayout.HORIZONTAL);
+              bar.setBackgroundColor(0xF2111111);
+              bar.setPadding(32, 20, 32, 20);
+              TextView tvInfo = new TextView(this);
+              tvInfo.setText("🟠A  🔵B  drag karo");
+              tvInfo.setTextColor(0xFFCCCCCC);
+              tvInfo.setTextSize(14);
+              tvInfo.setLayoutParams(new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+              bar.addView(tvInfo);
+              Button btnCancel = new Button(this);
+              btnCancel.setText("❌");
+              btnCancel.setTextSize(22);
+              btnCancel.setTextColor(Color.WHITE);
+              btnCancel.setBackgroundColor(0xFF880000);
+              LinearLayout.LayoutParams lpC = new LinearLayout.LayoutParams(160,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+              lpC.setMargins(0, 0, 20, 0);
+              btnCancel.setLayoutParams(lpC);
+              btnCancel.setOnClickListener(v -> removeAllViews());
+              bar.addView(btnCancel);
+              Button btnSave = new Button(this);
+              btnSave.setText("✅");
+              btnSave.setTextSize(22);
+              btnSave.setTextColor(Color.WHITE);
+              btnSave.setBackgroundColor(0xFF1B5E20);
+              btnSave.setLayoutParams(new LinearLayout.LayoutParams(160,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
               btnSave.setOnClickListener(v -> {
                 SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
                 prefs.edit()
@@ -490,36 +465,40 @@ jobs:
                   .putFloat("swipe_y2", by / screenH)
                   .apply();
                 sendBroadcast(new Intent("JAHEZ_SWIPE_SAVED"));
+                removeAllViews();
+              });
+              bar.addView(btnSave);
+              barView = bar;
+              WindowManager.LayoutParams lp = makeParams(
+                WindowManager.LayoutParams.MATCH_PARENT, BAR_HEIGHT,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+              lp.gravity = Gravity.BOTTOM | Gravity.START;
+              wm.addView(barView, lp);
+            }
+            // Remove all overlay views directly (no stopSelf thread issue)
+            void removeAllViews() {
+              new Handler(Looper.getMainLooper()).post(() -> {
+                try { if (lineView != null) { wm.removeView(lineView); lineView = null; } } catch (Exception ignored) {}
+                try { if (viewA   != null) { wm.removeView(viewA);    viewA   = null; } } catch (Exception ignored) {}
+                try { if (viewB   != null) { wm.removeView(viewB);    viewB   = null; } } catch (Exception ignored) {}
+                try { if (barView != null) { wm.removeView(barView);  barView = null; } } catch (Exception ignored) {}
                 stopSelf();
               });
-              btnBar.addView(btnCancel);
-              btnBar.addView(btnSave);
-              frame.addView(btnBar);
-              rootView = frame;
-              WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
+            }
+            WindowManager.LayoutParams makeParams(int w, int h, int flags) {
+              return new WindowManager.LayoutParams(w, h,
                 android.os.Build.VERSION.SDK_INT >= 26
                   ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                   : WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                  | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT);
-              params.gravity = Gravity.TOP | Gravity.START;
-              // Allow button clicks — remove NOT_FOCUSABLE for button bar
-              params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
-              wm.addView(rootView, params);
-            }
-            float dist(float x1, float y1, float x2, float y2) {
-              float dx = x1 - x2, dy = y1 - y2;
-              return (float) Math.sqrt(dx * dx + dy * dy);
+                flags, PixelFormat.TRANSLUCENT);
             }
             @Override public void onDestroy() {
               super.onDestroy();
-              if (rootView != null) {
-                try { wm.removeView(rootView); } catch (Exception ignored) {}
-              }
+              // Safety cleanup if killed externally
+              try { if (lineView != null) wm.removeView(lineView); } catch (Exception ignored) {}
+              try { if (viewA   != null) wm.removeView(viewA);    } catch (Exception ignored) {}
+              try { if (viewB   != null) wm.removeView(viewB);    } catch (Exception ignored) {}
+              try { if (barView != null) wm.removeView(barView);  } catch (Exception ignored) {}
             }
             @Override public IBinder onBind(Intent intent) { return null; }
           }
@@ -543,7 +522,6 @@ jobs:
           import android.util.DisplayMetrics;
           import android.view.MotionEvent;
           import android.view.View;
-          import android.view.WindowManager;
           public class SanedHook implements IXposedHookLoadPackage {
             static final String TARGET  = "net.jahez.fleets";
             static final String OUR_PKG = "com.danish.jahez";
@@ -565,14 +543,11 @@ jobs:
                     try {
                       IntentFilter f = new IntentFilter("JAHEZ_DO_ACCEPT");
                       act.registerReceiver(new BroadcastReceiver() {
-                        @Override public void onReceive(Context ctx, Intent intent) {
-                          doSwipe();
-                        }
+                        @Override public void onReceive(Context ctx, Intent intent) { doSwipe(); }
                       }, f);
                     } catch (Exception ignored) {}
                     try {
-                      android.content.Intent actIntent = act.getIntent();
-                      Bundle extras = actIntent != null ? actIntent.getExtras() : null;
+                      Bundle extras = act.getIntent() != null ? act.getIntent().getExtras() : null;
                       if (extras == null) return;
                       double pickupLat = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
                       double pickupLon = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
@@ -606,36 +581,32 @@ jobs:
                       Context.CONTEXT_IGNORE_SECURITY | Context.CONTEXT_INCLUDE_CODE);
                     prefs = ourCtx.getSharedPreferences("cfg", Context.MODE_PRIVATE);
                   } catch (Exception e) {
-                    android.util.Log.e("JahezHook", "Prefs ctx error: " + e.getMessage());
+                    android.util.Log.e("JahezHook", "Prefs error: " + e.getMessage());
                   }
-                  float rx1 = 0.15f, ry1 = 0.87f;
-                  float rx2 = 0.85f, ry2 = 0.87f;
+                  float rx1 = 0.15f, ry1 = 0.87f, rx2 = 0.85f, ry2 = 0.87f;
+                  int swipeDur = 200;
                   if (prefs != null) {
                     rx1 = prefs.getFloat("swipe_x1", 0.15f);
                     ry1 = prefs.getFloat("swipe_y1", 0.87f);
                     rx2 = prefs.getFloat("swipe_x2", 0.85f);
                     ry2 = prefs.getFloat("swipe_y2", 0.87f);
+                    swipeDur = prefs.getInt("swipe_dur", 200);
                   }
                   View root = act.getWindow().getDecorView();
                   DisplayMetrics dm = new DisplayMetrics();
                   act.getWindowManager().getDefaultDisplay().getMetrics(dm);
-                  int W = dm.widthPixels;
-                  int H = dm.heightPixels;
-                  float x1 = W * rx1, y1 = H * ry1;
-                  float x2 = W * rx2, y2 = H * ry2;
+                  float x1 = dm.widthPixels  * rx1, y1 = dm.heightPixels * ry1;
+                  float x2 = dm.widthPixels  * rx2, y2 = dm.heightPixels * ry2;
                   long t = SystemClock.uptimeMillis();
-                  root.dispatchTouchEvent(MotionEvent.obtain(t, t,
-                    MotionEvent.ACTION_DOWN, x1, y1, 0));
+                  root.dispatchTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x1, y1, 0));
                   for (int i = 1; i <= 8; i++) {
-                    float xi = x1 + (x2 - x1) * i / 8f;
-                    float yi = y1 + (y2 - y1) * i / 8f;
-                    root.dispatchTouchEvent(MotionEvent.obtain(t, t + i * 25,
-                      MotionEvent.ACTION_MOVE, xi, yi, 0));
+                    root.dispatchTouchEvent(MotionEvent.obtain(t,
+                      t + (long)(swipeDur * i / 8f), MotionEvent.ACTION_MOVE,
+                      x1 + (x2 - x1) * i / 8f, y1 + (y2 - y1) * i / 8f, 0));
                   }
-                  root.dispatchTouchEvent(MotionEvent.obtain(t, t + 250,
+                  root.dispatchTouchEvent(MotionEvent.obtain(t, t + swipeDur,
                     MotionEvent.ACTION_UP, x2, y2, 0));
-                  android.util.Log.d("JahezHook",
-                    "Swipe A(" + rx1 + "," + ry1 + ") -> B(" + rx2 + "," + ry2 + ")");
+                  android.util.Log.d("JahezHook", "Swipe done dur=" + swipeDur + "ms");
                 } catch (Exception e) {
                   android.util.Log.e("JahezHook", "Swipe error: " + e.getMessage());
                 }
@@ -645,7 +616,7 @@ jobs:
               try {
                 Object v = b.get(key);
                 if (v instanceof Double) return (Double) v;
-                if (v instanceof Float)  return (Float) v;
+                if (v instanceof Float)  return ((Float) v).doubleValue();
                 if (v instanceof String) return Double.parseDouble((String) v);
               } catch (Exception ignored) {}
               return -1;
@@ -681,7 +652,7 @@ jobs:
                 boolean isOrder = intent.getBooleanExtra("is_order", false);
                 if (!isOrder) {
                   String screen = intent.getStringExtra("screen");
-                  if (screen != null) saveLog("📩 Extras:\n" + screen);
+                  if (screen != null) saveLog("📩 " + screen);
                   return;
                 }
                 double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
@@ -696,12 +667,10 @@ jobs:
             final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-                String action = intent.getAction();
-                if ("JAHEZ_TOGGLE".equals(action)) {
-                  boolean current = prefs.getBoolean("enabled", false);
-                  prefs.edit().putBoolean("enabled", !current).apply();
-                  sendBroadcast(new Intent(!current ? "JAHEZ_AUTO_ON" : "JAHEZ_AUTO_OFF"));
-                  log("Toggle: " + (!current ? "ON" : "OFF"));
+                if ("JAHEZ_TOGGLE".equals(intent.getAction())) {
+                  boolean cur = prefs.getBoolean("enabled", false);
+                  prefs.edit().putBoolean("enabled", !cur).apply();
+                  sendBroadcast(new Intent(!cur ? "JAHEZ_AUTO_ON" : "JAHEZ_AUTO_OFF"));
                 }
                 showServiceNotification();
               }
@@ -713,36 +682,31 @@ jobs:
               f.addAction("JAHEZ_STATE_CHANGED");
               if (Build.VERSION.SDK_INT >= 33)
                 registerReceiver(toggleReceiver, f, Context.RECEIVER_NOT_EXPORTED);
-              else
-                registerReceiver(toggleReceiver, f);
+              else registerReceiver(toggleReceiver, f);
               IntentFilter of = new IntentFilter("JAHEZ_ORDER_DATA");
               if (Build.VERSION.SDK_INT >= 33)
                 registerReceiver(orderReceiver, of, Context.RECEIVER_EXPORTED);
-              else
-                registerReceiver(orderReceiver, of);
+              else registerReceiver(orderReceiver, of);
               showServiceNotification();
-              log("Service started");
             }
             @Override public int onStartCommand(Intent intent, int flags, int startId) { return START_STICKY; }
             @Override public IBinder onBind(Intent intent) { return null; }
             void showServiceNotification() {
-              boolean enabled = prefs != null && prefs.getBoolean("enabled", false);
+              boolean en = prefs != null && prefs.getBoolean("enabled", false);
               NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-              NotificationChannel ch = new NotificationChannel("jahez_svc", "Jahez Auto Service", NotificationManager.IMPORTANCE_LOW);
-              nm.createNotificationChannel(ch);
-              Intent toggleIntent = new Intent("JAHEZ_TOGGLE").setPackage(getPackageName());
-              PendingIntent togglePending = PendingIntent.getBroadcast(this, 0, toggleIntent,
+              nm.createNotificationChannel(new NotificationChannel(
+                "jahez_svc", "Jahez Auto Service", NotificationManager.IMPORTANCE_LOW));
+              PendingIntent pi = PendingIntent.getBroadcast(this, 0,
+                new Intent("JAHEZ_TOGGLE").setPackage(getPackageName()),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-              Notification.Action action = new Notification.Action.Builder(
-                enabled ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
-                enabled ? "✅ ON  —  tap to OFF" : "⏸ OFF  —  tap to ON",
-                togglePending).build();
               Notification notif = new Notification.Builder(this, "jahez_svc")
                 .setContentTitle("Jahez Auto")
-                .setContentText(enabled ? "Auto Accept: ON" : "Auto Accept: OFF")
+                .setContentText(en ? "Auto Accept: ON" : "Auto Accept: OFF")
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setOngoing(true)
-                .addAction(action)
+                .addAction(new Notification.Action.Builder(
+                  en ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                  en ? "✅ ON — tap to OFF" : "⏸ OFF — tap to ON", pi).build())
                 .build();
               startForeground(1, notif);
               nm.notify(1, notif);
@@ -754,37 +718,37 @@ jobs:
               lastEvent = now;
               float pickupDistKm = -1;
               try {
-                android.location.LocationManager lm = (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
+                android.location.LocationManager lm =
+                  (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
                 android.location.Location loc = null;
                 try { loc = lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER); } catch (Exception ignored) {}
-                if (loc == null) { try { loc = lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER); } catch (Exception ignored) {} }
+                if (loc == null) try { loc = lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER); } catch (Exception ignored) {}
                 if (loc != null && pickupLat > 0 && pickupLon > 0) {
                   float[] res = new float[1];
-                  android.location.Location.distanceBetween(loc.getLatitude(), loc.getLongitude(), pickupLat, pickupLon, res);
+                  android.location.Location.distanceBetween(
+                    loc.getLatitude(), loc.getLongitude(), pickupLat, pickupLon, res);
                   pickupDistKm = res[0] / 1000f;
                 }
               } catch (Exception e) { saveLog("GPS error: " + e.getMessage()); }
               float maxPickup = prefs.getFloat("max_pickup", 2.0f);
               float maxDrop   = prefs.getFloat("max_drop",   5.0f);
               float dropKm    = (float) dropDist;
-              saveLog(String.format("Pickup=%.2fkm(max%.1f) Drop=%.2fkm(max%.1f)", pickupDistKm, maxPickup, dropKm, maxDrop));
+              saveLog(String.format("Pickup=%.2fkm(max%.1f) Drop=%.2fkm(max%.1f)",
+                pickupDistKm, maxPickup, dropKm, maxDrop));
               boolean pickupOk = pickupDistKm < 0 || pickupDistKm <= maxPickup;
-              boolean dropOk   = dropKm < 0      || dropKm      <= maxDrop;
+              boolean dropOk   = dropKm < 0      || dropKm <= maxDrop;
               if (pickupOk && dropOk) {
-                Intent acceptIntent = new Intent("JAHEZ_DO_ACCEPT");
-                acceptIntent.setPackage("net.jahez.fleets");
-                sendBroadcast(acceptIntent);
+                sendBroadcast(new Intent("JAHEZ_DO_ACCEPT").setPackage("net.jahez.fleets"));
                 prefs.edit().putBoolean("enabled", false).apply();
                 sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
                 showServiceNotification();
                 String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
                 toast(msg); saveLog(msg);
               } else {
-                String reason = "";
-                if (!pickupOk) reason += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
-                if (!dropOk)   reason += (!reason.isEmpty() ? " | " : "") + "Drop " + fmt(dropKm) + "km > max " + fmt(maxDrop) + "km";
-                String msg = "❌ SKIP — " + reason;
-                toast(msg); saveLog(msg);
+                String r = "";
+                if (!pickupOk) r += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
+                if (!dropOk)   r += (r.isEmpty() ? "" : " | ") + "Drop " + fmt(dropKm) + "km > max " + fmt(maxDrop) + "km";
+                toast("❌ SKIP — " + r); saveLog("❌ SKIP — " + r);
               }
             }
             void saveLog(String msg) {
@@ -796,17 +760,15 @@ jobs:
               for (int i = 0; i < lines.length && i < 99; i++) sb.append("\n").append(lines[i]);
               prefs.edit().putString("logs", sb.toString()).apply();
             }
-            void toast(final String msg) {
+            void toast(String msg) {
               new Handler(Looper.getMainLooper()).post(() ->
-                android.widget.Toast.makeText(getApplicationContext(), msg, android.widget.Toast.LENGTH_LONG).show()
-              );
+                android.widget.Toast.makeText(getApplicationContext(), msg, android.widget.Toast.LENGTH_LONG).show());
             }
             String fmt(float v) { return v < 0 ? "?" : String.format("%.1f", v); }
-            void log(String msg) { Log.d(TAG, msg); }
             @Override public void onDestroy() {
               super.onDestroy();
               try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
-              try { unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
+              try { unregisterReceiver(orderReceiver);  } catch (Exception ignored) {}
             }
           }
           SEOF
@@ -822,10 +784,8 @@ jobs:
             @Override public void onReceive(Context ctx, Intent intent) {
               if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
                 Intent svc = new Intent(ctx, AutoService.class);
-                if (android.os.Build.VERSION.SDK_INT >= 26)
-                  ctx.startForegroundService(svc);
-                else
-                  ctx.startService(svc);
+                if (android.os.Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc);
+                else ctx.startService(svc);
               }
             }
           }
@@ -844,19 +804,13 @@ jobs:
               super.onCreate(saved);
               setContentView(R.layout.activity_log);
               SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              TextView tvLog = findViewById(R.id.tv_log);
+              TextView tvLog  = findViewById(R.id.tv_log);
               Button btnClear = findViewById(R.id.btn_clear);
-              Button btnBack = findViewById(R.id.btn_back);
-              loadLogs(tvLog, prefs);
-              btnClear.setOnClickListener(v -> {
-                prefs.edit().remove("logs").apply();
-                tvLog.setText("Log saaf ho gaya.");
-              });
-              btnBack.setOnClickListener(v -> finish());
-            }
-            void loadLogs(TextView tv, SharedPreferences prefs) {
+              Button btnBack  = findViewById(R.id.btn_back);
               String logs = prefs.getString("logs", "");
-              tv.setText(logs.isEmpty() ? "Abhi koi log nahi hai.\nJahez Fleets mein order aane do." : logs);
+              tvLog.setText(logs.isEmpty() ? "Abhi koi log nahi hai." : logs);
+              btnClear.setOnClickListener(v -> { prefs.edit().remove("logs").apply(); tvLog.setText("Log saaf ho gaya."); });
+              btnBack.setOnClickListener(v -> finish());
             }
           }
           LEOF
@@ -870,98 +824,108 @@ jobs:
             android:background="#0A0A0A">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
               android:orientation="vertical" android:padding="20dp">
+
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Jahez Auto" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Auto Accept Orders" android:textSize="12sp"
                 android:textColor="#666" android:gravity="center" android:layout_marginBottom="20dp"/>
+
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
                 android:textSize="24sp" android:textColor="#FF5555"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="28dp"/>
+
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="20dp"/>
+
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Max Pickup Distance (Km From You)"
+                android:text="Max Pickup Distance (km from you)"
                 android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
               <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
                 android:layout_height="56dp" android:inputType="numberDecimal" android:text="2.0"
                 android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
                 android:padding="12dp" android:layout_marginBottom="16dp"/>
+
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Max Drop Distance (Km From Pickup)"
+                android:text="Max Drop Distance (km from pickup)"
                 android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
               <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
                 android:layout_height="56dp" android:inputType="numberDecimal" android:text="5.0"
                 android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
                 android:padding="12dp" android:layout_marginBottom="20dp"/>
+
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:layout_marginBottom="4dp">
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="Scan Delay (order screen ke baad)"
+                  android:layout_weight="1" android:text="Swipe Duration"
                   android:textColor="#AAA" android:textSize="13sp"/>
-                <TextView android:id="@+id/tv_delay" android:layout_width="wrap_content"
+                <TextView android:id="@+id/tv_swipe_dur" android:layout_width="wrap_content"
                   android:layout_height="wrap_content" android:text="200ms"
-                  android:textColor="#4CAF50" android:textSize="14sp" android:textStyle="bold"/>
+                  android:textColor="#FF9800" android:textSize="14sp" android:textStyle="bold"/>
               </LinearLayout>
-              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:max="1450" android:progress="150"
-                android:progressTint="#4CAF50" android:thumbTint="#4CAF50"
-                android:layout_marginBottom="6dp"/>
+              <SeekBar android:id="@+id/sb_swipe_dur" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:max="500" android:progress="200"
+                android:progressTint="#FF9800" android:thumbTint="#FF9800"
+                android:layout_marginBottom="4dp"/>
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:layout_marginBottom="20dp">
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="50ms" android:textColor="#555" android:textSize="11sp"/>
+                  android:layout_weight="1" android:text="0ms" android:textColor="#555" android:textSize="11sp"/>
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="750ms" android:textColor="#555"
+                  android:layout_weight="1" android:text="250ms" android:textColor="#555"
                   android:textSize="11sp" android:gravity="center"/>
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="1500ms" android:textColor="#555"
+                  android:layout_weight="1" android:text="500ms" android:textColor="#555"
                   android:textSize="11sp" android:gravity="end"/>
               </LinearLayout>
+
               <Button android:id="@+id/btn_save" android:layout_width="match_parent"
                 android:layout_height="54dp" android:text="Save Settings"
                 android:backgroundTint="#2196F3" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
+
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="16dp"/>
+
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Swipe Points" android:textSize="15sp"
                 android:textColor="#FF9800" android:textStyle="bold" android:layout_marginBottom="6dp"/>
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="horizontal" android:layout_marginBottom="12dp">
+                android:orientation="horizontal" android:layout_marginBottom="10dp">
                 <TextView android:id="@+id/tv_point_a" android:layout_width="0dp"
                   android:layout_height="wrap_content" android:layout_weight="1"
-                  android:text="A: default (left)" android:textColor="#FF9800"
-                  android:textSize="12sp"/>
+                  android:text="A: default" android:textColor="#FF9800" android:textSize="12sp"/>
                 <TextView android:id="@+id/tv_point_b" android:layout_width="0dp"
                   android:layout_height="wrap_content" android:layout_weight="1"
-                  android:text="B: default (right)" android:textColor="#2196F3"
+                  android:text="B: default" android:textColor="#2196F3"
                   android:textSize="12sp" android:gravity="end"/>
               </LinearLayout>
               <Button android:id="@+id/btn_set_swipe" android:layout_width="match_parent"
-                android:layout_height="58dp"
-                android:text="Set Swipe Points (Screen Par)"
+                android:layout_height="58dp" android:text="🎯  Set Swipe Points On Screen"
                 android:backgroundTint="#FF9800" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="6dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Button dabao → app minimize hogi → A aur B circles drag karo → Save karo"
+                android:text="App minimize hogi → koi bhi app kholo → 🟠A aur 🔵B drag karo → ✅ save"
                 android:textColor="#555" android:textSize="11sp"
                 android:gravity="center" android:layout_marginBottom="20dp"/>
+
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="16dp"/>
+
               <Switch android:id="@+id/sw_enable" android:layout_width="match_parent"
                 android:layout_height="58dp" android:text="  Enable Auto Accept"
                 android:textColor="#FFF" android:textSize="16sp"
                 android:background="#1A1A1A" android:padding="16dp"
-                android:layout_gravity="center_horizontal" android:layout_marginBottom="12dp"/>
+                android:layout_marginBottom="12dp"/>
               <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
-                android:layout_height="54dp" android:text="View Logs"
+                android:layout_height="54dp" android:text="📋  View Logs"
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
+
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed mein Jahez Auto enable karo (scope: net.jahez.fleets)\n2. Distance set karo → Save\n3. Swipe points set karo\n4. Toggle ON karo\n5. Saned kholo — orders auto accept!"
+                android:text="Setup:\n1. LSPosed → Jahez Auto enable (scope: net.jahez.fleets)\n2. Distance set → Save\n3. Swipe points set karo\n4. Toggle ON\n5. Jahez Fleets kholo — auto accept!"
                 android:textColor="#555" android:textSize="12sp"
                 android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
@@ -984,8 +948,7 @@ jobs:
                 android:textColor="#FFF" android:layout_marginEnd="8dp"/>
               <Button android:id="@+id/btn_clear" android:layout_width="0dp"
                 android:layout_height="46dp" android:layout_weight="1"
-                android:text="Clear" android:backgroundTint="#B71C1C"
-                android:textColor="#FFF"/>
+                android:text="Clear" android:backgroundTint="#B71C1C" android:textColor="#FFF"/>
             </LinearLayout>
             <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
               <TextView android:id="@+id/tv_log" android:layout_width="match_parent"
@@ -1031,7 +994,6 @@ jobs:
           echo "Signing: $APK"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name "apksigner" -type f | sort -V | tail -1)
           if [ -z "$APKSIGNER" ]; then echo "apksigner not found!"; exit 1; fi
-          echo "Using: $APKSIGNER"
           $APKSIGNER sign --ks /tmp/key.keystore --ks-key-alias jahez \
             --ks-pass pass:danish123 --key-pass pass:danish123 \
             --out app/build/JahezAutoAccept.apk "$APK"
