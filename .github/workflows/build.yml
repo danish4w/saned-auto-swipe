@@ -262,6 +262,9 @@ jobs:
                 etPickup.clearFocus(); etDrop.clearFocus();
               });
               btnSetSwipe.setOnClickListener(v -> launchOverlay());
+              findViewById(R.id.btn_logs).setOnClickListener(v ->
+                startActivity(new Intent(this, LogActivity.class))
+              );
               refreshSwipeLabels();
               Intent svc = new Intent(this, AutoService.class);
               if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
@@ -602,7 +605,7 @@ jobs:
                       receiverRegistered = true;
                       try {
                         act.registerReceiver(new BroadcastReceiver() {
-                          @Override public void onReceive(Context ctx, Intent intent) { doSwipe(); }
+                          @Override public void onReceive(Context ctx, Intent intent) { doSwipe(intent); }
                         }, new IntentFilter("JAHEZ_DO_ACCEPT"));
                       } catch (Exception ignored) {}
                     }
@@ -625,33 +628,22 @@ jobs:
                 }
               );
             }
-            void doSwipe() {
+            void doSwipe(Intent srcIntent) {
               android.app.Activity act = currentActivity;
               if (act == null || act.isFinishing()) return;
+              // Coordinates directly from intent — no createPackageContext needed
+              float rx1 = srcIntent.getFloatExtra("x1", 0.15f);
+              float ry1 = srcIntent.getFloatExtra("y1", 0.87f);
+              float rx2 = srcIntent.getFloatExtra("x2", 0.85f);
+              float ry2 = srcIntent.getFloatExtra("y2", 0.87f);
+              int   dur = srcIntent.getIntExtra("dur", 200);
               new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
                 try {
-                  SharedPreferences prefs = null;
-                  try {
-                    prefs = act.createPackageContext(OUR_PKG,
-                      Context.CONTEXT_IGNORE_SECURITY | Context.CONTEXT_INCLUDE_CODE)
-                      .getSharedPreferences("cfg", Context.MODE_PRIVATE);
-                  } catch (Exception e) {
-                    android.util.Log.e("JahezHook", "Prefs error: " + e.getMessage());
-                  }
-                  float rx1 = 0.15f, ry1 = 0.87f, rx2 = 0.85f, ry2 = 0.87f;
-                  int dur = 200;
-                  if (prefs != null) {
-                    rx1 = prefs.getFloat("swipe_x1", 0.15f);
-                    ry1 = prefs.getFloat("swipe_y1", 0.87f);
-                    rx2 = prefs.getFloat("swipe_x2", 0.85f);
-                    ry2 = prefs.getFloat("swipe_y2", 0.87f);
-                    dur = prefs.getInt("swipe_dur", 200);
-                  }
                   View root = act.getWindow().getDecorView();
                   DisplayMetrics dm = new DisplayMetrics();
                   act.getWindowManager().getDefaultDisplay().getMetrics(dm);
-                  float x1 = dm.widthPixels * rx1,  y1 = dm.heightPixels * ry1;
-                  float x2 = dm.widthPixels * rx2,  y2 = dm.heightPixels * ry2;
+                  float x1 = dm.widthPixels  * rx1, y1 = dm.heightPixels * ry1;
+                  float x2 = dm.widthPixels  * rx2, y2 = dm.heightPixels * ry2;
                   long t = SystemClock.uptimeMillis();
                   root.dispatchTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x1, y1, 0));
                   for (int i = 1; i <= 10; i++) {
@@ -661,7 +653,7 @@ jobs:
                       y1 + (y2 - y1) * i / 10f, 0));
                   }
                   root.dispatchTouchEvent(MotionEvent.obtain(t, t + dur, MotionEvent.ACTION_UP, x2, y2, 0));
-                  android.util.Log.d("JahezHook", "Swipe done dur=" + dur + "ms");
+                  android.util.Log.d("JahezHook", "Swipe done x1=" + x1 + " y1=" + y1 + " x2=" + x2 + " y2=" + y2 + " dur=" + dur + "ms");
                 } catch (Exception e) {
                   android.util.Log.e("JahezHook", "Swipe error: " + e.getMessage());
                 }
@@ -789,7 +781,18 @@ jobs:
               boolean pickupOk = pickupDistKm < 0 || pickupDistKm <= maxPickup;
               boolean dropOk   = dropKm < 0      || dropKm <= maxDrop;
               if (pickupOk && dropOk) {
-                sendBroadcast(new Intent("JAHEZ_DO_ACCEPT").setPackage("net.jahez.fleets"));
+                float fx1 = prefs.getFloat("swipe_x1", 0.15f);
+                float fy1 = prefs.getFloat("swipe_y1", 0.87f);
+                float fx2 = prefs.getFloat("swipe_x2", 0.85f);
+                float fy2 = prefs.getFloat("swipe_y2", 0.87f);
+                int fdur  = prefs.getInt("swipe_dur", 200);
+                Intent acceptIntent = new Intent("JAHEZ_DO_ACCEPT").setPackage("net.jahez.fleets");
+                acceptIntent.putExtra("x1", fx1);
+                acceptIntent.putExtra("y1", fy1);
+                acceptIntent.putExtra("x2", fx2);
+                acceptIntent.putExtra("y2", fy2);
+                acceptIntent.putExtra("dur", fdur);
+                sendBroadcast(acceptIntent);
                 prefs.edit().putBoolean("enabled", false).apply();
                 sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
                 showServiceNotification();
