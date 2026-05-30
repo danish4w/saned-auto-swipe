@@ -203,7 +203,7 @@ jobs:
                   refreshStatus();
                 } else if ("JAHEZ_SWIPE_SAVED".equals(action)) {
                   refreshSwipeLabels();
-                  Toast.makeText(MainActivity.this, "✅ Swipe points save ho gaye!", Toast.LENGTH_SHORT).show();
+                  Toast.makeText(MainActivity.this, "Swipe points save ho gaye!", Toast.LENGTH_SHORT).show();
                 }
               }
             };
@@ -256,7 +256,7 @@ jobs:
                 float pk = parseFloat(etPickup.getText().toString(), 2.0f);
                 float dk = parseFloat(etDrop.getText().toString(), 5.0f);
                 prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
-                Toast.makeText(this, "Saved! Pickup<=" + pk + "km Drop<=" + dk + "km", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
                 if (imm != null) imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
                 etPickup.clearFocus(); etDrop.clearFocus();
@@ -274,7 +274,7 @@ jobs:
                   Uri.parse("package:" + getPackageName())), REQ_OVERLAY);
               } else {
                 startService(new Intent(this, SwipeOverlayService.class));
-                Toast.makeText(this, "🟠A aur 🔵B drag karo, phir ✅ dabao", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "A(orange) B(blue) drag karo — phir ✅ dabao", Toast.LENGTH_LONG).show();
                 moveTaskToBack(true);
               }
             }
@@ -331,7 +331,6 @@ jobs:
           import android.view.MotionEvent;
           import android.view.View;
           import android.view.WindowManager;
-          import android.widget.Button;
           import android.widget.LinearLayout;
           import android.widget.TextView;
           public class SwipeOverlayService extends Service {
@@ -339,8 +338,12 @@ jobs:
             View viewA, viewB, lineView, barView;
             int screenW, screenH;
             float ax, ay, bx, by;
-            static final int CIRCLE_SIZE = 120;
-            static final int BAR_HEIGHT  = 150;
+            // Circle size in pixels
+            static final int CS = 130;
+            // Bar size
+            static final int BAR_W = 260;
+            static final int BAR_H = 110;
+
             @Override public void onCreate() {
               super.onCreate();
               wm = (WindowManager) getSystemService(WINDOW_SERVICE);
@@ -348,11 +351,11 @@ jobs:
               wm.getDefaultDisplay().getMetrics(dm);
               screenW = dm.widthPixels;
               screenH = dm.heightPixels;
-              SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              float sx1 = prefs.getFloat("swipe_x1", -1);
-              float sy1 = prefs.getFloat("swipe_y1", -1);
-              float sx2 = prefs.getFloat("swipe_x2", -1);
-              float sy2 = prefs.getFloat("swipe_y2", -1);
+              SharedPreferences p = getSharedPreferences("cfg", MODE_PRIVATE);
+              float sx1 = p.getFloat("swipe_x1", -1);
+              float sy1 = p.getFloat("swipe_y1", -1);
+              float sx2 = p.getFloat("swipe_x2", -1);
+              float sy2 = p.getFloat("swipe_y2", -1);
               ax = sx1 < 0 ? screenW * 0.15f : screenW * sx1;
               ay = sy1 < 0 ? screenH * 0.75f : screenH * sy1;
               bx = sx2 < 0 ? screenW * 0.85f : screenW * sx2;
@@ -362,100 +365,149 @@ jobs:
               addCircle(false);
               addBar();
             }
+
+            // ── Full-screen transparent layer just for drawing the arrow line ──
             void addLineView() {
               lineView = new View(this) {
                 @Override protected void onDraw(Canvas c) {
                   Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  p.setColor(0xCCFFFFFF);
-                  p.setStrokeWidth(5);
+                  p.setColor(0xBBFFFFFF);
+                  p.setStrokeWidth(6);
                   c.drawLine(ax, ay, bx, by, p);
                   double ang = Math.atan2(by - ay, bx - ax);
-                  float al = 36, aa = (float) Math.toRadians(28);
-                  c.drawLine(bx, by, bx - (float)(al * Math.cos(ang - aa)), by - (float)(al * Math.sin(ang - aa)), p);
-                  c.drawLine(bx, by, bx - (float)(al * Math.cos(ang + aa)), by - (float)(al * Math.sin(ang + aa)), p);
+                  float al = 40, aa = (float) Math.toRadians(28);
+                  c.drawLine(bx, by, bx-(float)(al*Math.cos(ang-aa)), by-(float)(al*Math.sin(ang-aa)), p);
+                  c.drawLine(bx, by, bx-(float)(al*Math.cos(ang+aa)), by-(float)(al*Math.sin(ang+aa)), p);
                 }
               };
-              WindowManager.LayoutParams lp = makeParams(screenW, screenH,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+              WindowManager.LayoutParams lp = overlayParams(screenW, screenH,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
               lp.gravity = Gravity.TOP | Gravity.START;
               lp.x = 0; lp.y = 0;
               wm.addView(lineView, lp);
             }
+
+            // ── Draggable circle for A or B ──
             void addCircle(boolean isA) {
+              // Each circle tracks its own raw screen position via WindowManager lp.x / lp.y
+              // We use getRawX/getRawY to get absolute position and compute delta ourselves
+              final float[] lastRaw = {0f, 0f};
               View circle = new View(this) {
                 @Override protected void onDraw(Canvas c) {
-                  int r = CIRCLE_SIZE / 2;
+                  int r = CS / 2;
                   Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  fill.setColor(isA ? 0xEEFF9800 : 0xEE2196F3);
-                  c.drawCircle(r, r, r - 4, fill);
-                  Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  border.setColor(Color.WHITE);
-                  border.setStyle(Paint.Style.STROKE);
-                  border.setStrokeWidth(4);
-                  c.drawCircle(r, r, r - 4, border);
+                  fill.setColor(isA ? 0xEEFF6D00 : 0xEE1565C0);
+                  c.drawCircle(r, r, r - 5, fill);
+                  Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  stroke.setColor(Color.WHITE);
+                  stroke.setStyle(Paint.Style.STROKE);
+                  stroke.setStrokeWidth(5);
+                  c.drawCircle(r, r, r - 5, stroke);
                   Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
                   txt.setColor(Color.WHITE);
-                  txt.setTextSize(44);
+                  txt.setTextSize(52);
                   txt.setTextAlign(Paint.Align.CENTER);
                   txt.setFakeBoldText(true);
-                  c.drawText(isA ? "A" : "B", r, r + 16, txt);
+                  c.drawText(isA ? "A" : "B", r, r + 19, txt);
                 }
                 @Override public boolean onTouchEvent(MotionEvent e) {
                   WindowManager.LayoutParams lp = (WindowManager.LayoutParams) getLayoutParams();
-                  if (e.getAction() == MotionEvent.ACTION_MOVE) {
-                    lp.x = Math.max(0, Math.min(screenW - CIRCLE_SIZE,
-                      (int)(lp.x + e.getX() - CIRCLE_SIZE / 2)));
-                    lp.y = Math.max(0, Math.min(screenH - CIRCLE_SIZE - BAR_HEIGHT,
-                      (int)(lp.y + e.getY() - CIRCLE_SIZE / 2)));
-                    wm.updateViewLayout(this, lp);
-                    if (isA) { ax = lp.x + CIRCLE_SIZE / 2f; ay = lp.y + CIRCLE_SIZE / 2f; }
-                    else     { bx = lp.x + CIRCLE_SIZE / 2f; by = lp.y + CIRCLE_SIZE / 2f; }
-                    lineView.invalidate();
+                  switch (e.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                      lastRaw[0] = e.getRawX();
+                      lastRaw[1] = e.getRawY();
+                      break;
+                    case MotionEvent.ACTION_MOVE:
+                      float dx = e.getRawX() - lastRaw[0];
+                      float dy = e.getRawY() - lastRaw[1];
+                      lastRaw[0] = e.getRawX();
+                      lastRaw[1] = e.getRawY();
+                      lp.x = Math.max(0, Math.min(screenW - CS, lp.x + (int) dx));
+                      lp.y = Math.max(0, Math.min(screenH - CS, lp.y + (int) dy));
+                      wm.updateViewLayout(this, lp);
+                      if (isA) { ax = lp.x + CS / 2f; ay = lp.y + CS / 2f; }
+                      else     { bx = lp.x + CS / 2f; by = lp.y + CS / 2f; }
+                      lineView.invalidate();
+                      break;
                   }
                   return true;
                 }
               };
-              WindowManager.LayoutParams lp = makeParams(CIRCLE_SIZE, CIRCLE_SIZE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+              WindowManager.LayoutParams lp = overlayParams(CS, CS,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
               lp.gravity = Gravity.TOP | Gravity.START;
-              lp.x = (int)(isA ? ax - CIRCLE_SIZE / 2 : bx - CIRCLE_SIZE / 2);
-              lp.y = (int)(isA ? ay - CIRCLE_SIZE / 2 : by - CIRCLE_SIZE / 2);
+              lp.x = (int)((isA ? ax : bx) - CS / 2f);
+              lp.y = (int)((isA ? ay : by) - CS / 2f);
               wm.addView(circle, lp);
               if (isA) viewA = circle; else viewB = circle;
             }
+
+            // ── Draggable bar with ✅ and ❌ ──
             void addBar() {
+              final float[] lastRaw = {0f, 0f};
+              final boolean[] wasDrag = {false};
+
               LinearLayout bar = new LinearLayout(this);
               bar.setOrientation(LinearLayout.HORIZONTAL);
-              bar.setBackgroundColor(0xF2111111);
-              bar.setPadding(32, 20, 32, 20);
-              TextView tvInfo = new TextView(this);
-              tvInfo.setText("🟠A  🔵B  drag karo");
-              tvInfo.setTextColor(0xFFCCCCCC);
-              tvInfo.setTextSize(14);
-              tvInfo.setLayoutParams(new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-              bar.addView(tvInfo);
-              Button btnCancel = new Button(this);
+              bar.setBackgroundColor(0xEE111111);
+              bar.setPadding(18, 14, 18, 14);
+
+              // Cancel button — small
+              TextView btnCancel = new TextView(this);
               btnCancel.setText("❌");
-              btnCancel.setTextSize(22);
-              btnCancel.setTextColor(Color.WHITE);
-              btnCancel.setBackgroundColor(0xFF880000);
-              LinearLayout.LayoutParams lpC = new LinearLayout.LayoutParams(160,
+              btnCancel.setTextSize(26);
+              btnCancel.setGravity(Gravity.CENTER);
+              btnCancel.setBackgroundColor(0xFF6D0000);
+              btnCancel.setPadding(18, 10, 18, 10);
+              LinearLayout.LayoutParams lpC = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
-              lpC.setMargins(0, 0, 20, 0);
+              lpC.setMargins(0, 0, 16, 0);
               btnCancel.setLayoutParams(lpC);
-              btnCancel.setOnClickListener(v -> removeAllViews());
-              bar.addView(btnCancel);
-              Button btnSave = new Button(this);
+
+              // Save button — small
+              TextView btnSave = new TextView(this);
               btnSave.setText("✅");
-              btnSave.setTextSize(22);
-              btnSave.setTextColor(Color.WHITE);
-              btnSave.setBackgroundColor(0xFF1B5E20);
-              btnSave.setLayoutParams(new LinearLayout.LayoutParams(160,
+              btnSave.setTextSize(26);
+              btnSave.setGravity(Gravity.CENTER);
+              btnSave.setBackgroundColor(0xFF0A3D0A);
+              btnSave.setPadding(18, 10, 18, 10);
+              btnSave.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
+
+              bar.addView(btnCancel);
+              bar.addView(btnSave);
+              barView = bar;
+
+              // Bar drag — using getRawX/Y delta, same as circles
+              bar.setOnTouchListener((v, e) -> {
+                WindowManager.LayoutParams lp = (WindowManager.LayoutParams) barView.getLayoutParams();
+                switch (e.getAction()) {
+                  case MotionEvent.ACTION_DOWN:
+                    lastRaw[0] = e.getRawX();
+                    lastRaw[1] = e.getRawY();
+                    wasDrag[0] = false;
+                    break;
+                  case MotionEvent.ACTION_MOVE:
+                    float dx = e.getRawX() - lastRaw[0];
+                    float dy = e.getRawY() - lastRaw[1];
+                    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) wasDrag[0] = true;
+                    lastRaw[0] = e.getRawX();
+                    lastRaw[1] = e.getRawY();
+                    lp.x = Math.max(0, Math.min(screenW - BAR_W, lp.x + (int) dx));
+                    lp.y = Math.max(0, Math.min(screenH - BAR_H, lp.y + (int) dy));
+                    wm.updateViewLayout(barView, lp);
+                    break;
+                }
+                return wasDrag[0]; // if dragged, consume; else let children handle click
+              });
+
+              // Button clicks
+              btnCancel.setOnClickListener(v -> removeAllViews());
               btnSave.setOnClickListener(v -> {
                 SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
                 prefs.edit()
@@ -467,15 +519,18 @@ jobs:
                 sendBroadcast(new Intent("JAHEZ_SWIPE_SAVED"));
                 removeAllViews();
               });
-              bar.addView(btnSave);
-              barView = bar;
-              WindowManager.LayoutParams lp = makeParams(
-                WindowManager.LayoutParams.MATCH_PARENT, BAR_HEIGHT,
+
+              WindowManager.LayoutParams lp = overlayParams(
+                WindowManager.LayoutParams.WRAP_CONTENT, BAR_H,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-              lp.gravity = Gravity.BOTTOM | Gravity.START;
+              lp.gravity = Gravity.TOP | Gravity.START;
+              // Start bar at top-center
+              lp.x = screenW / 2 - BAR_W / 2;
+              lp.y = 60;
               wm.addView(barView, lp);
             }
-            // Remove all overlay views directly (no stopSelf thread issue)
+
             void removeAllViews() {
               new Handler(Looper.getMainLooper()).post(() -> {
                 try { if (lineView != null) { wm.removeView(lineView); lineView = null; } } catch (Exception ignored) {}
@@ -485,16 +540,17 @@ jobs:
                 stopSelf();
               });
             }
-            WindowManager.LayoutParams makeParams(int w, int h, int flags) {
+
+            WindowManager.LayoutParams overlayParams(int w, int h, int flags) {
               return new WindowManager.LayoutParams(w, h,
                 android.os.Build.VERSION.SDK_INT >= 26
                   ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                   : WindowManager.LayoutParams.TYPE_PHONE,
                 flags, PixelFormat.TRANSLUCENT);
             }
+
             @Override public void onDestroy() {
               super.onDestroy();
-              // Safety cleanup if killed externally
               try { if (lineView != null) wm.removeView(lineView); } catch (Exception ignored) {}
               try { if (viewA   != null) wm.removeView(viewA);    } catch (Exception ignored) {}
               try { if (viewB   != null) wm.removeView(viewB);    } catch (Exception ignored) {}
@@ -528,6 +584,7 @@ jobs:
             static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
             long lastBcast = 0;
             volatile android.app.Activity currentActivity = null;
+            boolean receiverRegistered = false;
             @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
               if (!TARGET.equals(lp.packageName)) return;
               XposedHelpers.findAndHookMethod(
@@ -540,27 +597,25 @@ jobs:
                     lastBcast = now;
                     android.app.Activity act = (android.app.Activity) p.thisObject;
                     currentActivity = act;
-                    try {
-                      IntentFilter f = new IntentFilter("JAHEZ_DO_ACCEPT");
-                      act.registerReceiver(new BroadcastReceiver() {
-                        @Override public void onReceive(Context ctx, Intent intent) { doSwipe(); }
-                      }, f);
-                    } catch (Exception ignored) {}
+                    // Register accept receiver only once
+                    if (!receiverRegistered) {
+                      receiverRegistered = true;
+                      try {
+                        act.registerReceiver(new BroadcastReceiver() {
+                          @Override public void onReceive(Context ctx, Intent intent) { doSwipe(); }
+                        }, new IntentFilter("JAHEZ_DO_ACCEPT"));
+                      } catch (Exception ignored) {}
+                    }
                     try {
                       Bundle extras = act.getIntent() != null ? act.getIntent().getExtras() : null;
                       if (extras == null) return;
-                      double pickupLat = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
-                      double pickupLon = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
-                      double dropDist  = getDouble(extras, "EXTRA_DISTANCE");
-                      double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
-                      double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
                       Intent intent = new Intent("JAHEZ_ORDER_DATA");
                       intent.setPackage(OUR_PKG);
-                      intent.putExtra("pickup_lat", pickupLat);
-                      intent.putExtra("pickup_lon", pickupLon);
-                      intent.putExtra("drop_dist",  dropDist);
-                      intent.putExtra("price",      price);
-                      intent.putExtra("bonus",      bonus);
+                      intent.putExtra("pickup_lat", getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE"));
+                      intent.putExtra("pickup_lon", getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE"));
+                      intent.putExtra("drop_dist",  getDouble(extras, "EXTRA_DISTANCE"));
+                      intent.putExtra("price",      getDouble(extras, "EXTRA_DELIVERY_PRICE"));
+                      intent.putExtra("bonus",      getDouble(extras, "EXTRA_BONUS_AMOUNT"));
                       intent.putExtra("is_order",   true);
                       act.sendBroadcast(intent);
                     } catch (Exception e) {
@@ -577,36 +632,36 @@ jobs:
                 try {
                   SharedPreferences prefs = null;
                   try {
-                    Context ourCtx = act.createPackageContext(OUR_PKG,
-                      Context.CONTEXT_IGNORE_SECURITY | Context.CONTEXT_INCLUDE_CODE);
-                    prefs = ourCtx.getSharedPreferences("cfg", Context.MODE_PRIVATE);
+                    prefs = act.createPackageContext(OUR_PKG,
+                      Context.CONTEXT_IGNORE_SECURITY | Context.CONTEXT_INCLUDE_CODE)
+                      .getSharedPreferences("cfg", Context.MODE_PRIVATE);
                   } catch (Exception e) {
                     android.util.Log.e("JahezHook", "Prefs error: " + e.getMessage());
                   }
                   float rx1 = 0.15f, ry1 = 0.87f, rx2 = 0.85f, ry2 = 0.87f;
-                  int swipeDur = 200;
+                  int dur = 200;
                   if (prefs != null) {
                     rx1 = prefs.getFloat("swipe_x1", 0.15f);
                     ry1 = prefs.getFloat("swipe_y1", 0.87f);
                     rx2 = prefs.getFloat("swipe_x2", 0.85f);
                     ry2 = prefs.getFloat("swipe_y2", 0.87f);
-                    swipeDur = prefs.getInt("swipe_dur", 200);
+                    dur = prefs.getInt("swipe_dur", 200);
                   }
                   View root = act.getWindow().getDecorView();
                   DisplayMetrics dm = new DisplayMetrics();
                   act.getWindowManager().getDefaultDisplay().getMetrics(dm);
-                  float x1 = dm.widthPixels  * rx1, y1 = dm.heightPixels * ry1;
-                  float x2 = dm.widthPixels  * rx2, y2 = dm.heightPixels * ry2;
+                  float x1 = dm.widthPixels * rx1,  y1 = dm.heightPixels * ry1;
+                  float x2 = dm.widthPixels * rx2,  y2 = dm.heightPixels * ry2;
                   long t = SystemClock.uptimeMillis();
                   root.dispatchTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x1, y1, 0));
-                  for (int i = 1; i <= 8; i++) {
+                  for (int i = 1; i <= 10; i++) {
                     root.dispatchTouchEvent(MotionEvent.obtain(t,
-                      t + (long)(swipeDur * i / 8f), MotionEvent.ACTION_MOVE,
-                      x1 + (x2 - x1) * i / 8f, y1 + (y2 - y1) * i / 8f, 0));
+                      t + (long)(dur * i / 10f), MotionEvent.ACTION_MOVE,
+                      x1 + (x2 - x1) * i / 10f,
+                      y1 + (y2 - y1) * i / 10f, 0));
                   }
-                  root.dispatchTouchEvent(MotionEvent.obtain(t, t + swipeDur,
-                    MotionEvent.ACTION_UP, x2, y2, 0));
-                  android.util.Log.d("JahezHook", "Swipe done dur=" + swipeDur + "ms");
+                  root.dispatchTouchEvent(MotionEvent.obtain(t, t + dur, MotionEvent.ACTION_UP, x2, y2, 0));
+                  android.util.Log.d("JahezHook", "Swipe done dur=" + dur + "ms");
                 } catch (Exception e) {
                   android.util.Log.e("JahezHook", "Swipe error: " + e.getMessage());
                 }
@@ -650,11 +705,7 @@ jobs:
             final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 boolean isOrder = intent.getBooleanExtra("is_order", false);
-                if (!isOrder) {
-                  String screen = intent.getStringExtra("screen");
-                  if (screen != null) saveLog("📩 " + screen);
-                  return;
-                }
+                if (!isOrder) return;
                 double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
                 double pickupLon = intent.getDoubleExtra("pickup_lon", -1);
                 double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
@@ -824,22 +875,18 @@ jobs:
             android:background="#0A0A0A">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
               android:orientation="vertical" android:padding="20dp">
-
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Jahez Auto" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Auto Accept Orders" android:textSize="12sp"
                 android:textColor="#666" android:gravity="center" android:layout_marginBottom="20dp"/>
-
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
                 android:textSize="24sp" android:textColor="#FF5555"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="28dp"/>
-
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="20dp"/>
-
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="Max Pickup Distance (km from you)"
                 android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
@@ -847,7 +894,6 @@ jobs:
                 android:layout_height="56dp" android:inputType="numberDecimal" android:text="2.0"
                 android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
                 android:padding="12dp" android:layout_marginBottom="16dp"/>
-
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="Max Drop Distance (km from pickup)"
                 android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
@@ -855,7 +901,6 @@ jobs:
                 android:layout_height="56dp" android:inputType="numberDecimal" android:text="5.0"
                 android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
                 android:padding="12dp" android:layout_marginBottom="20dp"/>
-
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:layout_marginBottom="4dp">
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
@@ -880,15 +925,12 @@ jobs:
                   android:layout_weight="1" android:text="500ms" android:textColor="#555"
                   android:textSize="11sp" android:gravity="end"/>
               </LinearLayout>
-
               <Button android:id="@+id/btn_save" android:layout_width="match_parent"
                 android:layout_height="54dp" android:text="Save Settings"
                 android:backgroundTint="#2196F3" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
-
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="16dp"/>
-
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Swipe Points" android:textSize="15sp"
                 android:textColor="#FF9800" android:textStyle="bold" android:layout_marginBottom="6dp"/>
@@ -903,27 +945,24 @@ jobs:
                   android:textSize="12sp" android:gravity="end"/>
               </LinearLayout>
               <Button android:id="@+id/btn_set_swipe" android:layout_width="match_parent"
-                android:layout_height="58dp" android:text="🎯  Set Swipe Points On Screen"
+                android:layout_height="58dp" android:text="Set Swipe Points On Screen"
                 android:backgroundTint="#FF9800" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="6dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="App minimize hogi → koi bhi app kholo → 🟠A aur 🔵B drag karo → ✅ save"
+                android:text="App minimize hogi → koi bhi app kholo → A(orange) B(blue) drag karo → ✅ save | ❌ cancel — bar bhi drag kar sako"
                 android:textColor="#555" android:textSize="11sp"
                 android:gravity="center" android:layout_marginBottom="20dp"/>
-
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="16dp"/>
-
               <Switch android:id="@+id/sw_enable" android:layout_width="match_parent"
                 android:layout_height="58dp" android:text="  Enable Auto Accept"
                 android:textColor="#FFF" android:textSize="16sp"
                 android:background="#1A1A1A" android:padding="16dp"
                 android:layout_marginBottom="12dp"/>
               <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
-                android:layout_height="54dp" android:text="📋  View Logs"
+                android:layout_height="54dp" android:text="View Logs"
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
-
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Setup:\n1. LSPosed → Jahez Auto enable (scope: net.jahez.fleets)\n2. Distance set → Save\n3. Swipe points set karo\n4. Toggle ON\n5. Jahez Fleets kholo — auto accept!"
                 android:textColor="#555" android:textSize="12sp"
