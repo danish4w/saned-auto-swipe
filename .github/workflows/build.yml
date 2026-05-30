@@ -1,6 +1,7 @@
 name: Build JahezAutoAccept
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -380,8 +381,7 @@ jobs:
               boolean a11y = isAccessibilityEnabled();
               String status =
                 (notif    ? "✅" : "❌") + " Notification  " +
-                (loc      ? "✅" : "❌") + " Location
-" +
+                (loc      ? "✅" : "❌") + " Location\n" +
                 (overlay  ? "✅" : "❌") + " Overlay  " +
                 (a11y     ? "✅" : "❌") + " Accessibility";
               tvPermStatus.setText(status);
