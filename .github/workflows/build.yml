@@ -36,6 +36,7 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/mipmap-anydpi-v26
+          mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/assets
 
       - name: Write Gradle Files
@@ -170,6 +171,15 @@ jobs:
                   <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 </intent-filter>
               </receiver>
+              <service android:name=".JahezAccessibility"
+                android:exported="true"
+                android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+                <intent-filter>
+                  <action android:name="android.accessibilityservice.AccessibilityService"/>
+                </intent-filter>
+                <meta-data android:name="android.accessibilityservice"
+                  android:resource="@xml/accessibility_service_config"/>
+              </service>
             </application>
           </manifest>
           MEOF
@@ -571,23 +581,16 @@ jobs:
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
-          import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.content.SharedPreferences;
           import android.os.Bundle;
-          import android.os.SystemClock;
-          import android.util.DisplayMetrics;
-          import android.view.MotionEvent;
-          import android.view.View;
           public class SanedHook implements IXposedHookLoadPackage {
             static final String TARGET  = "net.jahez.fleets";
             static final String OUR_PKG = "com.danish.jahez";
             static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
             long lastBcast = 0;
             volatile android.app.Activity currentActivity = null;
-            boolean receiverRegistered = false;
+
             @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
               if (!TARGET.equals(lp.packageName)) return;
               XposedHelpers.findAndHookMethod(
@@ -600,15 +603,7 @@ jobs:
                     lastBcast = now;
                     android.app.Activity act = (android.app.Activity) p.thisObject;
                     currentActivity = act;
-                    // Register accept receiver only once
-                    if (!receiverRegistered) {
-                      receiverRegistered = true;
-                      try {
-                        act.registerReceiver(new BroadcastReceiver() {
-                          @Override public void onReceive(Context ctx, Intent intent) { doSwipe(intent); }
-                        }, new IntentFilter("JAHEZ_DO_ACCEPT"));
-                      } catch (Exception ignored) {}
-                    }
+                    // Swipe JahezAccessibility karti hai — no receiver needed here
                     try {
                       Bundle extras = act.getIntent() != null ? act.getIntent().getExtras() : null;
                       if (extras == null) return;
@@ -628,37 +623,8 @@ jobs:
                 }
               );
             }
-            void doSwipe(Intent srcIntent) {
-              android.app.Activity act = currentActivity;
-              if (act == null || act.isFinishing()) return;
-              // Coordinates directly from intent — no createPackageContext needed
-              float rx1 = srcIntent.getFloatExtra("x1", 0.15f);
-              float ry1 = srcIntent.getFloatExtra("y1", 0.87f);
-              float rx2 = srcIntent.getFloatExtra("x2", 0.85f);
-              float ry2 = srcIntent.getFloatExtra("y2", 0.87f);
-              int   dur = srcIntent.getIntExtra("dur", 200);
-              new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                try {
-                  View root = act.getWindow().getDecorView();
-                  DisplayMetrics dm = new DisplayMetrics();
-                  act.getWindowManager().getDefaultDisplay().getMetrics(dm);
-                  float x1 = dm.widthPixels  * rx1, y1 = dm.heightPixels * ry1;
-                  float x2 = dm.widthPixels  * rx2, y2 = dm.heightPixels * ry2;
-                  long t = SystemClock.uptimeMillis();
-                  root.dispatchTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x1, y1, 0));
-                  for (int i = 1; i <= 10; i++) {
-                    root.dispatchTouchEvent(MotionEvent.obtain(t,
-                      t + (long)(dur * i / 10f), MotionEvent.ACTION_MOVE,
-                      x1 + (x2 - x1) * i / 10f,
-                      y1 + (y2 - y1) * i / 10f, 0));
-                  }
-                  root.dispatchTouchEvent(MotionEvent.obtain(t, t + dur, MotionEvent.ACTION_UP, x2, y2, 0));
-                  android.util.Log.d("JahezHook", "Swipe done x1=" + x1 + " y1=" + y1 + " x2=" + x2 + " y2=" + y2 + " dur=" + dur + "ms");
-                } catch (Exception e) {
-                  android.util.Log.e("JahezHook", "Swipe error: " + e.getMessage());
-                }
-              });
-            }
+            // Swipe ab JahezAccessibility karta hai via GestureDescription
+            // SanedHook sirf broadcast receive karta hai aur AutoService ko forward karta hai
             double getDouble(Bundle b, String key) {
               try {
                 Object v = b.get(key);
@@ -786,7 +752,7 @@ jobs:
                 float fx2 = prefs.getFloat("swipe_x2", 0.85f);
                 float fy2 = prefs.getFloat("swipe_y2", 0.87f);
                 int fdur  = prefs.getInt("swipe_dur", 200);
-                Intent acceptIntent = new Intent("JAHEZ_DO_ACCEPT").setPackage("net.jahez.fleets");
+                Intent acceptIntent = new Intent("JAHEZ_DO_ACCEPT");
                 acceptIntent.putExtra("x1", fx1);
                 acceptIntent.putExtra("y1", fy1);
                 acceptIntent.putExtra("x2", fx2);
@@ -1021,6 +987,100 @@ jobs:
             </style>
           </resources>
           TEOF
+
+      - name: Write Accessibility Config and Service
+        run: |
+          cat > app/src/main/res/xml/accessibility_service_config.xml << 'ACEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+            android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+            android:accessibilityFeedbackType="feedbackGeneric"
+            android:accessibilityFlags="flagDefault"
+            android:canPerformGestures="true"
+            android:notificationTimeout="100"
+            android:description="@string/app_name"/>
+          ACEOF
+
+          cat > app/src/main/java/com/danish/jahez/JahezAccessibility.java << 'JAEOF'
+          package com.danish.jahez;
+          import android.accessibilityservice.AccessibilityService;
+          import android.accessibilityservice.GestureDescription;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.content.SharedPreferences;
+          import android.graphics.Path;
+          import android.os.Build;
+          import android.util.DisplayMetrics;
+          import android.view.WindowManager;
+          import android.view.accessibility.AccessibilityEvent;
+          import android.util.Log;
+          public class JahezAccessibility extends AccessibilityService {
+            static final String TAG = "JahezA11y";
+            static JahezAccessibility instance;
+            BroadcastReceiver swipeReceiver;
+            @Override public void onServiceConnected() {
+              super.onServiceConnected();
+              instance = this;
+              Log.d(TAG, "Accessibility Service connected");
+              // JAHEZ_DO_ACCEPT sunna
+              swipeReceiver = new BroadcastReceiver() {
+                @Override public void onReceive(Context ctx, Intent intent) {
+                  Log.d(TAG, "DO_ACCEPT received — performing swipe");
+                  float x1  = intent.getFloatExtra("x1",  0.15f);
+                  float y1  = intent.getFloatExtra("y1",  0.87f);
+                  float x2  = intent.getFloatExtra("x2",  0.85f);
+                  float y2  = intent.getFloatExtra("y2",  0.87f);
+                  int   dur = intent.getIntExtra("dur",   200);
+                  performSwipe(x1, y1, x2, y2, dur);
+                }
+              };
+              IntentFilter f = new IntentFilter("JAHEZ_DO_ACCEPT");
+              if (Build.VERSION.SDK_INT >= 33)
+                registerReceiver(swipeReceiver, f, Context.RECEIVER_EXPORTED);
+              else
+                registerReceiver(swipeReceiver, f);
+            }
+            void performSwipe(float rx1, float ry1, float rx2, float ry2, int dur) {
+              try {
+                DisplayMetrics dm = new DisplayMetrics();
+                ((WindowManager) getSystemService(WINDOW_SERVICE))
+                  .getDefaultDisplay().getMetrics(dm);
+                float x1 = dm.widthPixels  * rx1;
+                float y1 = dm.heightPixels * ry1;
+                float x2 = dm.widthPixels  * rx2;
+                float y2 = dm.heightPixels * ry2;
+                // Ensure min duration 1ms for GestureDescription
+                int swipeDur = Math.max(dur, 50);
+                Path path = new Path();
+                path.moveTo(x1, y1);
+                path.lineTo(x2, y2);
+                GestureDescription.StrokeDescription stroke =
+                  new GestureDescription.StrokeDescription(path, 0, swipeDur);
+                GestureDescription gesture = new GestureDescription.Builder()
+                  .addStroke(stroke).build();
+                dispatchGesture(gesture, new GestureResultCallback() {
+                  @Override public void onCompleted(GestureDescription g) {
+                    Log.d(TAG, "Swipe completed A(" + rx1+","+ry1 + ") B(" + rx2+","+ry2 + ") dur=" + dur + "ms");
+                  }
+                  @Override public void onCancelled(GestureDescription g) {
+                    Log.e(TAG, "Swipe cancelled");
+                  }
+                }, null);
+              } catch (Exception e) {
+                Log.e(TAG, "Swipe error: " + e.getMessage());
+              }
+            }
+            @Override public void onAccessibilityEvent(AccessibilityEvent event) {}
+            @Override public void onInterrupt() {}
+            @Override public void onDestroy() {
+              super.onDestroy();
+              instance = null;
+              try { if (swipeReceiver != null) unregisterReceiver(swipeReceiver); } catch (Exception ignored) {}
+            }
+          }
+          JAEOF
 
       - name: Build APK
         run: ./gradlew assembleRelease --no-daemon 2>&1
