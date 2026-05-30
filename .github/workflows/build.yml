@@ -194,17 +194,22 @@ jobs:
           import android.content.Intent;
           import android.content.IntentFilter;
           import android.content.SharedPreferences;
+          import android.content.pm.PackageManager;
           import android.net.Uri;
           import android.os.Build;
           import android.os.Bundle;
           import android.provider.Settings;
+          import android.view.accessibility.AccessibilityManager;
           import android.view.inputmethod.InputMethodManager;
           import android.widget.*;
+          import java.util.ArrayList;
+          import java.util.List;
           public class MainActivity extends Activity {
             SharedPreferences prefs;
             Switch swEnable;
-            TextView tvStatus, tvPointA, tvPointB;
-            static final int REQ_OVERLAY = 100;
+            TextView tvStatus, tvPointA, tvPointB, tvPermStatus;
+            static final int REQ_OVERLAY      = 100;
+            static final int REQ_PERMISSIONS  = 101;
             final BroadcastReceiver uiReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 String action = intent.getAction();
@@ -225,12 +230,14 @@ jobs:
               EditText etDrop     = findViewById(R.id.et_drop);
               SeekBar sbSwipeDur  = findViewById(R.id.sb_swipe_dur);
               TextView tvSwipeDur = findViewById(R.id.tv_swipe_dur);
-              swEnable = findViewById(R.id.sw_enable);
-              tvStatus = findViewById(R.id.tv_status);
-              tvPointA = findViewById(R.id.tv_point_a);
-              tvPointB = findViewById(R.id.tv_point_b);
-              Button btnSave     = findViewById(R.id.btn_save);
-              Button btnSetSwipe = findViewById(R.id.btn_set_swipe);
+              swEnable    = findViewById(R.id.sw_enable);
+              tvStatus    = findViewById(R.id.tv_status);
+              tvPointA    = findViewById(R.id.tv_point_a);
+              tvPointB    = findViewById(R.id.tv_point_b);
+              tvPermStatus = findViewById(R.id.tv_perm_status);
+              Button btnSave        = findViewById(R.id.btn_save);
+              Button btnSetSwipe    = findViewById(R.id.btn_set_swipe);
+              Button btnFixPerms    = findViewById(R.id.btn_fix_perms);
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
               int savedSwipeDur = prefs.getInt("swipe_dur", 200);
@@ -244,11 +251,6 @@ jobs:
                 }
               });
               swEnable.setChecked(prefs.getBoolean("enabled", false));
-              if (Build.VERSION.SDK_INT >= 33)
-                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
-              requestPermissions(new String[]{
-                "android.permission.ACCESS_FINE_LOCATION",
-                "android.permission.ACCESS_COARSE_LOCATION"}, 1);
               IntentFilter filter = new IntentFilter();
               filter.addAction("JAHEZ_AUTO_OFF");
               filter.addAction("JAHEZ_AUTO_ON");
@@ -272,14 +274,78 @@ jobs:
                 etPickup.clearFocus(); etDrop.clearFocus();
               });
               btnSetSwipe.setOnClickListener(v -> launchOverlay());
+              btnFixPerms.setOnClickListener(v -> requestAllPermissions());
               findViewById(R.id.btn_logs).setOnClickListener(v ->
                 startActivity(new Intent(this, LogActivity.class))
               );
               refreshSwipeLabels();
+              // Auto request permissions on first launch
+              requestAllPermissions();
               Intent svc = new Intent(this, AutoService.class);
               if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
               else startService(svc);
             }
+            // ── Permission handling ──────────────────────────────
+            void requestAllPermissions() {
+              // Step 1: Runtime permissions (notification + location)
+              List<String> needed = new ArrayList<>();
+              if (Build.VERSION.SDK_INT >= 33) {
+                if (checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
+                  needed.add("android.permission.POST_NOTIFICATIONS");
+              }
+              if (checkSelfPermission("android.permission.ACCESS_FINE_LOCATION") != PackageManager.PERMISSION_GRANTED)
+                needed.add("android.permission.ACCESS_FINE_LOCATION");
+              if (checkSelfPermission("android.permission.ACCESS_COARSE_LOCATION") != PackageManager.PERMISSION_GRANTED)
+                needed.add("android.permission.ACCESS_COARSE_LOCATION");
+              if (!needed.isEmpty())
+                requestPermissions(needed.toArray(new String[0]), REQ_PERMISSIONS);
+              // Step 2: Overlay permission
+              if (!Settings.canDrawOverlays(this)) {
+                Toast.makeText(this, "Display over other apps permission chahiye", Toast.LENGTH_LONG).show();
+                startActivityForResult(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                  Uri.parse("package:" + getPackageName())), REQ_OVERLAY);
+                return;
+              }
+              // Step 3: Accessibility permission
+              if (!isAccessibilityEnabled()) {
+                Toast.makeText(this, "Accessibility Service enable karo — Jahez Auto ON karo", Toast.LENGTH_LONG).show();
+                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+              }
+            }
+            boolean isAccessibilityEnabled() {
+              AccessibilityManager am = (AccessibilityManager) getSystemService(ACCESSIBILITY_SERVICE);
+              if (am == null || !am.isEnabled()) return false;
+              String svc = getPackageName() + "/" + JahezAccessibility.class.getName();
+              android.provider.Settings.Secure.getString(getContentResolver(),
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+              String enabled = android.provider.Settings.Secure.getString(
+                getContentResolver(),
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+              return enabled != null && enabled.contains(svc);
+            }
+            @Override public void onRequestPermissionsResult(int req, String[] perms, int[] results) {
+              if (req == REQ_PERMISSIONS) {
+                // After runtime perms, check overlay
+                if (!Settings.canDrawOverlays(this)) {
+                  Toast.makeText(this, "Display over other apps permission chahiye", Toast.LENGTH_LONG).show();
+                  startActivityForResult(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName())), REQ_OVERLAY);
+                } else if (!isAccessibilityEnabled()) {
+                  Toast.makeText(this, "Accessibility Service enable karo — Jahez Auto ON karo", Toast.LENGTH_LONG).show();
+                  startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                }
+              }
+            }
+            @Override protected void onActivityResult(int req, int res, Intent data) {
+              if (req == REQ_OVERLAY) {
+                // After overlay, check accessibility
+                if (!isAccessibilityEnabled()) {
+                  Toast.makeText(this, "Accessibility Service enable karo — Jahez Auto ON karo", Toast.LENGTH_LONG).show();
+                  startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                }
+              }
+            }
+            // ─────────────────────────────────────────────────────
             void launchOverlay() {
               if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "Pehle 'Display over other apps' permission do", Toast.LENGTH_LONG).show();
@@ -291,14 +357,6 @@ jobs:
                 moveTaskToBack(true);
               }
             }
-            @Override protected void onActivityResult(int req, int res, Intent data) {
-              if (req == REQ_OVERLAY) {
-                if (Settings.canDrawOverlays(this)) {
-                  startService(new Intent(this, SwipeOverlayService.class));
-                  moveTaskToBack(true);
-                } else Toast.makeText(this, "Permission nahi mili", Toast.LENGTH_SHORT).show();
-              }
-            }
             void refreshSwipeLabels() {
               float x1 = prefs.getFloat("swipe_x1", -1);
               float y1 = prefs.getFloat("swipe_y1", -1);
@@ -307,7 +365,29 @@ jobs:
               if (tvPointA != null) tvPointA.setText(x1 < 0 ? "A: default" : "A: x=" + fp(x1) + " y=" + fp(y1));
               if (tvPointB != null) tvPointB.setText(x2 < 0 ? "B: default" : "B: x=" + fp(x2) + " y=" + fp(y2));
             }
-            @Override protected void onResume() { super.onResume(); refreshStatus(); refreshSwipeLabels(); }
+            @Override protected void onResume() {
+              super.onResume();
+              refreshStatus();
+              refreshSwipeLabels();
+              refreshPermStatus();
+            }
+            void refreshPermStatus() {
+              if (tvPermStatus == null) return;
+              boolean notif = Build.VERSION.SDK_INT < 33 ||
+                checkSelfPermission("android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED;
+              boolean loc = checkSelfPermission("android.permission.ACCESS_FINE_LOCATION") == PackageManager.PERMISSION_GRANTED;
+              boolean overlay = Settings.canDrawOverlays(this);
+              boolean a11y = isAccessibilityEnabled();
+              String status =
+                (notif    ? "✅" : "❌") + " Notification  " +
+                (loc      ? "✅" : "❌") + " Location
+" +
+                (overlay  ? "✅" : "❌") + " Overlay  " +
+                (a11y     ? "✅" : "❌") + " Accessibility";
+              tvPermStatus.setText(status);
+              tvPermStatus.setTextColor(
+                (notif && loc && overlay && a11y) ? 0xFF4CAF50 : 0xFFFF9800);
+            }
             @Override protected void onDestroy() {
               super.onDestroy();
               try { unregisterReceiver(uiReceiver); } catch (Exception ignored) {}
@@ -752,13 +832,14 @@ jobs:
                 float fx2 = prefs.getFloat("swipe_x2", 0.85f);
                 float fy2 = prefs.getFloat("swipe_y2", 0.87f);
                 int fdur  = prefs.getInt("swipe_dur", 200);
-                Intent acceptIntent = new Intent("JAHEZ_DO_ACCEPT");
-                acceptIntent.putExtra("x1", fx1);
-                acceptIntent.putExtra("y1", fy1);
-                acceptIntent.putExtra("x2", fx2);
-                acceptIntent.putExtra("y2", fy2);
-                acceptIntent.putExtra("dur", fdur);
-                sendBroadcast(acceptIntent);
+                // Direct call — no broadcast needed
+                if (JahezAccessibility.instance != null) {
+                  JahezAccessibility.instance.performSwipe(fx1, fy1, fx2, fy2, fdur);
+                  Log.d(TAG, "Swipe triggered via Accessibility instance");
+                } else {
+                  Log.e(TAG, "Accessibility instance null — service not running!");
+                  saveLog("⚠️ Accessibility Service enabled nahi hai — Settings se on karo");
+                }
                 prefs.edit().putBoolean("enabled", false).apply();
                 sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
                 showServiceNotification();
@@ -853,7 +934,17 @@ jobs:
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
                 android:textSize="24sp" android:textColor="#FF5555"
-                android:textStyle="bold" android:gravity="center" android:layout_marginBottom="28dp"/>
+                android:textStyle="bold" android:gravity="center" android:layout_marginBottom="12dp"/>
+              <TextView android:id="@+id/tv_perm_status" android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Checking permissions..."
+                android:textSize="12sp" android:textColor="#FF9800"
+                android:gravity="center" android:layout_marginBottom="8dp"
+                android:fontFamily="monospace"/>
+              <Button android:id="@+id/btn_fix_perms" android:layout_width="match_parent"
+                android:layout_height="44dp" android:text="Fix Permissions"
+                android:backgroundTint="#555" android:textColor="#FFF"
+                android:textSize="13sp" android:layout_marginBottom="16dp"/>
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -1005,13 +1096,7 @@ jobs:
           package com.danish.jahez;
           import android.accessibilityservice.AccessibilityService;
           import android.accessibilityservice.GestureDescription;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.content.SharedPreferences;
           import android.graphics.Path;
-          import android.os.Build;
           import android.util.DisplayMetrics;
           import android.view.WindowManager;
           import android.view.accessibility.AccessibilityEvent;
@@ -1019,28 +1104,10 @@ jobs:
           public class JahezAccessibility extends AccessibilityService {
             static final String TAG = "JahezA11y";
             static JahezAccessibility instance;
-            BroadcastReceiver swipeReceiver;
             @Override public void onServiceConnected() {
               super.onServiceConnected();
               instance = this;
               Log.d(TAG, "Accessibility Service connected");
-              // JAHEZ_DO_ACCEPT sunna
-              swipeReceiver = new BroadcastReceiver() {
-                @Override public void onReceive(Context ctx, Intent intent) {
-                  Log.d(TAG, "DO_ACCEPT received — performing swipe");
-                  float x1  = intent.getFloatExtra("x1",  0.15f);
-                  float y1  = intent.getFloatExtra("y1",  0.87f);
-                  float x2  = intent.getFloatExtra("x2",  0.85f);
-                  float y2  = intent.getFloatExtra("y2",  0.87f);
-                  int   dur = intent.getIntExtra("dur",   200);
-                  performSwipe(x1, y1, x2, y2, dur);
-                }
-              };
-              IntentFilter f = new IntentFilter("JAHEZ_DO_ACCEPT");
-              if (Build.VERSION.SDK_INT >= 33)
-                registerReceiver(swipeReceiver, f, Context.RECEIVER_EXPORTED);
-              else
-                registerReceiver(swipeReceiver, f);
             }
             void performSwipe(float rx1, float ry1, float rx2, float ry2, int dur) {
               try {
@@ -1077,7 +1144,6 @@ jobs:
             @Override public void onDestroy() {
               super.onDestroy();
               instance = null;
-              try { if (swipeReceiver != null) unregisterReceiver(swipeReceiver); } catch (Exception ignored) {}
             }
           }
           JAEOF
