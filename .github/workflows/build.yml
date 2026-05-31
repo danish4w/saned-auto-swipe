@@ -832,13 +832,19 @@ jobs:
                 float fx2 = prefs.getFloat("swipe_x2", 0.85f);
                 float fy2 = prefs.getFloat("swipe_y2", 0.87f);
                 int fdur  = prefs.getInt("swipe_dur", 200);
-                // Retry up to 5 times with 100ms gap if instance not ready yet
-                final float _x1=fx1, _y1=fy1, _x2=fx2, _y2=fy2;
-                final int _dur=fdur;
-                final float _pu=pickupDistKm, _dr=dropKm;
-                new Handler(Looper.getMainLooper()).post(() -> {
-                  trySwipe(_x1, _y1, _x2, _y2, _dur, _pu, _dr, 0);
-                });
+                // Broadcast to JahezAccessibility — same process receive karega
+                Intent swipeIntent = new Intent("JAHEZ_DO_SWIPE");
+                swipeIntent.putExtra("x1", fx1);
+                swipeIntent.putExtra("y1", fy1);
+                swipeIntent.putExtra("x2", fx2);
+                swipeIntent.putExtra("y2", fy2);
+                swipeIntent.putExtra("dur", fdur);
+                sendBroadcast(swipeIntent);
+                prefs.edit().putBoolean("enabled", false).apply();
+                sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
+                showServiceNotification();
+                String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
+                toast(msg); saveLog(msg);
               } else {
                 String r = "";
                 if (!pickupOk) r += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
@@ -846,28 +852,7 @@ jobs:
                 toast("❌ SKIP — " + r); saveLog("❌ SKIP — " + r);
               }
             }
-            void trySwipe(float x1, float y1, float x2, float y2, int dur,
-                            float pickupKm, float dropKm, int attempt) {
-              if (JahezAccessibility.instance != null) {
-                JahezAccessibility.instance.performSwipe(x1, y1, x2, y2, dur);
-                prefs.edit().putBoolean("enabled", false).apply();
-                sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
-                showServiceNotification();
-                String msg = "✅ ACCEPTED — Pickup " + fmt(pickupKm) + "km | Drop " + fmt(dropKm) + "km";
-                toast(msg); saveLog(msg);
-                Log.d(TAG, "Swipe done attempt=" + attempt);
-              } else if (attempt < 10) {
-                // Retry after 200ms — max 10 attempts = 2 seconds wait
-                new Handler(Looper.getMainLooper()).postDelayed(
-                  () -> trySwipe(x1, y1, x2, y2, dur, pickupKm, dropKm, attempt + 1),
-                  200);
-                Log.w(TAG, "A11y instance null, retry " + (attempt+1));
-              } else {
-                saveLog("⚠️ Swipe fail — Accessibility Service on karo (Settings > Accessibility > Jahez Auto)");
-                toast("⚠️ Accessibility Service on karo!");
-                // Keep enabled true so user can retry
-              }
-            }
+
             void saveLog(String msg) {
               java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
               String entry = "[" + sdf.format(new java.util.Date()) + "]  " + msg;
@@ -1119,11 +1104,28 @@ jobs:
           import android.util.Log;
           public class JahezAccessibility extends AccessibilityService {
             static final String TAG = "JahezA11y";
-            static JahezAccessibility instance;
+
+            BroadcastReceiver swipeReceiver;
             @Override public void onServiceConnected() {
               super.onServiceConnected();
               instance = this;
               Log.d(TAG, "Accessibility Service connected");
+              swipeReceiver = new android.content.BroadcastReceiver() {
+                @Override public void onReceive(android.content.Context ctx, android.content.Intent intent) {
+                  float x1  = intent.getFloatExtra("x1",  0.15f);
+                  float y1  = intent.getFloatExtra("y1",  0.87f);
+                  float x2  = intent.getFloatExtra("x2",  0.85f);
+                  float y2  = intent.getFloatExtra("y2",  0.87f);
+                  int   dur = intent.getIntExtra("dur",   200);
+                  Log.d(TAG, "JAHEZ_DO_SWIPE received — swiping");
+                  performSwipe(x1, y1, x2, y2, dur);
+                }
+              };
+              android.content.IntentFilter f = new android.content.IntentFilter("JAHEZ_DO_SWIPE");
+              if (android.os.Build.VERSION.SDK_INT >= 33)
+                registerReceiver(swipeReceiver, f, android.content.Context.RECEIVER_EXPORTED);
+              else
+                registerReceiver(swipeReceiver, f);
             }
             void performSwipe(float rx1, float ry1, float rx2, float ry2, int dur) {
               try {
@@ -1160,6 +1162,7 @@ jobs:
             @Override public void onDestroy() {
               super.onDestroy();
               instance = null;
+              try { if (swipeReceiver != null) unregisterReceiver(swipeReceiver); } catch (Exception ignored) {}
             }
           }
           JAEOF
