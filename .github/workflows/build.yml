@@ -737,24 +737,12 @@ jobs:
           import android.os.IBinder;
           import android.os.Looper;
           import android.util.Log;
-          import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
           public class AutoService extends Service {
             static final String TAG = "JahezAuto";
             SharedPreferences prefs;
             long lastEvent = 0;
-            final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
-              @Override public void onReceive(Context ctx, Intent intent) {
-                boolean isOrder = intent.getBooleanExtra("is_order", false);
-                if (!isOrder) return;
-                double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
-                double pickupLon = intent.getDoubleExtra("pickup_lon", -1);
-                double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
-                double price     = intent.getDoubleExtra("price",       0);
-                double bonus     = intent.getDoubleExtra("bonus",       0);
-                saveLog("🪝 Order! drop=" + String.format("%.2f", dropDist) + "km price=" + price + " bonus=" + bonus);
-                processOrderGps(pickupLat, pickupLon, dropDist);
-              }
-            };
+            // Order processing JahezAccessibility mein hai — AutoService sirf notification handle karta hai
             final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
@@ -774,10 +762,7 @@ jobs:
               if (Build.VERSION.SDK_INT >= 33)
                 registerReceiver(toggleReceiver, f, Context.RECEIVER_NOT_EXPORTED);
               else registerReceiver(toggleReceiver, f);
-              IntentFilter of = new IntentFilter("JAHEZ_ORDER_DATA");
-              if (Build.VERSION.SDK_INT >= 33)
-                registerReceiver(orderReceiver, of, Context.RECEIVER_EXPORTED);
-              else registerReceiver(orderReceiver, of);
+
               showServiceNotification();
             }
             @Override public int onStartCommand(Intent intent, int flags, int startId) { return START_STICKY; }
@@ -802,59 +787,6 @@ jobs:
               startForeground(1, notif);
               nm.notify(1, notif);
             }
-            void processOrderGps(double pickupLat, double pickupLon, double dropDist) {
-              if (prefs == null || !prefs.getBoolean("enabled", false)) return;
-              long now = System.currentTimeMillis();
-              if (now - lastEvent < 1500) return;
-              lastEvent = now;
-              float pickupDistKm = -1;
-              try {
-                android.location.LocationManager lm =
-                  (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
-                android.location.Location loc = null;
-                try { loc = lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER); } catch (Exception ignored) {}
-                if (loc == null) try { loc = lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER); } catch (Exception ignored) {}
-                if (loc != null && pickupLat > 0 && pickupLon > 0) {
-                  float[] res = new float[1];
-                  android.location.Location.distanceBetween(
-                    loc.getLatitude(), loc.getLongitude(), pickupLat, pickupLon, res);
-                  pickupDistKm = res[0] / 1000f;
-                }
-              } catch (Exception e) { saveLog("GPS error: " + e.getMessage()); }
-              float maxPickup = prefs.getFloat("max_pickup", 2.0f);
-              float maxDrop   = prefs.getFloat("max_drop",   5.0f);
-              float dropKm    = (float) dropDist;
-              saveLog(String.format("Pickup=%.2fkm(max%.1f) Drop=%.2fkm(max%.1f)",
-                pickupDistKm, maxPickup, dropKm, maxDrop));
-              boolean pickupOk = pickupDistKm < 0 || pickupDistKm <= maxPickup;
-              boolean dropOk   = dropKm < 0      || dropKm <= maxDrop;
-              if (pickupOk && dropOk) {
-                float fx1 = prefs.getFloat("swipe_x1", 0.15f);
-                float fy1 = prefs.getFloat("swipe_y1", 0.87f);
-                float fx2 = prefs.getFloat("swipe_x2", 0.85f);
-                float fy2 = prefs.getFloat("swipe_y2", 0.87f);
-                int fdur  = prefs.getInt("swipe_dur", 200);
-                // LocalBroadcastManager — same process, guaranteed delivery
-                Intent swipeIntent = new Intent("JAHEZ_DO_SWIPE");
-                swipeIntent.putExtra("x1", fx1);
-                swipeIntent.putExtra("y1", fy1);
-                swipeIntent.putExtra("x2", fx2);
-                swipeIntent.putExtra("y2", fy2);
-                swipeIntent.putExtra("dur", fdur);
-                LocalBroadcastManager.getInstance(this).sendBroadcast(swipeIntent);
-                prefs.edit().putBoolean("enabled", false).apply();
-                sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
-                showServiceNotification();
-                String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
-                toast(msg); saveLog(msg);
-              } else {
-                String r = "";
-                if (!pickupOk) r += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
-                if (!dropOk)   r += (r.isEmpty() ? "" : " | ") + "Drop " + fmt(dropKm) + "km > max " + fmt(maxDrop) + "km";
-                toast("❌ SKIP — " + r); saveLog("❌ SKIP — " + r);
-              }
-            }
-
             void saveLog(String msg) {
               java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
               String entry = "[" + sdf.format(new java.util.Date()) + "]  " + msg;
@@ -872,7 +804,7 @@ jobs:
             @Override public void onDestroy() {
               super.onDestroy();
               try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
-              try { unregisterReceiver(orderReceiver);  } catch (Exception ignored) {}
+
             }
           }
           SEOF
@@ -1103,31 +1035,89 @@ jobs:
           import android.content.Context;
           import android.content.Intent;
           import android.content.IntentFilter;
+          import android.content.SharedPreferences;
           import android.graphics.Path;
+          import android.os.Build;
+          import android.os.Handler;
+          import android.os.Looper;
           import android.util.DisplayMetrics;
           import android.view.WindowManager;
           import android.view.accessibility.AccessibilityEvent;
           import android.util.Log;
-          import androidx.localbroadcastmanager.content.LocalBroadcastManager;
           public class JahezAccessibility extends AccessibilityService {
             static final String TAG = "JahezA11y";
-            BroadcastReceiver swipeReceiver;
+            BroadcastReceiver orderReceiver;
+            SharedPreferences prefs;
+            long lastEvent = 0;
             @Override public void onServiceConnected() {
               super.onServiceConnected();
+              prefs = getSharedPreferences("cfg", MODE_PRIVATE);
               Log.d(TAG, "Accessibility Service connected");
-              swipeReceiver = new BroadcastReceiver() {
+              // JAHEZ_ORDER_DATA seedha receive karo — same process mein filter + swipe
+              orderReceiver = new BroadcastReceiver() {
                 @Override public void onReceive(Context ctx, Intent intent) {
-                  float x1  = intent.getFloatExtra("x1",  0.15f);
-                  float y1  = intent.getFloatExtra("y1",  0.87f);
-                  float x2  = intent.getFloatExtra("x2",  0.85f);
-                  float y2  = intent.getFloatExtra("y2",  0.87f);
-                  int   dur = intent.getIntExtra("dur",   200);
-                  Log.d(TAG, "JAHEZ_DO_SWIPE received — swiping");
-                  performSwipe(x1, y1, x2, y2, dur);
+                  if (!intent.getBooleanExtra("is_order", false)) return;
+                  if (prefs == null || !prefs.getBoolean("enabled", false)) return;
+                  long now = System.currentTimeMillis();
+                  if (now - lastEvent < 1500) return;
+                  lastEvent = now;
+                  double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
+                  double pickupLon = intent.getDoubleExtra("pickup_lon", -1);
+                  double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
+                  processOrder(pickupLat, pickupLon, dropDist);
                 }
               };
-              LocalBroadcastManager.getInstance(this)
-                .registerReceiver(swipeReceiver, new IntentFilter("JAHEZ_DO_SWIPE"));
+              IntentFilter f = new IntentFilter("JAHEZ_ORDER_DATA");
+              if (Build.VERSION.SDK_INT >= 33)
+                registerReceiver(orderReceiver, f, Context.RECEIVER_EXPORTED);
+              else
+                registerReceiver(orderReceiver, f);
+            }
+            void processOrder(double pickupLat, double pickupLon, double dropDist) {
+              // GPS check
+              float pickupDistKm = -1;
+              try {
+                android.location.LocationManager lm =
+                  (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
+                android.location.Location loc = null;
+                try { loc = lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER); } catch (Exception ignored) {}
+                if (loc == null) try { loc = lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER); } catch (Exception ignored) {}
+                if (loc != null && pickupLat > 0 && pickupLon > 0) {
+                  float[] res = new float[1];
+                  android.location.Location.distanceBetween(
+                    loc.getLatitude(), loc.getLongitude(), pickupLat, pickupLon, res);
+                  pickupDistKm = res[0] / 1000f;
+                }
+              } catch (Exception e) { saveLog("GPS error: " + e.getMessage()); }
+              float maxPickup = prefs.getFloat("max_pickup", 2.0f);
+              float maxDrop   = prefs.getFloat("max_drop",   5.0f);
+              float dropKm    = (float) dropDist;
+              saveLog(String.format("Pickup=%.2fkm(max%.1f) Drop=%.2fkm(max%.1f)",
+                pickupDistKm, maxPickup, dropKm, maxDrop));
+              boolean pickupOk = pickupDistKm < 0 || pickupDistKm <= maxPickup;
+              boolean dropOk   = dropKm < 0      || dropKm <= maxDrop;
+              if (pickupOk && dropOk) {
+                float fx1 = prefs.getFloat("swipe_x1", 0.15f);
+                float fy1 = prefs.getFloat("swipe_y1", 0.87f);
+                float fx2 = prefs.getFloat("swipe_x2", 0.85f);
+                float fy2 = prefs.getFloat("swipe_y2", 0.87f);
+                int   dur = prefs.getInt("swipe_dur",  200);
+                // Pehle swipe karo
+                performSwipe(fx1, fy1, fx2, fy2, dur);
+                // Swipe ke baad band karo
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                  prefs.edit().putBoolean("enabled", false).apply();
+                  sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
+                }, dur + 300);
+                String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
+                saveLog(msg);
+                android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show();
+              } else {
+                String r = "";
+                if (!pickupOk) r += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
+                if (!dropOk)   r += (r.isEmpty() ? "" : " | ") + "Drop " + fmt(dropKm) + "km > max " + fmt(maxDrop) + "km";
+                saveLog("❌ SKIP — " + r);
+              }
             }
             void performSwipe(float rx1, float ry1, float rx2, float ry2, int dur) {
               try {
@@ -1148,23 +1138,34 @@ jobs:
                 dispatchGesture(gesture, new GestureResultCallback() {
                   @Override public void onCompleted(GestureDescription g) {
                     Log.d(TAG, "Swipe completed A("+rx1+","+ry1+") B("+rx2+","+ry2+") dur="+dur+"ms");
+                    saveLog("👆 Swipe done!");
                   }
                   @Override public void onCancelled(GestureDescription g) {
                     Log.e(TAG, "Swipe cancelled");
+                    saveLog("⚠️ Swipe cancelled");
                   }
                 }, null);
               } catch (Exception e) {
                 Log.e(TAG, "Swipe error: " + e.getMessage());
+                saveLog("⚠️ Swipe error: " + e.getMessage());
               }
             }
+            void saveLog(String msg) {
+              if (prefs == null) return;
+              java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
+              String entry = "[" + sdf.format(new java.util.Date()) + "]  " + msg;
+              String existing = prefs.getString("logs", "");
+              String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
+              StringBuilder sb = new StringBuilder(entry);
+              for (int i = 0; i < lines.length && i < 99; i++) sb.append("\n").append(lines[i]);
+              prefs.edit().putString("logs", sb.toString()).apply();
+            }
+            String fmt(float v) { return v < 0 ? "?" : String.format("%.1f", v); }
             @Override public void onAccessibilityEvent(AccessibilityEvent event) {}
             @Override public void onInterrupt() {}
             @Override public void onDestroy() {
               super.onDestroy();
-              try {
-                if (swipeReceiver != null)
-                  LocalBroadcastManager.getInstance(this).unregisterReceiver(swipeReceiver);
-              } catch (Exception ignored) {}
+              try { if (orderReceiver != null) unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
             }
           }
           JAEOF
