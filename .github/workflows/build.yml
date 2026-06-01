@@ -44,11 +44,17 @@ jobs:
         run: |
           cat > settings.gradle << 'SEOF'
           pluginManagement {
-            repositories { google(); mavenCentral(); gradlePluginPortal() }
+            repositories {
+              google()
+              mavenCentral()
+              gradlePluginPortal()
+            }
           }
           dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
             repositories {
-              google(); mavenCentral()
+              google()
+              mavenCentral()
               maven { url 'https://api.xposed.info/' }
             }
           }
@@ -57,7 +63,9 @@ jobs:
           SEOF
 
           cat > build.gradle << 'BEOF'
-          plugins { id 'com.android.application' version '8.5.2' apply false }
+          plugins {
+            id 'com.android.application' version '8.5.2' apply false
+          }
           BEOF
 
           cat > gradle.properties << 'GEOF'
@@ -67,10 +75,14 @@ jobs:
           GEOF
 
           cat > app/build.gradle << 'ABEOF'
-          plugins { id 'com.android.application' }
+          plugins {
+            id 'com.android.application'
+          }
+          
           android {
             namespace 'com.danish.diag'
             compileSdk 34
+            
             defaultConfig {
               applicationId 'com.danish.diag'
               minSdk 26
@@ -78,17 +90,19 @@ jobs:
               versionCode 1
               versionName '1.0'
             }
+            
             buildTypes {
-              release { 
+              release {
                 minifyEnabled false
-                proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
               }
             }
+            
             compileOptions {
               sourceCompatibility JavaVersion.VERSION_17
               targetCompatibility JavaVersion.VERSION_17
             }
           }
+          
           dependencies {
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.squareup.okhttp3:okhttp:4.12.0'
@@ -102,9 +116,12 @@ jobs:
           cat > app/src/main/res/drawable/ic_launcher_background.xml << 'BGEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
-            android:width="108dp" android:height="108dp"
-            android:viewportWidth="108" android:viewportHeight="108">
-            <path android:fillColor="#1565C0"
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path
+              android:fillColor="#1565C0"
               android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
           </vector>
           BGEOF
@@ -112,9 +129,12 @@ jobs:
           cat > app/src/main/res/drawable/ic_launcher_foreground.xml << 'FGEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
-            android:width="108dp" android:height="108dp"
-            android:viewportWidth="108" android:viewportHeight="108">
-            <path android:fillColor="#FFFFFF"
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path
+              android:fillColor="#FFFFFF"
               android:pathData="M30,54 L50,30 L70,54 L58,54 L58,78 L42,78 L42,54 Z"/>
           </vector>
           FGEOF
@@ -139,60 +159,85 @@ jobs:
         run: |
           echo "com.danish.diag.DiagHook" > app/src/main/assets/xposed_init
 
-      - name: Write Manifest
+      - name: Write Manifest (Fixed)
         run: |
           cat > app/src/main/AndroidManifest.xml << 'MEOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-            <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-            <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-            <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.danish.diag">
+            
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+            <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
             
             <application
-              android:label="Jahez Diag"
-              android:icon="@mipmap/ic_launcher"
-              android:roundIcon="@mipmap/ic_launcher_round"
-              android:theme="@style/AppTheme"
-              android:allowBackup="false">
-              <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Jahez diagnostic hook - Logs API calls, touches & screen changes"/>
-              <meta-data android:name="xposedminversion" android:value="82"/>
+                android:allowBackup="false"
+                android:icon="@mipmap/ic_launcher"
+                android:label="Jahez Diag"
+                android:roundIcon="@mipmap/ic_launcher_round"
+                android:supportsRtl="true"
+                android:theme="@style/AppTheme">
               
-              <activity android:name=".MainActivity" android:exported="true">
+              <meta-data
+                  android:name="xposedmodule"
+                  android:value="true" />
+              <meta-data
+                  android:name="xposeddescription"
+                  android:value="Jahez diagnostic hook - Logs API calls, touches &amp; screen changes" />
+              <meta-data
+                  android:name="xposedminversion"
+                  android:value="82" />
+              
+              <activity
+                  android:name=".MainActivity"
+                  android:exported="true">
                 <intent-filter>
-                  <action android:name="android.intent.action.MAIN"/>
-                  <category android:name="android.intent.category.LAUNCHER"/>
+                  <action android:name="android.intent.action.MAIN" />
+                  <category android:name="android.intent.category.LAUNCHER" />
                 </intent-filter>
               </activity>
               
-              <activity android:name=".LogActivity" android:exported="false"/>
+              <activity
+                  android:name=".LogActivity"
+                  android:exported="false" />
               
-              <service android:name=".DiagService" android:exported="false"
-                android:foregroundServiceType="dataSync"/>
+              <service
+                  android:name=".DiagService"
+                  android:enabled="true"
+                  android:exported="false"
+                  android:foregroundServiceType="dataSync" />
               
-              <service android:name=".DiagAccessibility" android:exported="true"
-                android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+              <service
+                  android:name=".DiagAccessibility"
+                  android:exported="true"
+                  android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
                 <intent-filter>
-                  <action android:name="android.accessibilityservice.AccessibilityService"/>
+                  <action android:name="android.accessibilityservice.AccessibilityService" />
                 </intent-filter>
-                <meta-data android:name="android.accessibilityservice"
-                  android:resource="@xml/accessibility_config"/>
+                <meta-data
+                    android:name="android.accessibilityservice"
+                    android:resource="@xml/accessibility_config" />
               </service>
               
-              <receiver android:name=".BootReceiver" android:exported="true">
+              <receiver
+                  android:name=".BootReceiver"
+                  android:enabled="true"
+                  android:exported="true">
                 <intent-filter>
-                  <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                  <action android:name="android.intent.action.BOOT_COMPLETED" />
                 </intent-filter>
               </receiver>
+              
             </application>
+            
           </manifest>
           MEOF
 
-      - name: Write DiagHook (Fixed)
+      - name: Write DiagHook
         run: |
           cat > app/src/main/java/com/danish/diag/DiagHook.java << 'HEOF'
           package com.danish.diag;
@@ -335,7 +380,7 @@ jobs:
           }
           HEOF
 
-      - name: Write DiagService (Fixed)
+      - name: Write DiagService
         run: |
           cat > app/src/main/java/com/danish/diag/DiagService.java << 'SEOF'
           package com.danish.diag;
@@ -458,7 +503,7 @@ jobs:
           }
           SEOF
 
-      - name: Write DiagAccessibility (Fixed)
+      - name: Write DiagAccessibility
         run: |
           cat > app/src/main/res/xml/accessibility_config.xml << 'ACEOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -503,7 +548,6 @@ jobs:
                 
                 if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
                   saveLog("🖥 Screen: " + className);
-                  // Dump window content safely
                   dumpWindowContent();
                 } else if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
                   String text = event.getText() != null && !event.getText().isEmpty() ? 
@@ -593,7 +637,7 @@ jobs:
           }
           JAEOF
 
-      - name: Write MainActivity (Fixed)
+      - name: Write MainActivity
         run: |
           cat > app/src/main/java/com/danish/diag/MainActivity.java << 'JEOF'
           package com.danish.diag;
