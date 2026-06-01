@@ -1,7 +1,6 @@
-name: Build JahezAutoAccept
+name: Build AutoDriver
 
-on:
-  workflow_dispatch:
+on: [workflow_dispatch]
 
 jobs:
   build:
@@ -32,12 +31,11 @@ jobs:
 
       - name: Create Project Structure
         run: |
-          mkdir -p app/src/main/java/com/danish/jahez
+          mkdir -p app/src/main/java/com/auto/driver
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/assets
 
       - name: Write Gradle Files
@@ -52,7 +50,7 @@ jobs:
               maven { url 'https://api.xposed.info/' }
             }
           }
-          rootProject.name = "JahezAutoAccept"
+          rootProject.name = "AutoDriver"
           include ':app'
           SEOF
 
@@ -69,10 +67,10 @@ jobs:
           cat > app/build.gradle << 'ABEOF'
           plugins { id 'com.android.application' }
           android {
-            namespace 'com.danish.jahez'
+            namespace 'com.auto.driver'
             compileSdk 34
             defaultConfig {
-              applicationId 'com.danish.jahez'
+              applicationId 'com.auto.driver'
               minSdk 26
               targetSdk 34
               versionCode 1
@@ -89,7 +87,6 @@ jobs:
           dependencies {
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.google.android.material:material:1.12.0'
-            implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
             compileOnly 'de.robv.android.xposed:api:82'
           }
           ABEOF
@@ -134,7 +131,7 @@ jobs:
 
       - name: Write Xposed Files
         run: |
-          echo "com.danish.jahez.SanedHook" > app/src/main/assets/xposed_init
+          echo "com.auto.driver.SanedHook" > app/src/main/assets/xposed_init
 
       - name: Write Manifest
         run: |
@@ -147,9 +144,8 @@ jobs:
             <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
             <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
             <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-            <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
             <application
-              android:label="Jahez Auto"
+              android:label="Auto Driver"
               android:icon="@mipmap/ic_launcher"
               android:roundIcon="@mipmap/ic_launcher_round"
               android:theme="@style/AppTheme"
@@ -167,100 +163,78 @@ jobs:
               <activity android:name=".LogActivity" android:exported="false"/>
               <service android:name=".AutoService" android:exported="false"
                 android:foregroundServiceType="dataSync"/>
-              <service android:name=".SwipeOverlayService" android:exported="false"/>
               <receiver android:name=".BootReceiver" android:exported="true">
                 <intent-filter>
                   <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 </intent-filter>
               </receiver>
-              <service android:name=".JahezAccessibility"
-                android:exported="true"
-                android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-                <intent-filter>
-                  <action android:name="android.accessibilityservice.AccessibilityService"/>
-                </intent-filter>
-                <meta-data android:name="android.accessibilityservice"
-                  android:resource="@xml/accessibility_service_config"/>
-              </service>
             </application>
           </manifest>
           MEOF
 
+
       - name: Write MainActivity
         run: |
-          cat > app/src/main/java/com/danish/jahez/MainActivity.java << 'JEOF'
-          package com.danish.jahez;
+          cat > app/src/main/java/com/auto/driver/MainActivity.java << 'JEOF'
+          package com.auto.driver;
           import android.app.Activity;
           import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
           import android.content.IntentFilter;
           import android.content.SharedPreferences;
-          import android.content.pm.PackageManager;
-          import android.net.Uri;
           import android.os.Build;
           import android.os.Bundle;
-          import android.provider.Settings;
-          import android.view.accessibility.AccessibilityManager;
           import android.view.inputmethod.InputMethodManager;
           import android.widget.*;
-          import java.util.ArrayList;
-          import java.util.List;
+          import android.widget.SeekBar;
           public class MainActivity extends Activity {
             SharedPreferences prefs;
             Switch swEnable;
-            TextView tvStatus, tvPointA, tvPointB, tvPermStatus;
-            static final int REQ_OVERLAY      = 100;
-            static final int REQ_PERMISSIONS  = 101;
-            final BroadcastReceiver uiReceiver = new BroadcastReceiver() {
+            TextView tvStatus;
+            final BroadcastReceiver offReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
-                String action = intent.getAction();
-                if ("JAHEZ_AUTO_ON".equals(action) || "JAHEZ_AUTO_OFF".equals(action)) {
-                  if (swEnable != null) swEnable.setChecked("JAHEZ_AUTO_ON".equals(action));
-                  refreshStatus();
-                } else if ("JAHEZ_SWIPE_SAVED".equals(action)) {
-                  refreshSwipeLabels();
-                  Toast.makeText(MainActivity.this, "Swipe points save ho gaye!", Toast.LENGTH_SHORT).show();
-                }
+                if (swEnable != null)
+                  swEnable.setChecked("JAHEZ_AUTO_ON".equals(intent.getAction()));
+                refreshStatus();
               }
             };
             @Override protected void onCreate(Bundle saved) {
               super.onCreate(saved);
               setContentView(R.layout.activity_main);
               prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              EditText etPickup   = findViewById(R.id.et_pickup);
-              EditText etDrop     = findViewById(R.id.et_drop);
-              SeekBar sbSwipeDur  = findViewById(R.id.sb_swipe_dur);
-              TextView tvSwipeDur = findViewById(R.id.tv_swipe_dur);
-              swEnable    = findViewById(R.id.sw_enable);
-              tvStatus    = findViewById(R.id.tv_status);
-              tvPointA    = findViewById(R.id.tv_point_a);
-              tvPointB    = findViewById(R.id.tv_point_b);
-              tvPermStatus = findViewById(R.id.tv_perm_status);
-              Button btnSave        = findViewById(R.id.btn_save);
-              Button btnSetSwipe    = findViewById(R.id.btn_set_swipe);
-              Button btnFixPerms    = findViewById(R.id.btn_fix_perms);
+              EditText etPickup = findViewById(R.id.et_pickup);
+              EditText etDrop   = findViewById(R.id.et_drop);
+              SeekBar sbDelay   = findViewById(R.id.sb_delay);
+              TextView tvDelay  = findViewById(R.id.tv_delay);
+              swEnable = findViewById(R.id.sw_enable);
+              tvStatus = findViewById(R.id.tv_status);
+              Button btnSave = findViewById(R.id.btn_save);
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
-              int savedSwipeDur = prefs.getInt("swipe_dur", 200);
-              sbSwipeDur.setProgress(savedSwipeDur);
-              tvSwipeDur.setText(savedSwipeDur + "ms");
-              sbSwipeDur.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                public void onProgressChanged(SeekBar sb, int p, boolean u) { tvSwipeDur.setText(p + "ms"); }
+              int savedDelay = prefs.getInt("scan_delay", 200);
+              sbDelay.setProgress(savedDelay - 50);
+              tvDelay.setText(savedDelay + "ms");
+              sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                public void onProgressChanged(SeekBar sb, int p, boolean u) { tvDelay.setText((p + 50) + "ms"); }
                 public void onStartTrackingTouch(SeekBar sb) {}
                 public void onStopTrackingTouch(SeekBar sb) {
-                  prefs.edit().putInt("swipe_dur", sb.getProgress()).apply();
+                  prefs.edit().putInt("scan_delay", sb.getProgress() + 50).apply();
                 }
               });
               swEnable.setChecked(prefs.getBoolean("enabled", false));
+              if (Build.VERSION.SDK_INT >= 33)
+                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
+              requestPermissions(new String[]{
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_COARSE_LOCATION"}, 1);
               IntentFilter filter = new IntentFilter();
               filter.addAction("JAHEZ_AUTO_OFF");
               filter.addAction("JAHEZ_AUTO_ON");
-              filter.addAction("JAHEZ_SWIPE_SAVED");
               if (Build.VERSION.SDK_INT >= 33)
-                registerReceiver(uiReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                registerReceiver(offReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
               else
-                registerReceiver(uiReceiver, filter);
+                registerReceiver(offReceiver, filter);
               swEnable.setOnCheckedChangeListener((btn, checked) -> {
                 prefs.edit().putBoolean("enabled", checked).apply();
                 sendBroadcast(new Intent("JAHEZ_STATE_CHANGED"));
@@ -270,410 +244,87 @@ jobs:
                 float pk = parseFloat(etPickup.getText().toString(), 2.0f);
                 float dk = parseFloat(etDrop.getText().toString(), 5.0f);
                 prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
-                Toast.makeText(this, "Saved!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Saved! Pickup<=" + pk + "km Drop<=" + dk + "km", Toast.LENGTH_LONG).show();
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
                 if (imm != null) imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
                 etPickup.clearFocus(); etDrop.clearFocus();
               });
-              btnSetSwipe.setOnClickListener(v -> launchOverlay());
-              btnFixPerms.setOnClickListener(v -> requestAllPermissions());
               findViewById(R.id.btn_logs).setOnClickListener(v ->
                 startActivity(new Intent(this, LogActivity.class))
               );
-              refreshSwipeLabels();
-              // Auto request permissions on first launch
-              requestAllPermissions();
+              // Service start karo
               Intent svc = new Intent(this, AutoService.class);
               if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
               else startService(svc);
             }
-            // ── Permission handling ──────────────────────────────
-            void requestAllPermissions() {
-              // Step 1: Runtime permissions (notification + location)
-              List<String> needed = new ArrayList<>();
-              if (Build.VERSION.SDK_INT >= 33) {
-                if (checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
-                  needed.add("android.permission.POST_NOTIFICATIONS");
-              }
-              if (checkSelfPermission("android.permission.ACCESS_FINE_LOCATION") != PackageManager.PERMISSION_GRANTED)
-                needed.add("android.permission.ACCESS_FINE_LOCATION");
-              if (checkSelfPermission("android.permission.ACCESS_COARSE_LOCATION") != PackageManager.PERMISSION_GRANTED)
-                needed.add("android.permission.ACCESS_COARSE_LOCATION");
-              if (!needed.isEmpty())
-                requestPermissions(needed.toArray(new String[0]), REQ_PERMISSIONS);
-              // Step 2: Overlay permission
-              if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Display over other apps permission chahiye", Toast.LENGTH_LONG).show();
-                startActivityForResult(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                  Uri.parse("package:" + getPackageName())), REQ_OVERLAY);
-                return;
-              }
-              // Step 3: Accessibility permission
-              if (!isAccessibilityEnabled()) {
-                Toast.makeText(this, "Accessibility Service enable karo — Jahez Auto ON karo", Toast.LENGTH_LONG).show();
-                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-              }
-            }
-            boolean isAccessibilityEnabled() {
-              AccessibilityManager am = (AccessibilityManager) getSystemService(ACCESSIBILITY_SERVICE);
-              if (am == null || !am.isEnabled()) return false;
-              String svc = getPackageName() + "/" + JahezAccessibility.class.getName();
-              android.provider.Settings.Secure.getString(getContentResolver(),
-                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-              String enabled = android.provider.Settings.Secure.getString(
-                getContentResolver(),
-                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-              return enabled != null && enabled.contains(svc);
-            }
-            @Override public void onRequestPermissionsResult(int req, String[] perms, int[] results) {
-              if (req == REQ_PERMISSIONS) {
-                // After runtime perms, check overlay
-                if (!Settings.canDrawOverlays(this)) {
-                  Toast.makeText(this, "Display over other apps permission chahiye", Toast.LENGTH_LONG).show();
-                  startActivityForResult(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName())), REQ_OVERLAY);
-                } else if (!isAccessibilityEnabled()) {
-                  Toast.makeText(this, "Accessibility Service enable karo — Jahez Auto ON karo", Toast.LENGTH_LONG).show();
-                  startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                }
-              }
-            }
-            @Override protected void onActivityResult(int req, int res, Intent data) {
-              if (req == REQ_OVERLAY) {
-                // After overlay, check accessibility
-                if (!isAccessibilityEnabled()) {
-                  Toast.makeText(this, "Accessibility Service enable karo — Jahez Auto ON karo", Toast.LENGTH_LONG).show();
-                  startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                }
-              }
-            }
-            // ─────────────────────────────────────────────────────
-            void launchOverlay() {
-              if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Pehle 'Display over other apps' permission do", Toast.LENGTH_LONG).show();
-                startActivityForResult(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                  Uri.parse("package:" + getPackageName())), REQ_OVERLAY);
-              } else {
-                startService(new Intent(this, SwipeOverlayService.class));
-                Toast.makeText(this, "A(orange) B(blue) drag karo — phir ✅ dabao", Toast.LENGTH_LONG).show();
-                moveTaskToBack(true);
-              }
-            }
-            void refreshSwipeLabels() {
-              float x1 = prefs.getFloat("swipe_x1", -1);
-              float y1 = prefs.getFloat("swipe_y1", -1);
-              float x2 = prefs.getFloat("swipe_x2", -1);
-              float y2 = prefs.getFloat("swipe_y2", -1);
-              if (tvPointA != null) tvPointA.setText(x1 < 0 ? "A: default" : "A: x=" + fp(x1) + " y=" + fp(y1));
-              if (tvPointB != null) tvPointB.setText(x2 < 0 ? "B: default" : "B: x=" + fp(x2) + " y=" + fp(y2));
-            }
             @Override protected void onResume() {
               super.onResume();
               refreshStatus();
-              refreshSwipeLabels();
-              refreshPermStatus();
-            }
-            void refreshPermStatus() {
-              if (tvPermStatus == null) return;
-              boolean notif = Build.VERSION.SDK_INT < 33 ||
-                checkSelfPermission("android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED;
-              boolean loc = checkSelfPermission("android.permission.ACCESS_FINE_LOCATION") == PackageManager.PERMISSION_GRANTED;
-              boolean overlay = Settings.canDrawOverlays(this);
-              boolean a11y = isAccessibilityEnabled();
-              String status =
-                (notif    ? "✅" : "❌") + " Notification  " +
-                (loc      ? "✅" : "❌") + " Location\n" +
-                (overlay  ? "✅" : "❌") + " Overlay  " +
-                (a11y     ? "✅" : "❌") + " Accessibility";
-              tvPermStatus.setText(status);
-              tvPermStatus.setTextColor(
-                (notif && loc && overlay && a11y) ? 0xFF4CAF50 : 0xFFFF9800);
             }
             @Override protected void onDestroy() {
               super.onDestroy();
-              try { unregisterReceiver(uiReceiver); } catch (Exception ignored) {}
+              unregisterReceiver(offReceiver);
             }
             void refreshStatus() {
               if (tvStatus == null) return;
               boolean en = prefs.getBoolean("enabled", false);
               tvStatus.setText(en ? "AUTO ACCEPT: ON" : "AUTO ACCEPT: OFF");
               tvStatus.setTextColor(en ? 0xFF4CAF50 : 0xFFFF5555);
+              if (swEnable != null) swEnable.setVisibility(android.view.View.VISIBLE);
             }
             float parseFloat(String s, float def) {
               try { return Float.parseFloat(s.trim()); } catch (Exception e) { return def; }
             }
-            String fp(float v) { return String.format("%.2f", v); }
           }
           JEOF
 
-      - name: Write SwipeOverlayService
-        run: |
-          cat > app/src/main/java/com/danish/jahez/SwipeOverlayService.java << 'OEOF'
-          package com.danish.jahez;
-          import android.app.Service;
-          import android.content.Intent;
-          import android.content.SharedPreferences;
-          import android.graphics.Canvas;
-          import android.graphics.Color;
-          import android.graphics.Paint;
-          import android.graphics.PixelFormat;
-          import android.os.Handler;
-          import android.os.IBinder;
-          import android.os.Looper;
-          import android.util.DisplayMetrics;
-          import android.view.Gravity;
-          import android.view.MotionEvent;
-          import android.view.View;
-          import android.view.WindowManager;
-          import android.widget.LinearLayout;
-          import android.widget.TextView;
-          public class SwipeOverlayService extends Service {
-            WindowManager wm;
-            View viewA, viewB, lineView, barView;
-            int screenW, screenH;
-            float ax, ay, bx, by;
-            // Circle size in pixels
-            static final int CS = 130;
-            // Bar size
-            static final int BAR_W = 260;
-            static final int BAR_H = 110;
-
-            @Override public void onCreate() {
-              super.onCreate();
-              wm = (WindowManager) getSystemService(WINDOW_SERVICE);
-              DisplayMetrics dm = new DisplayMetrics();
-              wm.getDefaultDisplay().getMetrics(dm);
-              screenW = dm.widthPixels;
-              screenH = dm.heightPixels;
-              SharedPreferences p = getSharedPreferences("cfg", MODE_PRIVATE);
-              float sx1 = p.getFloat("swipe_x1", -1);
-              float sy1 = p.getFloat("swipe_y1", -1);
-              float sx2 = p.getFloat("swipe_x2", -1);
-              float sy2 = p.getFloat("swipe_y2", -1);
-              ax = sx1 < 0 ? screenW * 0.15f : screenW * sx1;
-              ay = sy1 < 0 ? screenH * 0.75f : screenH * sy1;
-              bx = sx2 < 0 ? screenW * 0.85f : screenW * sx2;
-              by = sy2 < 0 ? screenH * 0.75f : screenH * sy2;
-              addLineView();
-              addCircle(true);
-              addCircle(false);
-              addBar();
-            }
-
-            // ── Full-screen transparent layer just for drawing the arrow line ──
-            void addLineView() {
-              lineView = new View(this) {
-                @Override protected void onDraw(Canvas c) {
-                  Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  p.setColor(0xBBFFFFFF);
-                  p.setStrokeWidth(6);
-                  c.drawLine(ax, ay, bx, by, p);
-                  double ang = Math.atan2(by - ay, bx - ax);
-                  float al = 40, aa = (float) Math.toRadians(28);
-                  c.drawLine(bx, by, bx-(float)(al*Math.cos(ang-aa)), by-(float)(al*Math.sin(ang-aa)), p);
-                  c.drawLine(bx, by, bx-(float)(al*Math.cos(ang+aa)), by-(float)(al*Math.sin(ang+aa)), p);
-                }
-              };
-              WindowManager.LayoutParams lp = overlayParams(screenW, screenH,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-              lp.gravity = Gravity.TOP | Gravity.START;
-              lp.x = 0; lp.y = 0;
-              wm.addView(lineView, lp);
-            }
-
-            // ── Draggable circle for A or B ──
-            void addCircle(boolean isA) {
-              // Each circle tracks its own raw screen position via WindowManager lp.x / lp.y
-              // We use getRawX/getRawY to get absolute position and compute delta ourselves
-              final float[] lastRaw = {0f, 0f};
-              View circle = new View(this) {
-                @Override protected void onDraw(Canvas c) {
-                  int r = CS / 2;
-                  Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  fill.setColor(isA ? 0xEEFF6D00 : 0xEE1565C0);
-                  c.drawCircle(r, r, r - 5, fill);
-                  Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  stroke.setColor(Color.WHITE);
-                  stroke.setStyle(Paint.Style.STROKE);
-                  stroke.setStrokeWidth(5);
-                  c.drawCircle(r, r, r - 5, stroke);
-                  Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  txt.setColor(Color.WHITE);
-                  txt.setTextSize(52);
-                  txt.setTextAlign(Paint.Align.CENTER);
-                  txt.setFakeBoldText(true);
-                  c.drawText(isA ? "A" : "B", r, r + 19, txt);
-                }
-                @Override public boolean onTouchEvent(MotionEvent e) {
-                  WindowManager.LayoutParams lp = (WindowManager.LayoutParams) getLayoutParams();
-                  switch (e.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                      lastRaw[0] = e.getRawX();
-                      lastRaw[1] = e.getRawY();
-                      break;
-                    case MotionEvent.ACTION_MOVE:
-                      float dx = e.getRawX() - lastRaw[0];
-                      float dy = e.getRawY() - lastRaw[1];
-                      lastRaw[0] = e.getRawX();
-                      lastRaw[1] = e.getRawY();
-                      lp.x = Math.max(0, Math.min(screenW - CS, lp.x + (int) dx));
-                      lp.y = Math.max(0, Math.min(screenH - CS, lp.y + (int) dy));
-                      wm.updateViewLayout(this, lp);
-                      if (isA) { ax = lp.x + CS / 2f; ay = lp.y + CS / 2f; }
-                      else     { bx = lp.x + CS / 2f; by = lp.y + CS / 2f; }
-                      lineView.invalidate();
-                      break;
-                  }
-                  return true;
-                }
-              };
-              WindowManager.LayoutParams lp = overlayParams(CS, CS,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-              lp.gravity = Gravity.TOP | Gravity.START;
-              lp.x = (int)((isA ? ax : bx) - CS / 2f);
-              lp.y = (int)((isA ? ay : by) - CS / 2f);
-              wm.addView(circle, lp);
-              if (isA) viewA = circle; else viewB = circle;
-            }
-
-            // ── Draggable bar with ✅ and ❌ ──
-            void addBar() {
-              final float[] lastRaw = {0f, 0f};
-              final boolean[] wasDrag = {false};
-
-              LinearLayout bar = new LinearLayout(this);
-              bar.setOrientation(LinearLayout.HORIZONTAL);
-              bar.setBackgroundColor(0xEE111111);
-              bar.setPadding(18, 14, 18, 14);
-
-              // Cancel button — small
-              TextView btnCancel = new TextView(this);
-              btnCancel.setText("❌");
-              btnCancel.setTextSize(26);
-              btnCancel.setGravity(Gravity.CENTER);
-              btnCancel.setBackgroundColor(0xFF6D0000);
-              btnCancel.setPadding(18, 10, 18, 10);
-              LinearLayout.LayoutParams lpC = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-              lpC.setMargins(0, 0, 16, 0);
-              btnCancel.setLayoutParams(lpC);
-
-              // Save button — small
-              TextView btnSave = new TextView(this);
-              btnSave.setText("✅");
-              btnSave.setTextSize(26);
-              btnSave.setGravity(Gravity.CENTER);
-              btnSave.setBackgroundColor(0xFF0A3D0A);
-              btnSave.setPadding(18, 10, 18, 10);
-              btnSave.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-              bar.addView(btnCancel);
-              bar.addView(btnSave);
-              barView = bar;
-
-              // Bar drag — using getRawX/Y delta, same as circles
-              bar.setOnTouchListener((v, e) -> {
-                WindowManager.LayoutParams lp = (WindowManager.LayoutParams) barView.getLayoutParams();
-                switch (e.getAction()) {
-                  case MotionEvent.ACTION_DOWN:
-                    lastRaw[0] = e.getRawX();
-                    lastRaw[1] = e.getRawY();
-                    wasDrag[0] = false;
-                    break;
-                  case MotionEvent.ACTION_MOVE:
-                    float dx = e.getRawX() - lastRaw[0];
-                    float dy = e.getRawY() - lastRaw[1];
-                    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) wasDrag[0] = true;
-                    lastRaw[0] = e.getRawX();
-                    lastRaw[1] = e.getRawY();
-                    lp.x = Math.max(0, Math.min(screenW - BAR_W, lp.x + (int) dx));
-                    lp.y = Math.max(0, Math.min(screenH - BAR_H, lp.y + (int) dy));
-                    wm.updateViewLayout(barView, lp);
-                    break;
-                }
-                return wasDrag[0]; // if dragged, consume; else let children handle click
-              });
-
-              // Button clicks
-              btnCancel.setOnClickListener(v -> removeAllViews());
-              btnSave.setOnClickListener(v -> {
-                SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-                prefs.edit()
-                  .putFloat("swipe_x1", ax / screenW)
-                  .putFloat("swipe_y1", ay / screenH)
-                  .putFloat("swipe_x2", bx / screenW)
-                  .putFloat("swipe_y2", by / screenH)
-                  .apply();
-                sendBroadcast(new Intent("JAHEZ_SWIPE_SAVED"));
-                removeAllViews();
-              });
-
-              WindowManager.LayoutParams lp = overlayParams(
-                WindowManager.LayoutParams.WRAP_CONTENT, BAR_H,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-              lp.gravity = Gravity.TOP | Gravity.START;
-              // Start bar at top-center
-              lp.x = screenW / 2 - BAR_W / 2;
-              lp.y = 60;
-              wm.addView(barView, lp);
-            }
-
-            void removeAllViews() {
-              new Handler(Looper.getMainLooper()).post(() -> {
-                try { if (lineView != null) { wm.removeView(lineView); lineView = null; } } catch (Exception ignored) {}
-                try { if (viewA   != null) { wm.removeView(viewA);    viewA   = null; } } catch (Exception ignored) {}
-                try { if (viewB   != null) { wm.removeView(viewB);    viewB   = null; } } catch (Exception ignored) {}
-                try { if (barView != null) { wm.removeView(barView);  barView = null; } } catch (Exception ignored) {}
-                stopSelf();
-              });
-            }
-
-            WindowManager.LayoutParams overlayParams(int w, int h, int flags) {
-              return new WindowManager.LayoutParams(w, h,
-                android.os.Build.VERSION.SDK_INT >= 26
-                  ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                  : WindowManager.LayoutParams.TYPE_PHONE,
-                flags, PixelFormat.TRANSLUCENT);
-            }
-
-            @Override public void onDestroy() {
-              super.onDestroy();
-              try { if (lineView != null) wm.removeView(lineView); } catch (Exception ignored) {}
-              try { if (viewA   != null) wm.removeView(viewA);    } catch (Exception ignored) {}
-              try { if (viewB   != null) wm.removeView(viewB);    } catch (Exception ignored) {}
-              try { if (barView != null) wm.removeView(barView);  } catch (Exception ignored) {}
-            }
-            @Override public IBinder onBind(Intent intent) { return null; }
-          }
-          OEOF
-
       - name: Write SanedHook
         run: |
-          cat > app/src/main/java/com/danish/jahez/SanedHook.java << 'HEOF'
-          package com.danish.jahez;
+          cat > app/src/main/java/com/auto/driver/SanedHook.java << 'HEOF'
+          package com.auto.driver;
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
+          import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
+          import android.content.IntentFilter;
           import android.os.Bundle;
           public class SanedHook implements IXposedHookLoadPackage {
             static final String TARGET  = "net.jahez.fleets";
-            static final String OUR_PKG = "com.danish.jahez";
+            static final String OUR_PKG = "com.auto.driver";
             static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
+            static final String ACCEPT_BASE = "https://gateway.saned.io/api/v1/dispatch/accept-dispatch/";
             long lastBcast = 0;
-            volatile android.app.Activity currentActivity = null;
-
+            // Captured auth headers from Saned's OkHttp requests
+            volatile String capturedAuth    = "";
+            volatile String capturedXUniq   = "";
+            volatile String capturedLang    = "en";
+            volatile int    lastRequestId   = -1;
             @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
               if (!TARGET.equals(lp.packageName)) return;
+              // Hook 1: OkHttp Request.Builder.build() — capture auth headers
+              try {
+                XposedHelpers.findAndHookMethod(
+                  "okhttp3.Request$Builder", lp.classLoader, "build",
+                  new XC_MethodHook() {
+                    @Override protected void afterHookedMethod(MethodHookParam p) {
+                      try {
+                        Object req = p.getResult();
+                        Object hdrs = XposedHelpers.callMethod(req, "headers");
+                        String auth  = (String) XposedHelpers.callMethod(hdrs, "get", "Authorization");
+                        String xuniq = (String) XposedHelpers.callMethod(hdrs, "get", "x-unique-Identifier");
+                        String lang  = (String) XposedHelpers.callMethod(hdrs, "get", "Accept-Language");
+                        if (auth  != null && !auth.isEmpty())  capturedAuth  = auth;
+                        if (xuniq != null && !xuniq.isEmpty()) capturedXUniq = xuniq;
+                        if (lang  != null && !lang.isEmpty())  capturedLang  = lang;
+                      } catch (Exception ignored) {}
+                    }
+                  }
+                );
+              } catch (Exception e) { android.util.Log.e("JahezHook", "OkHttp hook failed: " + e); }
+              // Hook 2: Activity.onResume — order detect
               XposedHelpers.findAndHookMethod(
                 "android.app.Activity", lp.classLoader, "onResume",
                 new XC_MethodHook() {
@@ -682,35 +333,90 @@ jobs:
                     long now = System.currentTimeMillis();
                     if (now - lastBcast < 2000) return;
                     lastBcast = now;
-                    android.app.Activity act = (android.app.Activity) p.thisObject;
-                    currentActivity = act;
-                    // Swipe JahezAccessibility karti hai — no receiver needed here
                     try {
-                      Bundle extras = act.getIntent() != null ? act.getIntent().getExtras() : null;
+                      android.app.Activity act = (android.app.Activity) p.thisObject;
+                      android.content.Intent ai = act.getIntent();
+                      Bundle extras = ai != null ? ai.getExtras() : null;
                       if (extras == null) return;
+                      lastRequestId = getInt(extras, "EXTRA_DISPATCH_REQUEST_ID");
+                      double pickupLat = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
+                      double pickupLon = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
+                      double dropDist  = getDouble(extras, "EXTRA_DISTANCE");
+                      double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
+                      double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
                       Intent intent = new Intent("JAHEZ_ORDER_DATA");
                       intent.setPackage(OUR_PKG);
-                      intent.putExtra("pickup_lat", getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE"));
-                      intent.putExtra("pickup_lon", getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE"));
-                      intent.putExtra("drop_dist",  getDouble(extras, "EXTRA_DISTANCE"));
-                      intent.putExtra("price",      getDouble(extras, "EXTRA_DELIVERY_PRICE"));
-                      intent.putExtra("bonus",      getDouble(extras, "EXTRA_BONUS_AMOUNT"));
+                      intent.putExtra("pickup_lat", pickupLat);
+                      intent.putExtra("pickup_lon", pickupLon);
+                      intent.putExtra("drop_dist",  dropDist);
+                      intent.putExtra("price",      price);
+                      intent.putExtra("bonus",      bonus);
+                      intent.putExtra("request_id", lastRequestId);
                       intent.putExtra("is_order",   true);
                       act.sendBroadcast(intent);
-                    } catch (Exception e) {
-                      android.util.Log.e("JahezHook", "Error: " + e.getMessage());
-                    }
+                      // Register accept receiver
+                      try {
+                        android.app.Application app = android.app.AndroidAppHelper.currentApplication();
+                        IntentFilter f = new IntentFilter("JAHEZ_DO_ACCEPT");
+                        app.registerReceiver(new BroadcastReceiver() {
+                          @Override public void onReceive(Context ctx, Intent i) {
+                            int rid = i.getIntExtra("request_id", lastRequestId);
+                            doAcceptApi(rid);
+                          }
+                        }, f);
+                      } catch (Exception ignored) {}
+                    } catch (Exception e) { android.util.Log.e("JahezHook", e.getMessage()); }
                   }
                 }
               );
             }
-            // Swipe ab JahezAccessibility karta hai via GestureDescription
-            // SanedHook sirf broadcast receive karta hai aur AutoService ko forward karta hai
+            void doAcceptApi(int requestId) {
+              if (requestId < 0 || capturedAuth.isEmpty()) {
+                android.util.Log.e("JahezHook", "No auth or requestId=" + requestId);
+                return;
+              }
+              new Thread(() -> {
+                try {
+                  String url = ACCEPT_BASE + requestId;
+                  java.net.URL u = new java.net.URL(url);
+                  java.net.HttpURLConnection conn = (java.net.HttpURLConnection) u.openConnection();
+                  conn.setRequestMethod("PUT");
+                  conn.setRequestProperty("Authorization", capturedAuth);
+                  conn.setRequestProperty("Accept-Language", capturedLang);
+                  if (!capturedXUniq.isEmpty())
+                    conn.setRequestProperty("x-unique-Identifier", capturedXUniq);
+                  conn.setRequestProperty("Content-Type", "application/json");
+                  conn.setRequestProperty("Content-Length", "0");
+                  conn.setDoOutput(false);
+                  conn.setConnectTimeout(5000);
+                  conn.setReadTimeout(5000);
+                  int code = conn.getResponseCode();
+                  android.util.Log.d("JahezHook", "Accept API: " + code + " url=" + url);
+                  // Log response to our app
+                  Intent result = new Intent("JAHEZ_ORDER_DATA");
+                  result.setPackage(OUR_PKG);
+                  result.putExtra("screen", "🌐 PUT " + url + " → HTTP " + code);
+                  result.putExtra("is_order", false);
+                  android.app.AndroidAppHelper.currentApplication().sendBroadcast(result);
+                } catch (Exception e) {
+                  android.util.Log.e("JahezHook", "Accept API error: " + e.getMessage());
+                }
+              }).start();
+            }
+            int getInt(Bundle b, String key) {
+              try {
+                Object v = b.get(key);
+                if (v instanceof Integer) return (Integer) v;
+                if (v instanceof Long)    return ((Long) v).intValue();
+                if (v instanceof String)  return Integer.parseInt((String) v);
+              } catch (Exception ignored) {}
+              return -1;
+            }
             double getDouble(Bundle b, String key) {
               try {
                 Object v = b.get(key);
                 if (v instanceof Double) return (Double) v;
-                if (v instanceof Float)  return ((Float) v).doubleValue();
+                if (v instanceof Float)  return (Float) v;
                 if (v instanceof String) return Double.parseDouble((String) v);
               } catch (Exception ignored) {}
               return -1;
@@ -720,8 +426,8 @@ jobs:
 
       - name: Write AutoService
         run: |
-          cat > app/src/main/java/com/danish/jahez/AutoService.java << 'SEOF'
-          package com.danish.jahez;
+          cat > app/src/main/java/com/auto/driver/AutoService.java << 'SEOF'
+          package com.auto.driver;
           import android.app.Notification;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
@@ -736,20 +442,43 @@ jobs:
           import android.os.Handler;
           import android.os.IBinder;
           import android.os.Looper;
+          import android.util.DisplayMetrics;
           import android.util.Log;
+          import android.view.WindowManager;
+
 
           public class AutoService extends Service {
             static final String TAG = "JahezAuto";
             SharedPreferences prefs;
             long lastEvent = 0;
-            // Order processing JahezAccessibility mein hai — AutoService sirf notification handle karta hai
+            final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
+              @Override public void onReceive(Context ctx, Intent intent) {
+                boolean isOrder = intent.getBooleanExtra("is_order", false);
+                if (!isOrder) {
+                  // Debug/log only
+                  String screen = intent.getStringExtra("screen");
+                  if (screen != null) saveLog("📩 Extras:\n" + screen);
+                  return;
+                }
+                double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
+                double pickupLon = intent.getDoubleExtra("pickup_lon", -1);
+                double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
+                double price     = intent.getDoubleExtra("price",       0);
+                double bonus     = intent.getDoubleExtra("bonus",       0);
+                int requestId = intent.getIntExtra("request_id", -1);
+                saveLog("🪝 Order! drop=" + String.format("%.2f", dropDist) + "km price=" + price + " id=" + requestId);
+                processOrderGps(pickupLat, pickupLon, dropDist, requestId);
+              }
+            };
             final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-                if ("JAHEZ_TOGGLE".equals(intent.getAction())) {
-                  boolean cur = prefs.getBoolean("enabled", false);
-                  prefs.edit().putBoolean("enabled", !cur).apply();
-                  sendBroadcast(new Intent(!cur ? "JAHEZ_AUTO_ON" : "JAHEZ_AUTO_OFF"));
+                String action = intent.getAction();
+                if ("JAHEZ_TOGGLE".equals(action)) {
+                  boolean current = prefs.getBoolean("enabled", false);
+                  prefs.edit().putBoolean("enabled", !current).apply();
+                  sendBroadcast(new Intent(!current ? "JAHEZ_AUTO_ON" : "JAHEZ_AUTO_OFF"));
+                  log("Toggle: " + (!current ? "ON" : "OFF"));
                 }
                 showServiceNotification();
               }
@@ -761,31 +490,83 @@ jobs:
               f.addAction("JAHEZ_STATE_CHANGED");
               if (Build.VERSION.SDK_INT >= 33)
                 registerReceiver(toggleReceiver, f, Context.RECEIVER_NOT_EXPORTED);
-              else registerReceiver(toggleReceiver, f);
-
+              else
+                registerReceiver(toggleReceiver, f);
+              IntentFilter of = new IntentFilter("JAHEZ_ORDER_DATA");
+              if (Build.VERSION.SDK_INT >= 33)
+                registerReceiver(orderReceiver, of, Context.RECEIVER_EXPORTED);
+              else
+                registerReceiver(orderReceiver, of);
               showServiceNotification();
+              log("Service started");
             }
-            @Override public int onStartCommand(Intent intent, int flags, int startId) { return START_STICKY; }
+            @Override public int onStartCommand(Intent intent, int flags, int startId) {
+              return START_STICKY;
+            }
             @Override public IBinder onBind(Intent intent) { return null; }
             void showServiceNotification() {
-              boolean en = prefs != null && prefs.getBoolean("enabled", false);
+              boolean enabled = prefs != null && prefs.getBoolean("enabled", false);
               NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-              nm.createNotificationChannel(new NotificationChannel(
-                "jahez_svc", "Jahez Auto Service", NotificationManager.IMPORTANCE_LOW));
-              PendingIntent pi = PendingIntent.getBroadcast(this, 0,
-                new Intent("JAHEZ_TOGGLE").setPackage(getPackageName()),
+              NotificationChannel ch = new NotificationChannel("auto_svc", "Auto Driver Service", NotificationManager.IMPORTANCE_LOW);
+              nm.createNotificationChannel(ch);
+              Intent toggleIntent = new Intent("JAHEZ_TOGGLE").setPackage(getPackageName());
+              PendingIntent togglePending = PendingIntent.getBroadcast(this, 0, toggleIntent,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+              Notification.Action action = new Notification.Action.Builder(
+                enabled ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                enabled ? "✅ ON  —  tap to OFF" : "⏸ OFF  —  tap to ON",
+                togglePending).build();
               Notification notif = new Notification.Builder(this, "jahez_svc")
-                .setContentTitle("Jahez Auto")
-                .setContentText(en ? "Auto Accept: ON" : "Auto Accept: OFF")
+                .setContentTitle("Auto Driver")
+                .setContentText(enabled ? "Auto Accept: ON" : "Auto Accept: OFF")
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setOngoing(true)
-                .addAction(new Notification.Action.Builder(
-                  en ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
-                  en ? "✅ ON — tap to OFF" : "⏸ OFF — tap to ON", pi).build())
+                .addAction(action)
                 .build();
               startForeground(1, notif);
               nm.notify(1, notif);
+            }
+            void processOrderGps(double pickupLat, double pickupLon, double dropDist, int requestId) {
+              if (prefs == null || !prefs.getBoolean("enabled", false)) return;
+              long now = System.currentTimeMillis();
+              if (now - lastEvent < 1500) return;
+              lastEvent = now;
+              // Driver ki location lo
+              float pickupDistKm = -1;
+              try {
+                android.location.LocationManager lm = (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
+                android.location.Location loc = null;
+                try { loc = lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER); } catch (Exception ignored) {}
+                if (loc == null) { try { loc = lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER); } catch (Exception ignored) {} }
+                if (loc != null && pickupLat > 0 && pickupLon > 0) {
+                  float[] res = new float[1];
+                  android.location.Location.distanceBetween(loc.getLatitude(), loc.getLongitude(), pickupLat, pickupLon, res);
+                  pickupDistKm = res[0] / 1000f;
+                }
+              } catch (Exception e) { saveLog("GPS error: " + e.getMessage()); }
+              float maxPickup = prefs.getFloat("max_pickup", 2.0f);
+              float maxDrop   = prefs.getFloat("max_drop",   5.0f);
+              float dropKm    = (float) dropDist;
+              saveLog(String.format("Pickup=%.2fkm(max%.1f) Drop=%.2fkm(max%.1f)", pickupDistKm, maxPickup, dropKm, maxDrop));
+              boolean pickupOk = pickupDistKm < 0 || pickupDistKm <= maxPickup;
+              boolean dropOk   = dropKm < 0      || dropKm      <= maxDrop;
+              if (pickupOk && dropOk) {
+                Intent acceptIntent = new Intent("JAHEZ_DO_ACCEPT");
+                acceptIntent.setPackage("net.jahez.fleets");
+                acceptIntent.putExtra("request_id", requestId);
+                sendBroadcast(acceptIntent);
+                prefs.edit().putBoolean("enabled", false).apply();
+                sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
+                showServiceNotification();
+                String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
+                toast(msg); saveLog(msg);
+              } else {
+                String reason = "";
+                if (!pickupOk) reason += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
+                if (!dropOk)   reason += (!reason.isEmpty() ? " | " : "") + "Drop " + fmt(dropKm) + "km > max " + fmt(maxDrop) + "km";
+                String msg = "❌ SKIP — " + reason;
+                toast(msg); saveLog(msg);
+              }
             }
             void saveLog(String msg) {
               java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
@@ -796,23 +577,25 @@ jobs:
               for (int i = 0; i < lines.length && i < 99; i++) sb.append("\n").append(lines[i]);
               prefs.edit().putString("logs", sb.toString()).apply();
             }
-            void toast(String msg) {
+            void toast(final String msg) {
               new Handler(Looper.getMainLooper()).post(() ->
-                android.widget.Toast.makeText(getApplicationContext(), msg, android.widget.Toast.LENGTH_LONG).show());
+                android.widget.Toast.makeText(getApplicationContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+              );
             }
             String fmt(float v) { return v < 0 ? "?" : String.format("%.1f", v); }
+            void log(String msg) { Log.d(TAG, msg); }
             @Override public void onDestroy() {
               super.onDestroy();
               try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
-
+              try { unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
             }
           }
           SEOF
 
       - name: Write BootReceiver
         run: |
-          cat > app/src/main/java/com/danish/jahez/BootReceiver.java << 'BEOF'
-          package com.danish.jahez;
+          cat > app/src/main/java/com/auto/driver/BootReceiver.java << 'BEOF'
+          package com.auto.driver;
           import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
@@ -820,8 +603,10 @@ jobs:
             @Override public void onReceive(Context ctx, Intent intent) {
               if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
                 Intent svc = new Intent(ctx, AutoService.class);
-                if (android.os.Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc);
-                else ctx.startService(svc);
+                if (android.os.Build.VERSION.SDK_INT >= 26)
+                  ctx.startForegroundService(svc);
+                else
+                  ctx.startService(svc);
               }
             }
           }
@@ -829,8 +614,8 @@ jobs:
 
       - name: Write LogActivity
         run: |
-          cat > app/src/main/java/com/danish/jahez/LogActivity.java << 'LEOF'
-          package com.danish.jahez;
+          cat > app/src/main/java/com/auto/driver/LogActivity.java << 'LEOF'
+          package com.auto.driver;
           import android.app.Activity;
           import android.content.SharedPreferences;
           import android.os.Bundle;
@@ -840,13 +625,19 @@ jobs:
               super.onCreate(saved);
               setContentView(R.layout.activity_log);
               SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              TextView tvLog  = findViewById(R.id.tv_log);
+              TextView tvLog = findViewById(R.id.tv_log);
               Button btnClear = findViewById(R.id.btn_clear);
-              Button btnBack  = findViewById(R.id.btn_back);
-              String logs = prefs.getString("logs", "");
-              tvLog.setText(logs.isEmpty() ? "Abhi koi log nahi hai." : logs);
-              btnClear.setOnClickListener(v -> { prefs.edit().remove("logs").apply(); tvLog.setText("Log saaf ho gaya."); });
+              Button btnBack = findViewById(R.id.btn_back);
+              loadLogs(tvLog, prefs);
+              btnClear.setOnClickListener(v -> {
+                prefs.edit().remove("logs").apply();
+                tvLog.setText("Log saaf ho gaya.");
+              });
               btnBack.setOnClickListener(v -> finish());
+            }
+            void loadLogs(TextView tv, SharedPreferences prefs) {
+              String logs = prefs.getString("logs", "");
+              tv.setText(logs.isEmpty() ? "Abhi koi log nahi hai.\nJahez Fleets mein order aane do." : logs);
             }
           }
           LEOF
@@ -861,7 +652,7 @@ jobs:
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
               android:orientation="vertical" android:padding="20dp">
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Jahez Auto" android:textSize="30sp" android:textColor="#4CAF50"
+                android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Auto Accept Orders" android:textSize="12sp"
@@ -869,28 +660,18 @@ jobs:
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
                 android:textSize="24sp" android:textColor="#FF5555"
-                android:textStyle="bold" android:gravity="center" android:layout_marginBottom="12dp"/>
-              <TextView android:id="@+id/tv_perm_status" android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Checking permissions..."
-                android:textSize="12sp" android:textColor="#FF9800"
-                android:gravity="center" android:layout_marginBottom="8dp"
-                android:fontFamily="monospace"/>
-              <Button android:id="@+id/btn_fix_perms" android:layout_width="match_parent"
-                android:layout_height="44dp" android:text="Fix Permissions"
-                android:backgroundTint="#555" android:textColor="#FFF"
-                android:textSize="13sp" android:layout_marginBottom="16dp"/>
+                android:textStyle="bold" android:gravity="center" android:layout_marginBottom="28dp"/>
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Max Pickup Distance (km from you)"
+                android:text="Max Pickup Distance (Km From You)"
                 android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
               <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
                 android:layout_height="56dp" android:inputType="numberDecimal" android:text="2.0"
                 android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
                 android:padding="12dp" android:layout_marginBottom="16dp"/>
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Max Drop Distance (km from pickup)"
+                android:text="Max Drop Distance (Km From Pickup)"
                 android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
               <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
                 android:layout_height="56dp" android:inputType="numberDecimal" android:text="5.0"
@@ -899,67 +680,42 @@ jobs:
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:layout_marginBottom="4dp">
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="Swipe Duration"
+                  android:layout_weight="1" android:text="Scan Delay (order screen ke baad)"
                   android:textColor="#AAA" android:textSize="13sp"/>
-                <TextView android:id="@+id/tv_swipe_dur" android:layout_width="wrap_content"
+                <TextView android:id="@+id/tv_delay" android:layout_width="wrap_content"
                   android:layout_height="wrap_content" android:text="200ms"
-                  android:textColor="#FF9800" android:textSize="14sp" android:textStyle="bold"/>
+                  android:textColor="#4CAF50" android:textSize="14sp" android:textStyle="bold"/>
               </LinearLayout>
-              <SeekBar android:id="@+id/sb_swipe_dur" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:max="500" android:progress="200"
-                android:progressTint="#FF9800" android:thumbTint="#FF9800"
-                android:layout_marginBottom="4dp"/>
+              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:max="1450" android:progress="150"
+                android:progressTint="#4CAF50" android:thumbTint="#4CAF50"
+                android:layout_marginBottom="6dp"/>
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:layout_marginBottom="20dp">
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="0ms" android:textColor="#555" android:textSize="11sp"/>
+                  android:layout_weight="1" android:text="50ms" android:textColor="#555" android:textSize="11sp"/>
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="250ms" android:textColor="#555"
+                  android:layout_weight="1" android:text="750ms" android:textColor="#555"
                   android:textSize="11sp" android:gravity="center"/>
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="500ms" android:textColor="#555"
+                  android:layout_weight="1" android:text="1500ms" android:textColor="#555"
                   android:textSize="11sp" android:gravity="end"/>
               </LinearLayout>
               <Button android:id="@+id/btn_save" android:layout_width="match_parent"
                 android:layout_height="54dp" android:text="Save Settings"
                 android:backgroundTint="#2196F3" android:textColor="#FFF"
-                android:textStyle="bold" android:layout_marginBottom="20dp"/>
-              <View android:layout_width="match_parent" android:layout_height="1dp"
-                android:background="#222" android:layout_marginBottom="16dp"/>
-              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Swipe Points" android:textSize="15sp"
-                android:textColor="#FF9800" android:textStyle="bold" android:layout_marginBottom="6dp"/>
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="horizontal" android:layout_marginBottom="10dp">
-                <TextView android:id="@+id/tv_point_a" android:layout_width="0dp"
-                  android:layout_height="wrap_content" android:layout_weight="1"
-                  android:text="A: default" android:textColor="#FF9800" android:textSize="12sp"/>
-                <TextView android:id="@+id/tv_point_b" android:layout_width="0dp"
-                  android:layout_height="wrap_content" android:layout_weight="1"
-                  android:text="B: default" android:textColor="#2196F3"
-                  android:textSize="12sp" android:gravity="end"/>
-              </LinearLayout>
-              <Button android:id="@+id/btn_set_swipe" android:layout_width="match_parent"
-                android:layout_height="58dp" android:text="Set Swipe Points On Screen"
-                android:backgroundTint="#FF9800" android:textColor="#FFF"
-                android:textStyle="bold" android:layout_marginBottom="6dp"/>
-              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="App minimize hogi → koi bhi app kholo → A(orange) B(blue) drag karo → ✅ save | ❌ cancel — bar bhi drag kar sako"
-                android:textColor="#555" android:textSize="11sp"
-                android:gravity="center" android:layout_marginBottom="20dp"/>
-              <View android:layout_width="match_parent" android:layout_height="1dp"
-                android:background="#222" android:layout_marginBottom="16dp"/>
+                android:textStyle="bold" android:layout_marginBottom="16dp"/>
               <Switch android:id="@+id/sw_enable" android:layout_width="match_parent"
                 android:layout_height="58dp" android:text="  Enable Auto Accept"
                 android:textColor="#FFF" android:textSize="16sp"
                 android:background="#1A1A1A" android:padding="16dp"
-                android:layout_marginBottom="12dp"/>
+                android:layout_gravity="center_horizontal" android:layout_marginBottom="12dp"/>
               <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
-                android:layout_height="54dp" android:text="View Logs"
+                android:layout_height="54dp" android:text="📋  View Logs"
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed → Jahez Auto enable (scope: net.jahez.fleets)\n2. Distance set → Save\n3. Swipe points set karo\n4. Toggle ON\n5. Jahez Fleets kholo — auto accept!"
+                android:text="Setup:\n1. LSPosed mein Auto Driver enable karo (scope: net.jahez.fleets)\n2. Distance set karo → Save\n3. Toggle ON karo\n4. Saned kholo — orders auto accept!"
                 android:textColor="#555" android:textSize="12sp"
                 android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
@@ -982,7 +738,8 @@ jobs:
                 android:textColor="#FFF" android:layout_marginEnd="8dp"/>
               <Button android:id="@+id/btn_clear" android:layout_width="0dp"
                 android:layout_height="46dp" android:layout_weight="1"
-                android:text="Clear" android:backgroundTint="#B71C1C" android:textColor="#FFF"/>
+                android:text="Clear" android:backgroundTint="#B71C1C"
+                android:textColor="#FFF"/>
             </LinearLayout>
             <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
               <TextView android:id="@+id/tv_log" android:layout_width="match_parent"
@@ -999,7 +756,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml << 'REOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-            <string name="app_name">Jahez Auto</string>
+            <string name="app_name">Auto Driver</string>
           </resources>
           REOF
 
@@ -1013,162 +770,6 @@ jobs:
             </style>
           </resources>
           TEOF
-
-      - name: Write Accessibility Config and Service
-        run: |
-          cat > app/src/main/res/xml/accessibility_service_config.xml << 'ACEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-            android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
-            android:accessibilityFeedbackType="feedbackGeneric"
-            android:accessibilityFlags="flagDefault"
-            android:canPerformGestures="true"
-            android:notificationTimeout="100"
-            android:description="@string/app_name"/>
-          ACEOF
-
-          cat > app/src/main/java/com/danish/jahez/JahezAccessibility.java << 'JAEOF'
-          package com.danish.jahez;
-          import android.accessibilityservice.AccessibilityService;
-          import android.accessibilityservice.GestureDescription;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.content.SharedPreferences;
-          import android.graphics.Path;
-          import android.os.Build;
-          import android.os.Handler;
-          import android.os.Looper;
-          import android.util.DisplayMetrics;
-          import android.view.WindowManager;
-          import android.view.accessibility.AccessibilityEvent;
-          import android.util.Log;
-          public class JahezAccessibility extends AccessibilityService {
-            static final String TAG = "JahezA11y";
-            BroadcastReceiver orderReceiver;
-            SharedPreferences prefs;
-            long lastEvent = 0;
-            @Override public void onServiceConnected() {
-              super.onServiceConnected();
-              prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              Log.d(TAG, "Accessibility Service connected");
-              // JAHEZ_ORDER_DATA seedha receive karo — same process mein filter + swipe
-              orderReceiver = new BroadcastReceiver() {
-                @Override public void onReceive(Context ctx, Intent intent) {
-                  if (!intent.getBooleanExtra("is_order", false)) return;
-                  if (prefs == null || !prefs.getBoolean("enabled", false)) return;
-                  long now = System.currentTimeMillis();
-                  if (now - lastEvent < 1500) return;
-                  lastEvent = now;
-                  double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
-                  double pickupLon = intent.getDoubleExtra("pickup_lon", -1);
-                  double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
-                  processOrder(pickupLat, pickupLon, dropDist);
-                }
-              };
-              IntentFilter f = new IntentFilter("JAHEZ_ORDER_DATA");
-              if (Build.VERSION.SDK_INT >= 33)
-                registerReceiver(orderReceiver, f, Context.RECEIVER_EXPORTED);
-              else
-                registerReceiver(orderReceiver, f);
-            }
-            void processOrder(double pickupLat, double pickupLon, double dropDist) {
-              // GPS check
-              float pickupDistKm = -1;
-              try {
-                android.location.LocationManager lm =
-                  (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
-                android.location.Location loc = null;
-                try { loc = lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER); } catch (Exception ignored) {}
-                if (loc == null) try { loc = lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER); } catch (Exception ignored) {}
-                if (loc != null && pickupLat > 0 && pickupLon > 0) {
-                  float[] res = new float[1];
-                  android.location.Location.distanceBetween(
-                    loc.getLatitude(), loc.getLongitude(), pickupLat, pickupLon, res);
-                  pickupDistKm = res[0] / 1000f;
-                }
-              } catch (Exception e) { saveLog("GPS error: " + e.getMessage()); }
-              float maxPickup = prefs.getFloat("max_pickup", 2.0f);
-              float maxDrop   = prefs.getFloat("max_drop",   5.0f);
-              float dropKm    = (float) dropDist;
-              saveLog(String.format("Pickup=%.2fkm(max%.1f) Drop=%.2fkm(max%.1f)",
-                pickupDistKm, maxPickup, dropKm, maxDrop));
-              boolean pickupOk = pickupDistKm < 0 || pickupDistKm <= maxPickup;
-              boolean dropOk   = dropKm < 0      || dropKm <= maxDrop;
-              if (pickupOk && dropOk) {
-                float fx1 = prefs.getFloat("swipe_x1", 0.15f);
-                float fy1 = prefs.getFloat("swipe_y1", 0.87f);
-                float fx2 = prefs.getFloat("swipe_x2", 0.85f);
-                float fy2 = prefs.getFloat("swipe_y2", 0.87f);
-                int   dur = prefs.getInt("swipe_dur",  200);
-                // Pehle swipe karo
-                performSwipe(fx1, fy1, fx2, fy2, dur);
-                // Swipe ke baad band karo
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                  prefs.edit().putBoolean("enabled", false).apply();
-                  sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
-                }, dur + 300);
-                String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
-                saveLog(msg);
-                android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show();
-              } else {
-                String r = "";
-                if (!pickupOk) r += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
-                if (!dropOk)   r += (r.isEmpty() ? "" : " | ") + "Drop " + fmt(dropKm) + "km > max " + fmt(maxDrop) + "km";
-                saveLog("❌ SKIP — " + r);
-              }
-            }
-            void performSwipe(float rx1, float ry1, float rx2, float ry2, int dur) {
-              try {
-                DisplayMetrics dm = new DisplayMetrics();
-                ((WindowManager) getSystemService(WINDOW_SERVICE))
-                  .getDefaultDisplay().getMetrics(dm);
-                float x1 = dm.widthPixels  * rx1;
-                float y1 = dm.heightPixels * ry1;
-                float x2 = dm.widthPixels  * rx2;
-                float y2 = dm.heightPixels * ry2;
-                int swipeDur = Math.max(dur, 50);
-                Path path = new Path();
-                path.moveTo(x1, y1);
-                path.lineTo(x2, y2);
-                GestureDescription gesture = new GestureDescription.Builder()
-                  .addStroke(new GestureDescription.StrokeDescription(path, 0, swipeDur))
-                  .build();
-                dispatchGesture(gesture, new GestureResultCallback() {
-                  @Override public void onCompleted(GestureDescription g) {
-                    Log.d(TAG, "Swipe completed A("+rx1+","+ry1+") B("+rx2+","+ry2+") dur="+dur+"ms");
-                    saveLog("👆 Swipe done!");
-                  }
-                  @Override public void onCancelled(GestureDescription g) {
-                    Log.e(TAG, "Swipe cancelled");
-                    saveLog("⚠️ Swipe cancelled");
-                  }
-                }, null);
-              } catch (Exception e) {
-                Log.e(TAG, "Swipe error: " + e.getMessage());
-                saveLog("⚠️ Swipe error: " + e.getMessage());
-              }
-            }
-            void saveLog(String msg) {
-              if (prefs == null) return;
-              java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
-              String entry = "[" + sdf.format(new java.util.Date()) + "]  " + msg;
-              String existing = prefs.getString("logs", "");
-              String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
-              StringBuilder sb = new StringBuilder(entry);
-              for (int i = 0; i < lines.length && i < 99; i++) sb.append("\n").append(lines[i]);
-              prefs.edit().putString("logs", sb.toString()).apply();
-            }
-            String fmt(float v) { return v < 0 ? "?" : String.format("%.1f", v); }
-            @Override public void onAccessibilityEvent(AccessibilityEvent event) {}
-            @Override public void onInterrupt() {}
-            @Override public void onDestroy() {
-              super.onDestroy();
-              try { if (orderReceiver != null) unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
-            }
-          }
-          JAEOF
 
       - name: Build APK
         run: ./gradlew assembleRelease --no-daemon 2>&1
@@ -1184,14 +785,15 @@ jobs:
           echo "Signing: $APK"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name "apksigner" -type f | sort -V | tail -1)
           if [ -z "$APKSIGNER" ]; then echo "apksigner not found!"; exit 1; fi
+          echo "Using: $APKSIGNER"
           $APKSIGNER sign --ks /tmp/key.keystore --ks-key-alias jahez \
             --ks-pass pass:danish123 --key-pass pass:danish123 \
-            --out app/build/JahezAutoAccept.apk "$APK"
+            --out app/build/AutoDriver.apk "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: JahezAutoAccept
+          name: AutoDriver
           path: |
-            app/build/JahezAutoAccept.apk
+            app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
