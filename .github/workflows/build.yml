@@ -73,8 +73,8 @@ jobs:
               applicationId 'com.danish.jahez'
               minSdk 26
               targetSdk 34
-              versionCode 1
-              versionName '1.0'
+              versionCode 3
+              versionName '3.0'
             }
             buildTypes {
               release { minifyEnabled false }
@@ -151,7 +151,7 @@ jobs:
               android:theme="@style/AppTheme"
               android:allowBackup="false">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Jahez order hook with dynamic swipe"/>
+              <meta-data android:name="xposeddescription" android:value="Jahez order hook with 3-stage logging"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -211,7 +211,7 @@ jobs:
               Button btnSave = findViewById(R.id.btn_save);
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
-              int savedDelay = prefs.getInt("scan_delay", 400);
+              int savedDelay = prefs.getInt("scan_delay", 1000);
               sbDelay.setProgress(savedDelay - 50);
               tvDelay.setText(savedDelay + "ms");
               sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -276,7 +276,7 @@ jobs:
           }
           JEOF
 
-      - name: Write SanedHook (Dynamic Swipe - Fixed Imports)
+      - name: Write SanedHook (3-Stage Logging)
         run: |
           cat > app/src/main/java/com/danish/jahez/SanedHook.java << 'HEOF'
           package com.danish.jahez;
@@ -321,30 +321,36 @@ jobs:
                       IntentFilter filter = new IntentFilter("JAHEZ_DO_ACCEPT");
                       act.registerReceiver(new BroadcastReceiver() {
                         @Override public void onReceive(Context ctx, Intent intent) {
-                          int delay = intent.getIntExtra("scan_delay", 400);
+                          int delay = intent.getIntExtra("scan_delay", 1000);
+                          sendLog("📡 Stage1: Received JAHEZ_DO_ACCEPT, delay=" + delay + "ms");
                           new Handler(Looper.getMainLooper()).postDelayed(() -> doSwipe(), delay);
                         }
                       }, filter);
-                    } catch (Exception e) { android.util.Log.e("JahezHook", "Receiver reg fail", e); }
+                    } catch (Exception e) {
+                      sendLog("❌ Stage1 FAIL: Could not register receiver - " + e.getMessage());
+                    }
                     try {
                       android.content.Intent actIntent = act.getIntent();
                       Bundle extras = actIntent != null ? actIntent.getExtras() : null;
-                      if (extras == null) return;
-                      double pickupLat = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
-                      double pickupLon = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
-                      double dropDist  = getDouble(extras, "EXTRA_DISTANCE");
-                      double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
-                      double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
-                      Intent intent = new Intent("JAHEZ_ORDER_DATA");
-                      intent.setPackage(OUR_PKG);
-                      intent.putExtra("pickup_lat", pickupLat);
-                      intent.putExtra("pickup_lon", pickupLon);
-                      intent.putExtra("drop_dist",  dropDist);
-                      intent.putExtra("price",      price);
-                      intent.putExtra("bonus",      bonus);
-                      intent.putExtra("is_order",   true);
-                      act.sendBroadcast(intent);
-                    } catch (Exception e) { android.util.Log.e("JahezHook", "Order data error", e); }
+                      if (extras != null) {
+                        double pickupLat = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
+                        double pickupLon = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
+                        double dropDist  = getDouble(extras, "EXTRA_DISTANCE");
+                        double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
+                        double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
+                        Intent intent = new Intent("JAHEZ_ORDER_DATA");
+                        intent.setPackage(OUR_PKG);
+                        intent.putExtra("pickup_lat", pickupLat);
+                        intent.putExtra("pickup_lon", pickupLon);
+                        intent.putExtra("drop_dist",  dropDist);
+                        intent.putExtra("price",      price);
+                        intent.putExtra("bonus",      bonus);
+                        intent.putExtra("is_order",   true);
+                        act.sendBroadcast(intent);
+                      }
+                    } catch (Exception e) {
+                      sendLog("⚠️ Order data send error: " + e.getMessage());
+                    }
                   }
                 }
               );
@@ -352,34 +358,62 @@ jobs:
             private void doSwipe() {
               android.app.Activity act = currentActivity;
               if (act == null || act.isFinishing()) {
-                android.util.Log.e("JahezHook", "Activity null/finishing");
+                sendLog("❌ Stage2 FAIL: Activity null/finishing");
                 return;
               }
               new Handler(Looper.getMainLooper()).post(() -> {
                 try {
                   View root = act.getWindow().getDecorView();
-                  View swipeView = findViewWithText(root, new String[]{"ACCEPT", "SWIPE", "SLIDE", "ACCEPTAR", "ACEPTAR", "ACCEPT ORDER"});
+                  Thread.sleep(100);
+                  sendLog("🔍 Stage2: Searching for swipe button...");
+                  View swipeView = findViewWithText(root, new String[]{"ACCEPT","SWIPE","SLIDE","ACCEPTAR","ACEPTAR","CONFIRM","OK","ACCEPT ORDER","SWIPE TO ACCEPT"});
                   float startX, endX, y;
-                  if (swipeView != null) {
+                  if (swipeView != null && swipeView.isShown()) {
                     int[] loc = new int[2];
                     swipeView.getLocationOnScreen(loc);
-                    startX = loc[0] + 20;
-                    endX   = loc[0] + swipeView.getWidth() - 20;
+                    startX = loc[0] + 30;
+                    endX   = loc[0] + swipeView.getWidth() - 30;
                     y      = loc[1] + swipeView.getHeight() / 2f;
-                    android.util.Log.d("JahezHook", "Found swipe button");
+                    sendLog(String.format("✅ Stage2 SUCCESS: Button found at (%d,%d) → (%d,%d)", (int)startX, (int)y, (int)endX, (int)y));
                   } else {
                     DisplayMetrics dm = new DisplayMetrics();
                     act.getWindowManager().getDefaultDisplay().getMetrics(dm);
                     startX = dm.widthPixels * 0.2f;
                     endX   = dm.widthPixels * 0.8f;
                     y      = dm.heightPixels * 0.85f;
-                    android.util.Log.d("JahezHook", "Using fallback coordinates");
+                    sendLog(String.format("⚠️ Stage2 FALLBACK: Button NOT found, using screen coordinates (%d,%d) → (%d,%d)", (int)startX, (int)y, (int)endX, (int)y));
                   }
-                  performSwipe(root, startX, endX, y);
+                  sendLog("🖱️ Stage3: Injecting MotionEvent swipe...");
+                  boolean success = performSwipe(root, startX, endX, y);
+                  if (success) sendLog("✅ Stage3 SUCCESS: MotionEvent swipe completed");
+                  else sendLog("❌ Stage3 FAIL: MotionEvent injection failed");
                 } catch (Exception e) {
-                  android.util.Log.e("JahezHook", "Swipe error", e);
+                  sendLog("❌ Stage2/3 EXCEPTION: " + e.getMessage());
                 }
               });
+            }
+            private boolean performSwipe(View root, float startX, float endX, float y) {
+              try {
+                long downTime = SystemClock.uptimeMillis();
+                MotionEvent down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, startX, y, 0);
+                root.dispatchTouchEvent(down);
+                down.recycle();
+                int steps = 20;
+                for (int i = 1; i <= steps; i++) {
+                  float stepX = startX + (endX - startX) * i / steps;
+                  long eventTime = downTime + i * 8;
+                  MotionEvent move = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_MOVE, stepX, y, 0);
+                  root.dispatchTouchEvent(move);
+                  move.recycle();
+                }
+                MotionEvent up = MotionEvent.obtain(downTime, downTime + steps * 8 + 20, MotionEvent.ACTION_UP, endX, y, 0);
+                root.dispatchTouchEvent(up);
+                up.recycle();
+                return true;
+              } catch (Exception e) {
+                sendLog("❌ Stage3 EXCEPTION during injection: " + e.getMessage());
+                return false;
+              }
             }
             private View findViewWithText(View root, String[] texts) {
               if (root == null) return null;
@@ -392,33 +426,21 @@ jobs:
               }
               if (root instanceof TextView) {
                 String txt = ((TextView) root).getText().toString().toUpperCase();
-                for (String s : texts) {
-                  if (txt.contains(s)) return root;
-                }
+                for (String s : texts) if (txt.contains(s)) return root;
               } else if (root instanceof Button) {
                 String txt = ((Button) root).getText().toString().toUpperCase();
-                for (String s : texts) {
-                  if (txt.contains(s)) return root;
-                }
+                for (String s : texts) if (txt.contains(s)) return root;
               }
               return null;
             }
-            private void performSwipe(View root, float startX, float endX, float y) throws Exception {
-              long downTime = SystemClock.uptimeMillis();
-              MotionEvent down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, startX, y, 0);
-              root.dispatchTouchEvent(down);
-              down.recycle();
-              int steps = 15;
-              for (int i = 1; i <= steps; i++) {
-                float stepX = startX + (endX - startX) * i / steps;
-                long eventTime = downTime + i * 10;
-                MotionEvent move = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_MOVE, stepX, y, 0);
-                root.dispatchTouchEvent(move);
-                move.recycle();
-              }
-              MotionEvent up = MotionEvent.obtain(downTime, downTime + steps * 10 + 20, MotionEvent.ACTION_UP, endX, y, 0);
-              root.dispatchTouchEvent(up);
-              up.recycle();
+            private void sendLog(String msg) {
+              try {
+                Intent intent = new Intent("JAHEZ_SWIPE_LOG");
+                intent.setPackage(OUR_PKG);
+                intent.putExtra("log", msg);
+                android.app.Activity act = currentActivity;
+                if (act != null) act.sendBroadcast(intent);
+              } catch (Exception ignored) {}
             }
             private double getDouble(Bundle b, String key) {
               try {
@@ -432,7 +454,7 @@ jobs:
           }
           HEOF
 
-      - name: Write AutoService
+      - name: Write AutoService (with swipe log receiver)
         run: |
           cat > app/src/main/java/com/danish/jahez/AutoService.java << 'SEOF'
           package com.danish.jahez;
@@ -455,6 +477,12 @@ jobs:
             static final String TAG = "JahezAuto";
             SharedPreferences prefs;
             long lastEvent = 0;
+            private final BroadcastReceiver swipeLogReceiver = new BroadcastReceiver() {
+              @Override public void onReceive(Context ctx, Intent intent) {
+                String logMsg = intent.getStringExtra("log");
+                if (logMsg != null) saveLog(logMsg);
+              }
+            };
             final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 boolean isOrder = intent.getBooleanExtra("is_order", false);
@@ -471,8 +499,7 @@ jobs:
             final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
                 if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-                String action = intent.getAction();
-                if ("JAHEZ_TOGGLE".equals(action)) {
+                if ("JAHEZ_TOGGLE".equals(intent.getAction())) {
                   boolean current = prefs.getBoolean("enabled", false);
                   prefs.edit().putBoolean("enabled", !current).apply();
                   sendBroadcast(new Intent(!current ? "JAHEZ_AUTO_ON" : "JAHEZ_AUTO_OFF"));
@@ -495,6 +522,11 @@ jobs:
                 registerReceiver(orderReceiver, of, Context.RECEIVER_EXPORTED);
               else
                 registerReceiver(orderReceiver, of);
+              IntentFilter lf = new IntentFilter("JAHEZ_SWIPE_LOG");
+              if (Build.VERSION.SDK_INT >= 33)
+                registerReceiver(swipeLogReceiver, lf, Context.RECEIVER_NOT_EXPORTED);
+              else
+                registerReceiver(swipeLogReceiver, lf);
               showServiceNotification();
               log("Service started");
             }
@@ -550,7 +582,7 @@ jobs:
               if (pickupOk && dropOk) {
                 Intent acceptIntent = new Intent("JAHEZ_DO_ACCEPT");
                 acceptIntent.setPackage("net.jahez.fleets");
-                int delay = prefs.getInt("scan_delay", 400);
+                int delay = prefs.getInt("scan_delay", 1000);
                 acceptIntent.putExtra("scan_delay", delay);
                 sendBroadcast(acceptIntent);
                 String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
@@ -584,6 +616,7 @@ jobs:
               super.onDestroy();
               try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
               try { unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
+              try { unregisterReceiver(swipeLogReceiver); } catch (Exception ignored) {}
             }
           }
           SEOF
@@ -627,13 +660,13 @@ jobs:
               loadLogs(tvLog, prefs);
               btnClear.setOnClickListener(v -> {
                 prefs.edit().remove("logs").apply();
-                tvLog.setText("Log saaf ho gaya.");
+                tvLog.setText("Log cleared.");
               });
               btnBack.setOnClickListener(v -> finish());
             }
             void loadLogs(TextView tv, SharedPreferences prefs) {
               String logs = prefs.getString("logs", "");
-              tv.setText(logs.isEmpty() ? "Abhi koi log nahi hai.\nJahez Fleets mein order aane do." : logs);
+              tv.setText(logs.isEmpty() ? "No logs yet.\nWait for an order." : logs);
             }
           }
           LEOF
@@ -679,11 +712,11 @@ jobs:
                   android:layout_weight="1" android:text="Swipe Delay (after order screen appears)"
                   android:textColor="#AAA" android:textSize="13sp"/>
                 <TextView android:id="@+id/tv_delay" android:layout_width="wrap_content"
-                  android:layout_height="wrap_content" android:text="400ms"
+                  android:layout_height="wrap_content" android:text="1000ms"
                   android:textColor="#4CAF50" android:textSize="14sp" android:textStyle="bold"/>
               </LinearLayout>
               <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:max="1450" android:progress="350"
+                android:layout_height="wrap_content" android:max="1450" android:progress="950"
                 android:progressTint="#4CAF50" android:thumbTint="#4CAF50"
                 android:layout_marginBottom="6dp"/>
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
