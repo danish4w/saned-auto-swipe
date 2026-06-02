@@ -8,10 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+
       - uses: android-actions/setup-android@v3
 
       - name: Download Gradle Wrapper
@@ -53,14 +55,17 @@ jobs:
           rootProject.name = "JahezDiagnostic"
           include ':app'
           SEOF
+
           cat > build.gradle << 'BEOF'
           plugins { id 'com.android.application' version '8.5.2' apply false }
           BEOF
+
           cat > gradle.properties << 'GEOF'
           android.useAndroidX=true
-          android.enableJetifier=false
+          android.enableJetifier=true
           org.gradle.jvmargs=-Xmx2048m
           GEOF
+
           cat > app/build.gradle << 'ABEOF'
           plugins { id 'com.android.application' }
           android {
@@ -73,14 +78,16 @@ jobs:
               versionCode 1
               versionName '1.0'
             }
-            buildTypes { release { minifyEnabled false } }
+            buildTypes {
+              release { minifyEnabled false }
+            }
             compileOptions {
               sourceCompatibility JavaVersion.VERSION_17
               targetCompatibility JavaVersion.VERSION_17
             }
           }
           dependencies {
-            implementation 'androidx.appcompat:appcompat:1.7.0'
+            implementation 'androidx.appcompat:appcompat:1.6.1'
             compileOnly 'de.robv.android.xposed:api:82'
           }
           ABEOF
@@ -89,23 +96,34 @@ jobs:
         run: |
           cat > app/src/main/res/drawable/ic_launcher_background.xml << 'BGEOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <vector android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108" xmlns:android="http://schemas.android.com/apk/res/android">
-            <path android:fillColor="#1565C0" android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp" android:height="108dp"
+            android:viewportWidth="108" android:viewportHeight="108">
+            <path android:fillColor="#1565C0"
+              android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
           </vector>
           BGEOF
+
           cat > app/src/main/res/drawable/ic_launcher_foreground.xml << 'FGEOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <vector android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108" xmlns:android="http://schemas.android.com/apk/res/android">
-            <path android:fillColor="#FFFFFF" android:pathData="M30,54 L50,30 L70,54 L58,54 L58,78 L42,78 L42,54 Z"/>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp" android:height="108dp"
+            android:viewportWidth="108" android:viewportHeight="108">
+            <path android:fillColor="#FFFFFF"
+              android:pathData="M30,54 L50,30 L70,54 L58,54 L58,78 L42,78 L42,54 Z"/>
           </vector>
           FGEOF
+
           cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'ICEOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
             <background android:drawable="@drawable/ic_launcher_background"/>
             <foreground android:drawable="@drawable/ic_launcher_foreground"/>
           </adaptive-icon>
           ICEOF
+
           cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml << 'RNDEOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
             <background android:drawable="@drawable/ic_launcher_background"/>
             <foreground android:drawable="@drawable/ic_launcher_foreground"/>
@@ -113,12 +131,14 @@ jobs:
           RNDEOF
 
       - name: Write Xposed Files
-        run: echo "com.danish.diag.DiagHook" > app/src/main/assets/xposed_init
+        run: |
+          echo "com.danish.diag.DiagHook" > app/src/main/assets/xposed_init
 
       - name: Write Manifest
         run: |
           cat > app/src/main/AndroidManifest.xml << 'MEOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.danish.diag">
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
@@ -126,31 +146,45 @@ jobs:
             <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
             <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
             <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-            <application android:allowBackup="false" android:icon="@mipmap/ic_launcher" android:label="Jahez Diag" android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme">
+            <application
+              android:label="Jahez Diag"
+              android:icon="@mipmap/ic_launcher"
+              android:roundIcon="@mipmap/ic_launcher_round"
+              android:theme="@style/AppTheme"
+              android:allowBackup="false">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Jahez diagnostic - Broadcast, Touch, UI"/>
+              <meta-data android:name="xposeddescription" android:value="Jahez diagnostic hook"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true">
-                <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
               </activity>
               <activity android:name=".LogActivity" android:exported="false"/>
-              <service android:name=".DiagService" android:exported="false" android:foregroundServiceType="dataSync"/>
-              <service android:name=".DiagAccessibility" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-                <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
-                <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_config"/>
+              <service android:name=".DiagService" android:exported="false"
+                android:foregroundServiceType="dataSync"/>
+              <service android:name=".DiagAccessibility" android:exported="true"
+                android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+                <intent-filter>
+                  <action android:name="android.accessibilityservice.AccessibilityService"/>
+                </intent-filter>
+                <meta-data android:name="android.accessibilityservice"
+                  android:resource="@xml/accessibility_config"/>
               </service>
               <receiver android:name=".BootReceiver" android:exported="true">
-                <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter>
+                <intent-filter>
+                  <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                </intent-filter>
               </receiver>
             </application>
           </manifest>
           MEOF
 
-      - name: Write DiagHook (Fixed - No OkHttp dependency crash)
+      - name: Write DiagHook (Fixed – No AndroidAppHelper, Multi‑network hooks)
         run: |
           cat > app/src/main/java/com/danish/diag/DiagHook.java << 'HEOF'
           package com.danish.diag;
-          
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.XC_MethodHook;
@@ -161,46 +195,45 @@ jobs:
           import android.content.Intent;
           import android.os.Bundle;
           import android.util.Log;
-          import android.view.View;
           import android.view.MotionEvent;
           import java.net.HttpURLConnection;
-          import java.net.URL;
-          
+
           public class DiagHook implements IXposedHookLoadPackage {
               static final String TARGET = "net.jahez.fleets";
               static final String TAG = "JahezDiag";
-              
-              @Override 
+
+              @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  log("Hook loaded for: " + lp.packageName);
-          
-                  // 1. BroadcastReceiver Hook - Most important for order data
+                  log("✅ Hook loaded for: " + lp.packageName);
+
+                  // 1. BroadcastReceiver – captures order data (EXTRA_DISTANCE, lat/lon, requestId)
                   try {
-                      XposedHelpers.findAndHookMethod(BroadcastReceiver.class, "onReceive", Context.class, Intent.class, new XC_MethodHook() {
-                          @Override
-                          protected void beforeHookedMethod(MethodHookParam param) {
-                              Intent intent = (Intent) param.args[1];
-                              if (intent == null) return;
-                              Bundle extras = intent.getExtras();
-                              if (extras != null && extras.containsKey("EXTRA_DISPATCH_TYPE")) {
-                                  StringBuilder sb = new StringBuilder("📡 Broadcast:");
-                                  for (String key : extras.keySet()) {
-                                      Object val = extras.get(key);
-                                      String valStr = (val != null) ? val.toString() : "null";
-                                      if (valStr.length() > 150) valStr = valStr.substring(0, 150);
-                                      sb.append("\n      ").append(key).append(" = ").append(valStr);
+                      XposedHelpers.findAndHookMethod(BroadcastReceiver.class, "onReceive",
+                          Context.class, Intent.class, new XC_MethodHook() {
+                              @Override
+                              protected void beforeHookedMethod(MethodHookParam param) {
+                                  Intent intent = (Intent) param.args[1];
+                                  if (intent == null) return;
+                                  Bundle extras = intent.getExtras();
+                                  if (extras != null && extras.containsKey("EXTRA_DISPATCH_TYPE")) {
+                                      StringBuilder sb = new StringBuilder("📡 ORDER BROADCAST:");
+                                      for (String key : extras.keySet()) {
+                                          Object val = extras.get(key);
+                                          sb.append("\n    ").append(key).append(" = ").append(val);
+                                      }
+                                      String msg = sb.toString();
+                                      log(msg);
+                                      // send to service using the context from the receiver
+                                      Context ctx = (Context) param.args[0];
+                                      sendBroadcast(ctx, msg);
                                   }
-                                  log(sb.toString());
                               }
-                          }
-                      });
+                          });
                       log("✅ BroadcastReceiver hook installed");
-                  } catch (Exception e) {
-                      log("❌ BroadcastReceiver hook failed: " + e);
-                  }
-          
-                  // 2. HttpURLConnection Hook (works even if OkHttp is obfuscated)
+                  } catch (Throwable t) { log("❌ Broadcast hook failed: " + t); }
+
+                  // 2. HttpURLConnection – reliable, never obfuscated
                   try {
                       XposedHelpers.findAndHookMethod(HttpURLConnection.class, "connect", new XC_MethodHook() {
                           @Override
@@ -209,78 +242,134 @@ jobs:
                               try {
                                   String url = conn.getURL().toString();
                                   String method = conn.getRequestMethod();
-                                  log("🌐 " + method + " " + url);
-                              } catch (Exception e) { /* ignore */ }
+                                  String msg = "🌐 [HttpURL] " + method + " " + url;
+                                  log(msg);
+                                  // we don't have a context here, so only Xposed log
+                              } catch (Exception e) {}
                           }
                       });
                       log("✅ HttpURLConnection hook installed");
-                  } catch (Exception e) {
-                      log("⚠️ HttpURLConnection hook failed (non-critical): " + e);
-                  }
-          
-                  // 3. View Touch Hook
-                  try {
-                      XposedHelpers.findAndHookMethod(View.class, "dispatchTouchEvent", MotionEvent.class, new XC_MethodHook() {
-                          @Override
-                          protected void beforeHookedMethod(MethodHookParam param) {
-                              MotionEvent event = (MotionEvent) param.args[0];
-                              if (event == null) return;
-                              int action = event.getActionMasked();
-                              if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_UP) return;
-                              View view = (View) param.thisObject;
-                              String viewInfo = view.getClass().getSimpleName();
-                              if (view.getId() != View.NO_ID) {
+                  } catch (Throwable t) { log("⚠️ HttpURLConnection hook failed: " + t); }
+
+                  // 3. OkHttp – try multiple possible class names (obfuscation‑resilient)
+                  String[] okhttpNames = {
+                      "okhttp3.RealCall",
+                      "okhttp3.internal.connection.RealCall",
+                      "okhttp3.Call"
+                  };
+                  boolean hooked = false;
+                  for (String name : okhttpNames) {
+                      try {
+                          Class<?> callClass = XposedHelpers.findClass(name, lp.classLoader);
+                          // synchronous call
+                          XposedHelpers.findAndHookMethod(callClass, "execute", new XC_MethodHook() {
+                              @Override
+                              protected void afterHookedMethod(MethodHookParam param) {
                                   try {
-                                      String idName = view.getResources().getResourceEntryName(view.getId());
-                                      viewInfo += " [id=" + idName + "]";
-                                  } catch (Exception ignored) {}
+                                      Object response = param.getResult();
+                                      Object request = XposedHelpers.callMethod(response, "request");
+                                      String method = (String) XposedHelpers.callMethod(request, "method");
+                                      String url = XposedHelpers.callMethod(request, "url").toString();
+                                      String msg = "🌐 [OkHttp] " + method + " " + url;
+                                      log(msg);
+                                      // No context here, only Xposed log
+                                  } catch (Exception e) {}
                               }
-                              String actionName = (action == MotionEvent.ACTION_DOWN) ? "DOWN" : "UP";
-                              log(String.format("👆 TOUCH %s x=%.1f y=%.1f view=%s",
-                                  actionName, event.getRawX(), event.getRawY(), viewInfo));
-                          }
-                      });
-                      log("✅ View touch hook installed");
-                  } catch (Exception e) {
-                      log("❌ View touch hook failed: " + e);
+                          });
+                          // asynchronous call
+                          XposedHelpers.findAndHookMethod(callClass, "enqueue", Object.class, new XC_MethodHook() {
+                              @Override
+                              protected void beforeHookedMethod(MethodHookParam param) {
+                                  try {
+                                      Object request = XposedHelpers.callMethod(param.thisObject, "request");
+                                      String method = (String) XposedHelpers.callMethod(request, "method");
+                                      String url = XposedHelpers.callMethod(request, "url").toString();
+                                      String msg = "🌐 [OkHttp Async] " + method + " " + url;
+                                      log(msg);
+                                  } catch (Exception e) {}
+                              }
+                          });
+                          log("✅ OkHttp hook installed via: " + name);
+                          hooked = true;
+                          break;
+                      } catch (Throwable t) { /* try next name */ }
                   }
-          
-                  // 4. Activity onResume (Order screen detection)
+                  if (!hooked) log("⚠️ OkHttp hook failed (all class names tried)");
+
+                  // 4. Activity onResume – log activity name and intent extras
                   try {
-                      XposedHelpers.findAndHookMethod("android.app.Activity", lp.classLoader, "onResume", new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) {
-                              android.app.Activity activity = (android.app.Activity) param.thisObject;
-                              String className = activity.getClass().getName();
-                              if (className.contains("IncomingDispatch")) {
-                                  log("📱 Order Screen: " + className);
-                                  // Log intent extras if any (usually none, but just in case)
-                                  Intent intent = activity.getIntent();
+                      XposedHelpers.findAndHookMethod("android.app.Activity", lp.classLoader, "onResume",
+                          new XC_MethodHook() {
+                              @Override
+                              protected void afterHookedMethod(MethodHookParam param) {
+                                  android.app.Activity act = (android.app.Activity) param.thisObject;
+                                  String className = act.getClass().getName();
+                                  String msg = "📱 Activity: " + className;
+                                  log(msg);
+                                  sendBroadcast(act, msg);
+                                  // Log intent extras if any
+                                  Intent intent = act.getIntent();
                                   if (intent != null && intent.getExtras() != null && !intent.getExtras().isEmpty()) {
                                       Bundle extras = intent.getExtras();
-                                      StringBuilder sb = new StringBuilder("📦 Activity Extras:");
+                                      StringBuilder sb = new StringBuilder("📦 Intent Extras:");
                                       for (String key : extras.keySet()) {
-                                          sb.append("\n      ").append(key).append(" = ").append(extras.get(key));
+                                          sb.append("\n    ").append(key).append(" = ").append(extras.get(key));
                                       }
-                                      log(sb.toString());
+                                      String extraMsg = sb.toString();
+                                      log(extraMsg);
+                                      sendBroadcast(act, extraMsg);
                                   }
                               }
-                          }
-                      });
+                          });
                       log("✅ Activity hook installed");
-                  } catch (Exception e) {
-                      log("❌ Activity hook failed: " + e);
-                  }
+                  } catch (Throwable t) { log("❌ Activity hook failed: " + t); }
+
+                  // 5. Touch events on Activity
+                  try {
+                      XposedHelpers.findAndHookMethod("android.app.Activity", lp.classLoader, "dispatchTouchEvent",
+                          MotionEvent.class, new XC_MethodHook() {
+                              @Override
+                              protected void beforeHookedMethod(MethodHookParam param) {
+                                  MotionEvent ev = (MotionEvent) param.args[0];
+                                  if (ev == null) return;
+                                  int action = ev.getActionMasked();
+                                  if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_UP) return;
+                                  android.app.Activity act = (android.app.Activity) param.thisObject;
+                                  android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+                                  act.getWindowManager().getDefaultDisplay().getMetrics(dm);
+                                  int W = dm.widthPixels, H = dm.heightPixels;
+                                  String actName = act.getClass().getSimpleName();
+                                  String actionName = (action == MotionEvent.ACTION_DOWN) ? "DOWN" : "UP";
+                                  String msg = String.format("👆 TOUCH %s x=%.1f y=%.1f (%.2f,%.2f) screen=%dx%d act=%s",
+                                      actionName, ev.getRawX(), ev.getRawY(),
+                                      ev.getRawX()/W, ev.getRawY()/H, W, H, actName);
+                                  log(msg);
+                                  sendBroadcast(act, msg);
+                              }
+                          });
+                      log("✅ Touch hook installed");
+                  } catch (Throwable t) { log("❌ Touch hook failed: " + t); }
               }
-              
+
               private void log(String msg) {
                   Log.d(TAG, msg);
                   XposedBridge.log("[JahezDiag] " + msg);
               }
+
+              private void sendBroadcast(Context ctx, String msg) {
+                  try {
+                      Intent intent = new Intent("JAHEZ_DIAG_LOG");
+                      intent.putExtra("msg", msg);
+                      intent.setPackage("com.danish.diag");
+                      ctx.sendBroadcast(intent);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Broadcast failed: " + e.getMessage());
+                  }
+              }
           }
           HEOF
 
-      - name: Write DiagService (same as before)
+      - name: Write DiagService
         run: |
           cat > app/src/main/java/com/danish/diag/DiagService.java << 'SEOF'
           package com.danish.diag;
@@ -296,11 +385,11 @@ jobs:
           import android.os.Build;
           import android.os.IBinder;
           import android.util.Log;
-          import androidx.core.app.NotificationCompat;
           public class DiagService extends Service {
-              private static final String TAG = "JahezDiag";
-              private SharedPreferences prefs;
-              private final BroadcastReceiver logReceiver = new BroadcastReceiver() {
+              static final String TAG   = "JahezDiag";
+              static final String CH_ID = "diag_svc";
+              SharedPreferences prefs;
+              final BroadcastReceiver diagReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
                       String msg = intent.getStringExtra("msg");
                       if (msg != null) saveLog(msg);
@@ -308,37 +397,51 @@ jobs:
               };
               @Override public void onCreate() {
                   super.onCreate();
-                  prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      NotificationChannel ch = new NotificationChannel("jahez_diag", "Jahez Diag", NotificationManager.IMPORTANCE_LOW);
-                      getSystemService(NotificationManager.class).createNotificationChannel(ch);
-                  }
-                  startForeground(1001, new NotificationCompat.Builder(this, "jahez_diag")
-                      .setContentTitle("Jahez Diag")
-                      .setContentText("Monitoring...")
-                      .setSmallIcon(android.R.drawable.ic_menu_info_details)
-                      .build());
-                  registerReceiver(logReceiver, new IntentFilter("JAHEZ_DIAG_LOG"), Context.RECEIVER_NOT_EXPORTED);
-                  Log.d(TAG, "Service started");
+                  prefs = getSharedPreferences("diag_cfg", MODE_PRIVATE);
+                  IntentFilter f = new IntentFilter("JAHEZ_DIAG_LOG");
+                  if (Build.VERSION.SDK_INT >= 33)
+                      registerReceiver(diagReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+                  else
+                      registerReceiver(diagReceiver, f);
+                  showNotification();
+                  Log.d(TAG, "DiagService started");
               }
-              private void saveLog(String msg) {
-                  java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US);
+              @Override public int onStartCommand(Intent intent, int flags, int startId) { return START_STICKY; }
+              @Override public IBinder onBind(Intent intent) { return null; }
+              void showNotification() {
+                  NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(CH_ID, "Jahez Diagnostic", NotificationManager.IMPORTANCE_LOW);
+                      nm.createNotificationChannel(channel);
+                  }
+                  Notification notif = new Notification.Builder(this, CH_ID)
+                      .setContentTitle("Jahez Diagnostic")
+                      .setContentText("Logging events...")
+                      .setSmallIcon(android.R.drawable.ic_menu_info_details)
+                      .setOngoing(true)
+                      .build();
+                  startForeground(1, notif);
+              }
+              void saveLog(String msg) {
+                  java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
                   String entry = "[" + sdf.format(new java.util.Date()) + "] " + msg;
                   String existing = prefs.getString("logs", "");
                   String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
                   StringBuilder sb = new StringBuilder(entry);
-                  for (int i = 0; i < Math.min(lines.length, 499); i++) sb.append("\n").append(lines[i]);
+                  for (int i = 0; i < lines.length && i < 199; i++) sb.append("\n").append(lines[i]);
                   prefs.edit().putString("logs", sb.toString()).apply();
               }
-              @Override public int onStartCommand(Intent i, int f, int id) { return START_STICKY; }
-              @Override public IBinder onBind(Intent i) { return null; }
-              @Override public void onDestroy() { try { unregisterReceiver(logReceiver); } catch (Exception e) {} }
+              @Override public void onDestroy() {
+                  super.onDestroy();
+                  try { unregisterReceiver(diagReceiver); } catch (Exception ignored) {}
+              }
           }
           SEOF
 
       - name: Write DiagAccessibility
         run: |
           cat > app/src/main/res/xml/accessibility_config.xml << 'ACEOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
             android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked"
             android:accessibilityFeedbackType="feedbackGeneric"
@@ -347,6 +450,7 @@ jobs:
             android:notificationTimeout="100"
             android:packageNames="net.jahez.fleets"/>
           ACEOF
+
           cat > app/src/main/java/com/danish/diag/DiagAccessibility.java << 'JAEOF'
           package com.danish.diag;
           import android.accessibilityservice.AccessibilityService;
@@ -358,15 +462,17 @@ jobs:
               private SharedPreferences prefs;
               @Override public void onServiceConnected() {
                   super.onServiceConnected();
-                  prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
-                  saveLog("♿ Accessibility ON");
+                  prefs = getSharedPreferences("diag_cfg", MODE_PRIVATE);
+                  saveLog("♿ Accessibility Service connected");
               }
               @Override public void onAccessibilityEvent(AccessibilityEvent event) {
                   if (!"net.jahez.fleets".equals(event.getPackageName())) return;
-                  if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-                      saveLog("🖥 Screen: " + event.getClassName());
+                  int type = event.getEventType();
+                  String className = event.getClassName() != null ? event.getClassName().toString() : "";
+                  if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                      saveLog("🖥 Screen: " + className);
                       dumpUI();
-                  } else if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+                  } else if (type == AccessibilityEvent.TYPE_VIEW_CLICKED) {
                       String text = !event.getText().isEmpty() ? event.getText().get(0).toString() : "";
                       saveLog("🖱 Click: " + text);
                   }
@@ -394,17 +500,20 @@ jobs:
                   }
                   for (int i = 0; i < node.getChildCount(); i++) {
                       AccessibilityNodeInfo child = node.getChild(i);
-                      if (child != null) { dumpNode(child, sb, depth + 1); child.recycle(); }
+                      if (child != null) {
+                          dumpNode(child, sb, depth + 1);
+                          child.recycle();
+                      }
                   }
               }
               private void saveLog(String msg) {
                   if (prefs == null) return;
-                  java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US);
+                  java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
                   String entry = "[" + sdf.format(new java.util.Date()) + "] " + msg;
                   String existing = prefs.getString("logs", "");
                   String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
                   StringBuilder sb = new StringBuilder(entry);
-                  for (int i = 0; i < Math.min(lines.length, 499); i++) sb.append("\n").append(lines[i]);
+                  for (int i = 0; i < lines.length && i < 199; i++) sb.append("\n").append(lines[i]);
                   prefs.edit().putString("logs", sb.toString()).apply();
               }
               @Override public void onInterrupt() {}
@@ -417,42 +526,50 @@ jobs:
           package com.danish.diag;
           import android.app.Activity;
           import android.content.Intent;
-          android.content.SharedPreferences;
-          android.net.Uri;
-          android.os.Build;
-          android.os.Bundle;
-          android.provider.Settings;
-          android.widget.Button;
-          android.widget.TextView;
-          android.widget.Toast;
+          import android.content.SharedPreferences;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.provider.Settings;
+          import android.widget.*;
           public class MainActivity extends Activity {
               @Override protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
-                  startService(new Intent(this, DiagService.class));
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                      requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 100);
-                  requestPermissions(new String[]{"android.permission.ACCESS_FINE_LOCATION","android.permission.ACCESS_COARSE_LOCATION"}, 101);
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this))
-                      startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+                  Intent svc = new Intent(this, DiagService.class);
+                  if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
+                  else startService(svc);
+                  if (Build.VERSION.SDK_INT >= 33)
+                      requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
+                  requestPermissions(new String[]{
+                      "android.permission.ACCESS_FINE_LOCATION",
+                      "android.permission.ACCESS_COARSE_LOCATION"}, 1);
+                  if (!Settings.canDrawOverlays(this)) {
+                      startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                          Uri.parse("package:" + getPackageName())));
+                  }
+                  if (!isA11yEnabled()) {
+                      Toast.makeText(this, "Enable Accessibility for Jahez Diag", Toast.LENGTH_LONG).show();
+                      startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                  }
                   findViewById(R.id.btn_logs).setOnClickListener(v -> startActivity(new Intent(this, LogActivity.class)));
                   findViewById(R.id.btn_clear).setOnClickListener(v -> {
-                      getSharedPreferences("diag_data", MODE_PRIVATE).edit().remove("logs").apply();
-                      Toast.makeText(this, "Cleared", Toast.LENGTH_SHORT).show();
-                      updateStatus();
+                      getSharedPreferences("diag_cfg", MODE_PRIVATE).edit().remove("logs").apply();
+                      Toast.makeText(this, "Logs cleared", Toast.LENGTH_SHORT).show();
                   });
                   updateStatus();
               }
-              private boolean isAccessibilityEnabled() {
+              private boolean isA11yEnabled() {
                   String svc = getPackageName() + "/" + DiagAccessibility.class.getName();
                   String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
                   return enabled != null && enabled.contains(svc);
               }
               private void updateStatus() {
                   TextView tv = findViewById(R.id.tv_status);
-                  tv.setText("Jahez Diagnostic\n━━━━━━━━━━━━━━\n✅ LSPosed: Enabled\n" +
-                      (isAccessibilityEnabled() ? "✅ Accessibility: ON" : "❌ Accessibility: OFF") +
-                      "\n━━━━━━━━━━━━━━\n📌 Order aane par:\n• Broadcast extras\n• Network calls\n• Touch events\n• UI dump\n━━━━━━━━━━━━━━\n👉 Logs dekhne ke liye 'View Logs' dabayein");
+                  tv.setText("LSPosed: scope net.jahez.fleets\n" +
+                      "Accessibility: " + (isA11yEnabled() ? "✅ ON" : "❌ OFF") + "\n" +
+                      "Open Saned → order accept karo\n" +
+                      "Phir logs yahan dekho");
               }
               @Override protected void onResume() { super.onResume(); updateStatus(); }
           }
@@ -464,22 +581,23 @@ jobs:
           package com.danish.diag;
           import android.app.Activity;
           import android.content.SharedPreferences;
-          android.os.Bundle;
-          android.widget.Button;
-          android.widget.TextView;
+          import android.os.Bundle;
+          import android.widget.*;
           public class LogActivity extends Activity {
-              @Override protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
+              @Override protected void onCreate(Bundle saved) {
+                  super.onCreate(saved);
                   setContentView(R.layout.activity_log);
-                  SharedPreferences prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
-                  TextView tv = findViewById(R.id.tv_log);
+                  SharedPreferences prefs = getSharedPreferences("diag_cfg", MODE_PRIVATE);
+                  TextView tvLog = findViewById(R.id.tv_log);
+                  Button btnClear = findViewById(R.id.btn_clear);
+                  Button btnBack = findViewById(R.id.btn_back);
                   String logs = prefs.getString("logs", "");
-                  tv.setText(logs.isEmpty() ? "No logs yet.\nOpen Saned and accept an order." : logs);
-                  findViewById(R.id.btn_clear).setOnClickListener(v -> {
+                  tvLog.setText(logs.isEmpty() ? "No logs yet.\nOpen Saned and accept an order." : logs);
+                  btnClear.setOnClickListener(v -> {
                       prefs.edit().remove("logs").apply();
-                      tv.setText("Logs cleared.");
+                      tvLog.setText("Cleared.");
                   });
-                  findViewById(R.id.btn_back).setOnClickListener(v -> finish());
+                  btnBack.setOnClickListener(v -> finish());
               }
           }
           LEOF
@@ -490,11 +608,12 @@ jobs:
           package com.danish.diag;
           import android.content.BroadcastReceiver;
           import android.content.Context;
-          android.content.Intent;
+          import android.content.Intent;
           public class BootReceiver extends BroadcastReceiver {
               @Override public void onReceive(Context ctx, Intent intent) {
-                  if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()))
+                  if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
                       ctx.startService(new Intent(ctx, DiagService.class));
+                  }
               }
           }
           BEOF
@@ -502,41 +621,51 @@ jobs:
       - name: Write Layouts
         run: |
           cat > app/src/main/res/layout/activity_main.xml << 'LEOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
             android:layout_width="match_parent" android:layout_height="match_parent"
-            android:orientation="vertical" android:padding="20dp" android:background="#0D1117">
+            android:orientation="vertical" android:padding="20dp" android:background="#0A0A0A">
             <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-              android:text="🔍 Jahez Diagnostic" android:textSize="28sp" android:textColor="#58A6FF"
-              android:textStyle="bold" android:gravity="center" android:layout_marginBottom="20dp"/>
-            <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-              <TextView android:id="@+id/tv_status" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Loading..." android:textSize="13sp" android:textColor="#E6EDF3"
-                android:background="#161B22" android:padding="16dp" android:fontFamily="monospace"/>
-            </ScrollView>
-            <Button android:id="@+id/btn_logs" android:layout_width="match_parent" android:layout_height="56dp"
-              android:text="📋 View Logs" android:backgroundTint="#238636" android:textColor="#FFF"
-              android:layout_marginBottom="12dp"/>
-            <Button android:id="@+id/btn_clear" android:layout_width="match_parent" android:layout_height="48dp"
-              android:text="🗑 Clear Logs" android:backgroundTint="#DA3633" android:textColor="#FFF"/>
+              android:text="Jahez Diagnostic" android:textSize="26sp" android:textColor="#2196F3"
+              android:textStyle="bold" android:gravity="center" android:layout_marginBottom="8dp"/>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:text="Logs all API calls, touches, screen changes" android:textSize="12sp"
+              android:textColor="#666" android:gravity="center" android:layout_marginBottom="20dp"/>
+            <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
+              android:layout_height="wrap_content" android:text="Checking..." android:textSize="13sp"
+              android:textColor="#FF9800" android:background="#1A1A1A" android:padding="16dp"
+              android:layout_marginBottom="20dp" android:fontFamily="monospace" android:lineSpacingExtra="4dp"/>
+            <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
+              android:layout_height="56dp" android:text="View Logs" android:backgroundTint="#2196F3"
+              android:textColor="#FFF" android:textStyle="bold" android:layout_marginBottom="12dp"/>
+            <Button android:id="@+id/btn_clear" android:layout_width="match_parent"
+              android:layout_height="48dp" android:text="Clear Logs" android:backgroundTint="#B71C1C"
+              android:textColor="#FFF"/>
           </LinearLayout>
           LEOF
+
           cat > app/src/main/res/layout/activity_log.xml << 'LOGEOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
             android:layout_width="match_parent" android:layout_height="match_parent"
-            android:orientation="vertical" android:background="#0D1117" android:padding="12dp">
+            android:orientation="vertical" android:background="#0A0A0A" android:padding="12dp">
             <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-              android:text="📄 Diagnostic Logs" android:textSize="20sp" android:textColor="#58A6FF"
-              android:textStyle="bold" android:layout_marginBottom="12dp"/>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-              <Button android:id="@+id/btn_back" android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-                android:text="← Back" android:backgroundTint="#30363D" android:textColor="#FFF" android:layout_marginEnd="8dp"/>
-              <Button android:id="@+id/btn_clear" android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-                android:text="Clear All" android:backgroundTint="#DA3633" android:textColor="#FFF"/>
+              android:text="Diagnostic Log" android:textSize="20sp" android:textColor="#2196F3"
+              android:textStyle="bold" android:layout_marginBottom="10dp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:orientation="horizontal" android:layout_marginBottom="10dp">
+              <Button android:id="@+id/btn_back" android:layout_width="0dp" android:layout_height="44dp"
+                android:layout_weight="1" android:text="Back" android:backgroundTint="#333"
+                android:textColor="#FFF" android:layout_marginEnd="8dp"/>
+              <Button android:id="@+id/btn_clear" android:layout_width="0dp" android:layout_height="44dp"
+                android:layout_weight="1" android:text="Clear" android:backgroundTint="#B71C1C"
+                android:textColor="#FFF"/>
             </LinearLayout>
             <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
-              <TextView android:id="@+id/tv_log" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Loading..." android:textSize="11sp" android:textColor="#E6EDF3"
-                android:fontFamily="monospace" android:padding="12dp" android:background="#161B22"/>
+              <TextView android:id="@+id/tv_log" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="Loading..." android:textColor="#CCC"
+                android:textSize="11sp" android:fontFamily="monospace" android:lineSpacingExtra="4dp"
+                android:padding="8dp" android:background="#111"/>
             </ScrollView>
           </LinearLayout>
           LOGEOF
@@ -544,30 +673,45 @@ jobs:
       - name: Write Resources
         run: |
           cat > app/src/main/res/values/strings.xml << 'REOF'
-          <resources><string name="app_name">Jahez Diagnostic</string></resources>
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <string name="app_name">Jahez Diagnostic</string>
+          </resources>
           REOF
+
           cat > app/src/main/res/values/themes.xml << 'TEOF'
-          <resources><style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
-            <item name="colorPrimary">#58A6FF</item><item name="colorPrimaryDark">#1F6FEB</item>
-            <item name="colorAccent">#238636</item><item name="android:windowBackground">#0D1117</item>
-          </style></resources>
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+              <item name="colorPrimary">#2196F3</item>
+              <item name="colorPrimaryDark">#1565C0</item>
+              <item name="colorAccent">#FF9800</item>
+            </style>
+          </resources>
           TEOF
 
       - name: Build APK
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon 2>&1
 
       - name: Sign APK
         run: |
-          keytool -genkey -v -keystore /tmp/debug.keystore -alias jahezdiag -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=JahezDiag, O=Diag, C=SA" -storepass android -keypass android 2>/dev/null || true
-          UNSIGNED=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
-          if [ -z "$UNSIGNED" ]; then UNSIGNED=$(find app/build -name "*.apk" | head -1); fi
-          APKSIGNER=$(find $ANDROID_HOME/build-tools -name "apksigner" 2>/dev/null | sort -V | tail -1)
-          $APKSIGNER sign --ks /tmp/debug.keystore --ks-key-alias jahezdiag --ks-pass pass:android --key-pass pass:android --out app/build/JahezDiagnostic.apk "$UNSIGNED"
+          keytool -genkey -v -keystore /tmp/key.keystore -alias diag \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Danish,O=JahezDiag,C=SA" \
+            -storepass danish123 -keypass danish123 2>/dev/null
+          APK=$(find app/build -name "*release-unsigned*.apk" | head -1)
+          if [ -z "$APK" ]; then APK=$(find app/build -name "*release*.apk" | head -1); fi
+          echo "Signing: $APK"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name "apksigner" -type f | sort -V | tail -1)
+          if [ -z "$APKSIGNER" ]; then echo "apksigner not found!"; exit 1; fi
+          $APKSIGNER sign --ks /tmp/key.keystore --ks-key-alias diag \
+            --ks-pass pass:danish123 --key-pass pass:danish123 \
+            --out app/build/JahezDiagnostic.apk "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: JahezDiagnostic
-          path: app/build/JahezDiagnostic.apk
+          path: |
+            app/build/JahezDiagnostic.apk
+            app/build/outputs/apk/**/*.apk
