@@ -159,7 +159,7 @@ jobs:
         run: |
           echo "com.danish.diag.DiagHook" > app/src/main/assets/xposed_init
 
-      - name: Write Manifest (Fixed)
+      - name: Write Manifest
         run: |
           cat > app/src/main/AndroidManifest.xml << 'MEOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -237,7 +237,7 @@ jobs:
           </manifest>
           MEOF
 
-      - name: Write DiagHook
+      - name: Write DiagHook (Fixed - No AndroidAppHelper)
         run: |
           cat > app/src/main/java/com/danish/diag/DiagHook.java << 'HEOF'
           package com.danish.diag;
@@ -245,138 +245,105 @@ jobs:
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.XC_MethodHook;
+          import de.robv.android.xposed.XposedBridge;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
-          import de.robv.android.xposed.AndroidAppHelper;
           import android.content.Intent;
           import android.os.Bundle;
           import android.util.Log;
           
           public class DiagHook implements IXposedHookLoadPackage {
-            static final String TARGET  = "net.jahez.fleets";
-            static final String TAG = "JahezDiag";
-            
-            @Override 
-            public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
-              if (!TARGET.equals(lp.packageName)) return;
-              Log.d(TAG, "Hook loaded for: " + lp.packageName);
-
-              // ── 1. OkHttp Request Hook ──
-              try {
-                Class<?> requestBuilderClass = XposedHelpers.findClass("okhttp3.Request$Builder", lp.classLoader);
-                XposedHelpers.findAndHookMethod(requestBuilderClass, "build",
-                  new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) {
-                      try {
-                        Object request = param.getResult();
-                        Object url = XposedHelpers.callMethod(request, "url");
-                        String urlStr = url.toString();
-                        String method = (String) XposedHelpers.callMethod(request, "method");
-                        
-                        StringBuilder logMsg = new StringBuilder("🌐 " + method + " " + urlStr);
-                        
-                        // Log headers safely
-                        try {
-                          Object headers = XposedHelpers.callMethod(request, "headers");
-                          int count = (int) XposedHelpers.callMethod(headers, "size");
-                          for (int i = 0; i < Math.min(count, 20); i++) {
-                            String name = (String) XposedHelpers.callMethod(headers, "name", i);
-                            String value = (String) XposedHelpers.callMethod(headers, "value", i);
-                            if (name.toLowerCase().contains("authorization") || 
-                                name.toLowerCase().contains("token")) {
-                              value = value.length() > 30 ? value.substring(0, 30) + "..." : value;
-                            }
-                            logMsg.append("\n      ").append(name).append(": ").append(value);
+              static final String TARGET = "net.jahez.fleets";
+              static final String TAG = "JahezDiag";
+              
+              @Override 
+              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
+                  if (!TARGET.equals(lp.packageName)) return;
+                  log("Hook loaded for: " + lp.packageName);
+          
+                  // ── 1. OkHttp Request Hook ──
+                  try {
+                      Class<?> requestBuilderClass = XposedHelpers.findClass("okhttp3.Request$Builder", lp.classLoader);
+                      XposedHelpers.findAndHookMethod(requestBuilderClass, "build", new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) {
+                              try {
+                                  Object request = param.getResult();
+                                  Object url = XposedHelpers.callMethod(request, "url");
+                                  String urlStr = url.toString();
+                                  String method = (String) XposedHelpers.callMethod(request, "method");
+                                  log("🌐 " + method + " " + urlStr);
+                              } catch (Exception e) {
+                                  Log.e(TAG, "Request hook error: " + e.getMessage());
+                              }
                           }
-                        } catch (Exception ignored) {}
-                        
-                        sendLog(lp, logMsg.toString());
-                      } catch (Exception e) {
-                        Log.e(TAG, "Request hook error: " + e.getMessage());
-                      }
-                    }
+                      });
+                      log("OkHttp request hook installed");
+                  } catch (Exception e) {
+                      log("OkHttp hook failed: " + e);
                   }
-                );
-                Log.d(TAG, "OkHttp request hook installed");
-              } catch (Exception e) {
-                Log.e(TAG, "OkHttp request hook failed: " + e);
-              }
-
-              // ── 2. Activity.onResume Hook ──
-              try {
-                XposedHelpers.findAndHookMethod("android.app.Activity", lp.classLoader, "onResume",
-                  new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) {
-                      android.app.Activity activity = (android.app.Activity) param.thisObject;
-                      String className = activity.getClass().getName();
-                      sendLog(lp, "📱 Activity: " + className);
-                      
-                      // Log intent extras
-                      try {
-                        Intent intent = activity.getIntent();
-                        if (intent != null && intent.getExtras() != null) {
-                          Bundle extras = intent.getExtras();
-                          if (!extras.isEmpty()) {
-                            StringBuilder sb = new StringBuilder("📦 Extras:");
-                            for (String key : extras.keySet()) {
-                              Object val = extras.get(key);
-                              String valStr = (val != null) ? val.toString() : "null";
-                              if (valStr.length() > 100) valStr = valStr.substring(0, 100) + "...";
-                              sb.append("\n      ").append(key).append(" = ").append(valStr);
-                            }
-                            sendLog(lp, sb.toString());
+          
+                  // ── 2. Activity.onResume Hook ──
+                  try {
+                      XposedHelpers.findAndHookMethod("android.app.Activity", lp.classLoader, "onResume", new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) {
+                              android.app.Activity activity = (android.app.Activity) param.thisObject;
+                              String className = activity.getClass().getName();
+                              log("📱 Activity: " + className);
+                              
+                              try {
+                                  Intent intent = activity.getIntent();
+                                  if (intent != null && intent.getExtras() != null) {
+                                      Bundle extras = intent.getExtras();
+                                      if (!extras.isEmpty()) {
+                                          StringBuilder sb = new StringBuilder("📦 Extras:");
+                                          for (String key : extras.keySet()) {
+                                              Object val = extras.get(key);
+                                              String valStr = (val != null) ? val.toString() : "null";
+                                              if (valStr.length() > 100) valStr = valStr.substring(0, 100) + "...";
+                                              sb.append("\n      ").append(key).append(" = ").append(valStr);
+                                          }
+                                          log(sb.toString());
+                                      }
+                                  }
+                              } catch (Exception e) {
+                                  Log.e(TAG, "Extras error: " + e.getMessage());
+                              }
                           }
-                        }
-                      } catch (Exception e) {
-                        Log.e(TAG, "Extras error: " + e.getMessage());
-                      }
-                    }
+                      });
+                      log("Activity hook installed");
+                  } catch (Exception e) {
+                      log("Activity hook failed: " + e);
                   }
-                );
-              } catch (Exception e) {
-                Log.e(TAG, "Activity hook failed: " + e);
-              }
-
-              // ── 3. Touch Events Hook ──
-              try {
-                XposedHelpers.findAndHookMethod("android.app.Activity", lp.classLoader, "dispatchTouchEvent",
-                  android.view.MotionEvent.class,
-                  new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                      android.view.MotionEvent event = (android.view.MotionEvent) param.args[0];
-                      if (event == null) return;
-                      
-                      int action = event.getActionMasked();
-                      if (action != android.view.MotionEvent.ACTION_DOWN && 
-                          action != android.view.MotionEvent.ACTION_UP) return;
-                      
-                      android.app.Activity activity = (android.app.Activity) param.thisObject;
-                      String actionName = action == android.view.MotionEvent.ACTION_DOWN ? "DOWN" : "UP";
-                      
-                      sendLog(lp, String.format("👆 TOUCH %s x=%.1f y=%.1f class=%s",
-                        actionName, event.getRawX(), event.getRawY(),
-                        activity.getClass().getSimpleName()));
-                    }
+          
+                  // ── 3. Touch Events Hook ──
+                  try {
+                      XposedHelpers.findAndHookMethod("android.app.Activity", lp.classLoader, "dispatchTouchEvent",
+                          android.view.MotionEvent.class, new XC_MethodHook() {
+                              @Override
+                              protected void beforeHookedMethod(MethodHookParam param) {
+                                  android.view.MotionEvent event = (android.view.MotionEvent) param.args[0];
+                                  if (event == null) return;
+                                  int action = event.getActionMasked();
+                                  if (action != android.view.MotionEvent.ACTION_DOWN && 
+                                      action != android.view.MotionEvent.ACTION_UP) return;
+                                  android.app.Activity activity = (android.app.Activity) param.thisObject;
+                                  String actionName = action == android.view.MotionEvent.ACTION_DOWN ? "DOWN" : "UP";
+                                  log(String.format("👆 TOUCH %s x=%.1f y=%.1f class=%s",
+                                      actionName, event.getRawX(), event.getRawY(),
+                                      activity.getClass().getSimpleName()));
+                              }
+                          });
+                      log("Touch hook installed");
+                  } catch (Exception e) {
+                      log("Touch hook failed: " + e);
                   }
-                );
-              } catch (Exception e) {
-                Log.e(TAG, "Touch hook failed: " + e);
               }
-            }
-            
-            private void sendLog(XC_LoadPackage.LoadPackageParam lp, String msg) {
-              try {
-                Log.d(TAG, msg);
-                Intent intent = new Intent("JAHEZ_DIAG_LOG");
-                intent.putExtra("msg", msg);
-                intent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
-                AndroidAppHelper.currentApplication().sendBroadcast(intent);
-              } catch (Exception e) {
-                Log.e(TAG, "sendLog error: " + e.getMessage());
+              
+              private void log(String msg) {
+                  Log.d(TAG, msg);
+                  XposedBridge.log("[JahezDiag] " + msg);
               }
-            }
           }
           HEOF
 
@@ -400,106 +367,102 @@ jobs:
           import androidx.core.app.NotificationCompat;
           
           public class DiagService extends Service {
-            private static final String TAG = "JahezDiag";
-            private static final String CHANNEL_ID = "jahez_diag_channel";
-            private static final int NOTIFICATION_ID = 1001;
-            private SharedPreferences prefs;
-            
-            private final BroadcastReceiver logReceiver = new BroadcastReceiver() {
+              private static final String TAG = "JahezDiag";
+              private static final String CHANNEL_ID = "jahez_diag_channel";
+              private static final int NOTIFICATION_ID = 1001;
+              private SharedPreferences prefs;
+              
+              private final BroadcastReceiver logReceiver = new BroadcastReceiver() {
+                  @Override
+                  public void onReceive(Context context, Intent intent) {
+                      String msg = intent.getStringExtra("msg");
+                      if (msg != null) {
+                          saveLog(msg);
+                      }
+                  }
+              };
+              
               @Override
-              public void onReceive(Context context, Intent intent) {
-                String msg = intent.getStringExtra("msg");
-                if (msg != null) {
-                  saveLog(msg);
-                }
-              }
-            };
-            
-            @Override
-            public void onCreate() {
-              super.onCreate();
-              prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
-              createNotificationChannel();
-              startForeground(NOTIFICATION_ID, createNotification());
-              
-              IntentFilter filter = new IntentFilter("JAHEZ_DIAG_LOG");
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(logReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-              } else {
-                registerReceiver(logReceiver, filter);
+              public void onCreate() {
+                  super.onCreate();
+                  prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
+                  createNotificationChannel();
+                  startForeground(NOTIFICATION_ID, createNotification());
+                  
+                  IntentFilter filter = new IntentFilter("JAHEZ_DIAG_LOG");
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      registerReceiver(logReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                  } else {
+                      registerReceiver(logReceiver, filter);
+                  }
+                  
+                  Log.d(TAG, "DiagService started");
               }
               
-              Log.d(TAG, "DiagService started");
-            }
-            
-            private void createNotificationChannel() {
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                NotificationChannel channel = new NotificationChannel(
-                  CHANNEL_ID,
-                  "Jahez Diagnostic",
-                  NotificationManager.IMPORTANCE_LOW
-                );
-                channel.setDescription("Logging Jahez app activities");
-                NotificationManager manager = getSystemService(NotificationManager.class);
-                if (manager != null) {
-                  manager.createNotificationChannel(channel);
-                }
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID,
+                          "Jahez Diagnostic",
+                          NotificationManager.IMPORTANCE_LOW
+                      );
+                      channel.setDescription("Logging Jahez app activities");
+                      NotificationManager manager = getSystemService(NotificationManager.class);
+                      if (manager != null) {
+                          manager.createNotificationChannel(channel);
+                      }
+                  }
               }
-            }
-            
-            private Notification createNotification() {
-              NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Jahez Diagnostic")
-                .setContentText("Monitoring Jahez app...")
-                .setSmallIcon(android.R.drawable.ic_menu_info_details)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setOngoing(true);
               
-              return builder.build();
-            }
-            
-            private void saveLog(String msg) {
-              try {
-                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US);
-                String timestamp = sdf.format(new java.util.Date());
-                String entry = "[" + timestamp + "] " + msg;
-                
-                String existingLogs = prefs.getString("logs", "");
-                String[] lines = existingLogs.isEmpty() ? new String[0] : existingLogs.split("\n");
-                
-                // Keep last 500 lines to avoid excessive storage
-                StringBuilder newLogs = new StringBuilder(entry);
-                int maxLines = Math.min(lines.length, 499);
-                for (int i = 0; i < maxLines; i++) {
-                  newLogs.append("\n").append(lines[i]);
-                }
-                
-                prefs.edit().putString("logs", newLogs.toString()).apply();
-                Log.d(TAG, "Log saved: " + msg);
-              } catch (Exception e) {
-                Log.e(TAG, "Save log error: " + e.getMessage());
+              private Notification createNotification() {
+                  NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setContentTitle("Jahez Diagnostic")
+                      .setContentText("Monitoring Jahez app...")
+                      .setSmallIcon(android.R.drawable.ic_menu_info_details)
+                      .setPriority(NotificationCompat.PRIORITY_LOW)
+                      .setOngoing(true);
+                  return builder.build();
               }
-            }
-            
-            @Override
-            public int onStartCommand(Intent intent, int flags, int startId) {
-              return START_STICKY;
-            }
-            
-            @Override
-            public IBinder onBind(Intent intent) {
-              return null;
-            }
-            
-            @Override
-            public void onDestroy() {
-              super.onDestroy();
-              try {
-                unregisterReceiver(logReceiver);
-              } catch (Exception e) {
-                Log.e(TAG, "Unregister error: " + e.getMessage());
+              
+              private void saveLog(String msg) {
+                  try {
+                      java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US);
+                      String timestamp = sdf.format(new java.util.Date());
+                      String entry = "[" + timestamp + "] " + msg;
+                      
+                      String existingLogs = prefs.getString("logs", "");
+                      String[] lines = existingLogs.isEmpty() ? new String[0] : existingLogs.split("\n");
+                      StringBuilder newLogs = new StringBuilder(entry);
+                      int maxLines = Math.min(lines.length, 499);
+                      for (int i = 0; i < maxLines; i++) {
+                          newLogs.append("\n").append(lines[i]);
+                      }
+                      prefs.edit().putString("logs", newLogs.toString()).apply();
+                      Log.d(TAG, "Log saved: " + msg);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Save log error: " + e.getMessage());
+                  }
               }
-            }
+              
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  return START_STICKY;
+              }
+              
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+              
+              @Override
+              public void onDestroy() {
+                  super.onDestroy();
+                  try {
+                      unregisterReceiver(logReceiver);
+                  } catch (Exception e) {
+                      Log.e(TAG, "Unregister error: " + e.getMessage());
+                  }
+              }
           }
           SEOF
 
@@ -526,114 +489,106 @@ jobs:
           import android.util.Log;
           
           public class DiagAccessibility extends AccessibilityService {
-            private static final String TAG = "JahezDiagA11y";
-            private SharedPreferences prefs;
-            
-            @Override
-            public void onServiceConnected() {
-              super.onServiceConnected();
-              prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
-              Log.d(TAG, "Accessibility service connected");
-              saveLog("♿ Accessibility Service enabled");
-            }
-            
-            @Override
-            public void onAccessibilityEvent(AccessibilityEvent event) {
-              try {
-                String packageName = event.getPackageName() != null ? event.getPackageName().toString() : "";
-                if (!"net.jahez.fleets".equals(packageName)) return;
-                
-                int eventType = event.getEventType();
-                String className = event.getClassName() != null ? event.getClassName().toString() : "";
-                
-                if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-                  saveLog("🖥 Screen: " + className);
-                  dumpWindowContent();
-                } else if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-                  String text = event.getText() != null && !event.getText().isEmpty() ? 
-                    event.getText().get(0).toString() : "";
-                  String viewId = event.getSource() != null ? 
-                    String.valueOf(event.getSource().getViewIdResourceName()) : "";
-                  saveLog("🖱 Click: " + className + " id=" + viewId + " text=" + text);
-                }
-              } catch (Exception e) {
-                Log.e(TAG, "Event error: " + e.getMessage());
-              }
-            }
-            
-            private void dumpWindowContent() {
-              AccessibilityNodeInfo root = null;
-              try {
-                root = getRootInActiveWindow();
-                if (root == null) return;
-                
-                StringBuilder dump = new StringBuilder("📱 UI Dump:");
-                dumpNode(root, dump, 0);
-                
-                if (dump.length() > 2000) {
-                  dump = new StringBuilder(dump.substring(0, 2000) + "...");
-                }
-                saveLog(dump.toString());
-              } catch (Exception e) {
-                Log.e(TAG, "Dump error: " + e.getMessage());
-              } finally {
-                if (root != null) {
-                  root.recycle();
-                }
-              }
-            }
-            
-            private void dumpNode(AccessibilityNodeInfo node, StringBuilder sb, int depth) {
-              if (node == null || depth > 5) return;
+              private static final String TAG = "JahezDiagA11y";
+              private SharedPreferences prefs;
               
-              try {
-                String className = node.getClassName() != null ? node.getClassName().toString() : "";
-                String text = node.getText() != null ? node.getText().toString() : "";
-                String viewId = node.getViewIdResourceName() != null ? node.getViewIdResourceName() : "";
-                
-                if (!text.isEmpty() || !viewId.isEmpty()) {
-                  String indent = "  ".repeat(depth);
-                  sb.append("\n").append(indent);
-                  String shortClass = className.contains(".") ? 
-                    className.substring(className.lastIndexOf(".") + 1) : className;
-                  sb.append(shortClass);
-                  if (!text.isEmpty()) sb.append(" \"").append(text.substring(0, Math.min(text.length(), 50))).append("\"");
-                  if (!viewId.isEmpty()) sb.append(" [").append(viewId).append("]");
-                  if (node.isClickable()) sb.append(" (clickable)");
-                }
-                
-                for (int i = 0; i < node.getChildCount(); i++) {
-                  AccessibilityNodeInfo child = node.getChild(i);
-                  if (child != null) {
-                    dumpNode(child, sb, depth + 1);
-                    child.recycle();
+              @Override
+              public void onServiceConnected() {
+                  super.onServiceConnected();
+                  prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
+                  Log.d(TAG, "Accessibility service connected");
+                  saveLog("♿ Accessibility Service enabled");
+              }
+              
+              @Override
+              public void onAccessibilityEvent(AccessibilityEvent event) {
+                  try {
+                      String packageName = event.getPackageName() != null ? event.getPackageName().toString() : "";
+                      if (!"net.jahez.fleets".equals(packageName)) return;
+                      
+                      int eventType = event.getEventType();
+                      String className = event.getClassName() != null ? event.getClassName().toString() : "";
+                      
+                      if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                          saveLog("🖥 Screen: " + className);
+                          dumpWindowContent();
+                      } else if (eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+                          String text = event.getText() != null && !event.getText().isEmpty() ? 
+                              event.getText().get(0).toString() : "";
+                          String viewId = event.getSource() != null ? 
+                              String.valueOf(event.getSource().getViewIdResourceName()) : "";
+                          saveLog("🖱 Click: " + className + " id=" + viewId + " text=" + text);
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Event error: " + e.getMessage());
                   }
-                }
-              } catch (Exception e) {
-                Log.e(TAG, "Dump node error: " + e.getMessage());
               }
-            }
-            
-            private void saveLog(String msg) {
-              if (prefs == null) return;
-              java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US);
-              String timestamp = sdf.format(new java.util.Date());
-              String entry = "[" + timestamp + "] " + msg;
               
-              String existing = prefs.getString("logs", "");
-              String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
-              StringBuilder newLogs = new StringBuilder(entry);
-              int maxLines = Math.min(lines.length, 499);
-              for (int i = 0; i < maxLines; i++) {
-                newLogs.append("\n").append(lines[i]);
+              private void dumpWindowContent() {
+                  AccessibilityNodeInfo root = null;
+                  try {
+                      root = getRootInActiveWindow();
+                      if (root == null) return;
+                      StringBuilder dump = new StringBuilder("📱 UI Dump:");
+                      dumpNode(root, dump, 0);
+                      if (dump.length() > 2000) {
+                          dump = new StringBuilder(dump.substring(0, 2000) + "...");
+                      }
+                      saveLog(dump.toString());
+                  } catch (Exception e) {
+                      Log.e(TAG, "Dump error: " + e.getMessage());
+                  } finally {
+                      if (root != null) root.recycle();
+                  }
               }
-              prefs.edit().putString("logs", newLogs.toString()).apply();
-            }
-            
-            @Override
-            public void onInterrupt() {
-              Log.d(TAG, "Accessibility service interrupted");
-            }
+              
+              private void dumpNode(AccessibilityNodeInfo node, StringBuilder sb, int depth) {
+                  if (node == null || depth > 5) return;
+                  try {
+                      String className = node.getClassName() != null ? node.getClassName().toString() : "";
+                      String text = node.getText() != null ? node.getText().toString() : "";
+                      String viewId = node.getViewIdResourceName() != null ? node.getViewIdResourceName() : "";
+                      if (!text.isEmpty() || !viewId.isEmpty()) {
+                          String indent = "  ".repeat(depth);
+                          sb.append("\n").append(indent);
+                          String shortClass = className.contains(".") ? 
+                              className.substring(className.lastIndexOf(".") + 1) : className;
+                          sb.append(shortClass);
+                          if (!text.isEmpty()) sb.append(" \"").append(text.substring(0, Math.min(text.length(), 50))).append("\"");
+                          if (!viewId.isEmpty()) sb.append(" [").append(viewId).append("]");
+                          if (node.isClickable()) sb.append(" (clickable)");
+                      }
+                      for (int i = 0; i < node.getChildCount(); i++) {
+                          AccessibilityNodeInfo child = node.getChild(i);
+                          if (child != null) {
+                              dumpNode(child, sb, depth + 1);
+                              child.recycle();
+                          }
+                      }
+                  } catch (Exception e) {
+                      Log.e(TAG, "Dump node error: " + e.getMessage());
+                  }
+              }
+              
+              private void saveLog(String msg) {
+                  if (prefs == null) return;
+                  java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US);
+                  String timestamp = sdf.format(new java.util.Date());
+                  String entry = "[" + timestamp + "] " + msg;
+                  String existing = prefs.getString("logs", "");
+                  String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
+                  StringBuilder newLogs = new StringBuilder(entry);
+                  int maxLines = Math.min(lines.length, 499);
+                  for (int i = 0; i < maxLines; i++) {
+                      newLogs.append("\n").append(lines[i]);
+                  }
+                  prefs.edit().putString("logs", newLogs.toString()).apply();
+              }
+              
+              @Override
+              public void onInterrupt() {
+                  Log.d(TAG, "Accessibility service interrupted");
+              }
           }
           JAEOF
 
@@ -654,91 +609,90 @@ jobs:
           import android.widget.Toast;
           
           public class MainActivity extends Activity {
-            @Override 
-            protected void onCreate(Bundle savedInstanceState) {
-              super.onCreate(savedInstanceState);
-              setContentView(R.layout.activity_main);
-              
-              // Start foreground service
-              Intent serviceIntent = new Intent(this, DiagService.class);
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
-              } else {
-                startService(serviceIntent);
+              @Override 
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_main);
+                  
+                  // Start foreground service
+                  Intent serviceIntent = new Intent(this, DiagService.class);
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      startForegroundService(serviceIntent);
+                  } else {
+                      startService(serviceIntent);
+                  }
+                  
+                  // Request permissions
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 100);
+                  }
+                  requestPermissions(new String[]{
+                      "android.permission.ACCESS_FINE_LOCATION",
+                      "android.permission.ACCESS_COARSE_LOCATION"
+                  }, 101);
+                  
+                  // Check overlay permission
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                      Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                          Uri.parse("package:" + getPackageName()));
+                      startActivity(intent);
+                  }
+                  
+                  // Setup buttons
+                  Button logsButton = findViewById(R.id.btn_logs);
+                  Button clearButton = findViewById(R.id.btn_clear);
+                  
+                  logsButton.setOnClickListener(v -> 
+                      startActivity(new Intent(this, LogActivity.class)));
+                  
+                  clearButton.setOnClickListener(v -> {
+                      SharedPreferences prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
+                      prefs.edit().remove("logs").apply();
+                      Toast.makeText(this, "Logs cleared", Toast.LENGTH_SHORT).show();
+                      updateStatus();
+                  });
+                  
+                  updateStatus();
               }
               
-              // Request permissions
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 100);
+              private boolean isAccessibilityEnabled() {
+                  String service = getPackageName() + "/" + DiagAccessibility.class.getName();
+                  String enabledServices = Settings.Secure.getString(
+                      getContentResolver(),
+                      Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                  );
+                  return enabledServices != null && enabledServices.contains(service);
               }
               
-              requestPermissions(new String[]{
-                "android.permission.ACCESS_FINE_LOCATION",
-                "android.permission.ACCESS_COARSE_LOCATION"
-              }, 101);
-              
-              // Check overlay permission
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                  Uri.parse("package:" + getPackageName()));
-                startActivity(intent);
+              private void updateStatus() {
+                  TextView statusText = findViewById(R.id.tv_status);
+                  boolean a11yEnabled = isAccessibilityEnabled();
+                  
+                  String status = "📱 Jahez Diagnostic Module\n" +
+                      "━━━━━━━━━━━━━━━━━━━━\n" +
+                      "✅ LSPosed: Enabled (scope: net.jahez.fleets)\n" +
+                      "⚠️ Accessibility: " + (a11yEnabled ? "✅ ON" : "❌ OFF") + "\n" +
+                      "━━━━━━━━━━━━━━━━━━━━\n" +
+                      "📌 Instructions:\n" +
+                      "1. Enable Accessibility service below\n" +
+                      "2. Open Jahez (Saned) app\n" +
+                      "3. Accept an order\n" +
+                      "4. Check logs via View Logs button\n" +
+                      "━━━━━━━━━━━━━━━━━━━━\n" +
+                      "🛠 Features:\n" +
+                      "• API calls logging\n" +
+                      "• Screen change tracking\n" +
+                      "• Touch events logging\n" +
+                      "• UI hierarchy dump";
+                  
+                  statusText.setText(status);
               }
               
-              // Setup buttons
-              Button logsButton = findViewById(R.id.btn_logs);
-              Button clearButton = findViewById(R.id.btn_clear);
-              
-              logsButton.setOnClickListener(v -> 
-                startActivity(new Intent(this, LogActivity.class)));
-              
-              clearButton.setOnClickListener(v -> {
-                SharedPreferences prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
-                prefs.edit().remove("logs").apply();
-                Toast.makeText(this, "Logs cleared", Toast.LENGTH_SHORT).show();
-                updateStatus();
-              });
-              
-              updateStatus();
-            }
-            
-            private boolean isAccessibilityEnabled() {
-              String service = getPackageName() + "/" + DiagAccessibility.class.getName();
-              String enabledServices = Settings.Secure.getString(
-                getContentResolver(),
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-              );
-              return enabledServices != null && enabledServices.contains(service);
-            }
-            
-            private void updateStatus() {
-              TextView statusText = findViewById(R.id.tv_status);
-              boolean a11yEnabled = isAccessibilityEnabled();
-              
-              String status = "📱 Jahez Diagnostic Module\n" +
-                "━━━━━━━━━━━━━━━━━━━━\n" +
-                "✅ LSPosed: Enabled (scope: net.jahez.fleets)\n" +
-                "⚠️ Accessibility: " + (a11yEnabled ? "✅ ON" : "❌ OFF") + "\n" +
-                "━━━━━━━━━━━━━━━━━━━━\n" +
-                "📌 Instructions:\n" +
-                "1. Enable Accessibility service below\n" +
-                "2. Open Jahez (Saned) app\n" +
-                "3. Accept an order\n" +
-                "4. Check logs via View Logs button\n" +
-                "━━━━━━━━━━━━━━━━━━━━\n" +
-                "🛠 Features:\n" +
-                "• API calls logging\n" +
-                "• Screen change tracking\n" +
-                "• Touch events logging\n" +
-                "• UI hierarchy dump";
-              
-              statusText.setText(status);
-            }
-            
-            @Override
-            protected void onResume() {
-              super.onResume();
-              updateStatus();
-            }
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  updateStatus();
+              }
           }
           JEOF
 
@@ -754,30 +708,30 @@ jobs:
           import android.widget.TextView;
           
           public class LogActivity extends Activity {
-            @Override 
-            protected void onCreate(Bundle savedInstanceState) {
-              super.onCreate(savedInstanceState);
-              setContentView(R.layout.activity_log);
-              
-              SharedPreferences prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
-              TextView logText = findViewById(R.id.tv_log);
-              Button clearButton = findViewById(R.id.btn_clear);
-              Button backButton = findViewById(R.id.btn_back);
-              
-              String logs = prefs.getString("logs", "");
-              if (logs.isEmpty()) {
-                logText.setText("No logs yet.\n\nOpen Jahez (Saned) app and accept an order to start logging.");
-              } else {
-                logText.setText(logs);
+              @Override 
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_log);
+                  
+                  SharedPreferences prefs = getSharedPreferences("diag_data", MODE_PRIVATE);
+                  TextView logText = findViewById(R.id.tv_log);
+                  Button clearButton = findViewById(R.id.btn_clear);
+                  Button backButton = findViewById(R.id.btn_back);
+                  
+                  String logs = prefs.getString("logs", "");
+                  if (logs.isEmpty()) {
+                      logText.setText("No logs yet.\n\nOpen Jahez (Saned) app and accept an order to start logging.");
+                  } else {
+                      logText.setText(logs);
+                  }
+                  
+                  clearButton.setOnClickListener(v -> {
+                      prefs.edit().remove("logs").apply();
+                      logText.setText("Logs cleared.");
+                  });
+                  
+                  backButton.setOnClickListener(v -> finish());
               }
-              
-              clearButton.setOnClickListener(v -> {
-                prefs.edit().remove("logs").apply();
-                logText.setText("Logs cleared.");
-              });
-              
-              backButton.setOnClickListener(v -> finish());
-            }
           }
           LEOF
 
@@ -792,17 +746,17 @@ jobs:
           import android.os.Build;
           
           public class BootReceiver extends BroadcastReceiver {
-            @Override 
-            public void onReceive(Context context, Intent intent) {
-              if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-                Intent serviceIntent = new Intent(context, DiagService.class);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                  context.startForegroundService(serviceIntent);
-                } else {
-                  context.startService(serviceIntent);
-                }
+              @Override 
+              public void onReceive(Context context, Intent intent) {
+                  if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+                      Intent serviceIntent = new Intent(context, DiagService.class);
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          context.startForegroundService(serviceIntent);
+                      } else {
+                          context.startService(serviceIntent);
+                      }
+                  }
               }
-            }
           }
           BEOF
 
@@ -972,7 +926,6 @@ jobs:
           
           echo "Signing: $UNSIGNED_APK"
           
-          # Find apksigner
           if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME/build-tools" ]; then
             APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name "apksigner" -type f | sort -V | tail -1)
           elif [ -d "/usr/local/lib/android/sdk/build-tools" ]; then
