@@ -251,7 +251,6 @@ jobs:
               findViewById(R.id.btn_logs).setOnClickListener(v ->
                 startActivity(new Intent(this, LogActivity.class))
               );
-              // Start foreground service
               Intent svc = new Intent(this, AutoService.class);
               if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
               else startService(svc);
@@ -277,7 +276,7 @@ jobs:
           }
           JEOF
 
-      - name: Write SanedHook (Dynamic Swipe - Option B)
+      - name: Write SanedHook (Dynamic Swipe - Fixed Imports)
         run: |
           cat > app/src/main/java/com/danish/jahez/SanedHook.java << 'HEOF'
           package com.danish.jahez;
@@ -289,10 +288,10 @@ jobs:
           import android.content.Context;
           import android.content.Intent;
           import android.content.IntentFilter;
-          android.os.Bundle;
-          android.os.Handler;
-          android.os.Looper;
-          android.os.SystemClock;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.os.SystemClock;
           import android.util.DisplayMetrics;
           import android.view.MotionEvent;
           import android.view.View;
@@ -359,7 +358,6 @@ jobs:
               new Handler(Looper.getMainLooper()).post(() -> {
                 try {
                   View root = act.getWindow().getDecorView();
-                  // Dynamically find the swipe button by text
                   View swipeView = findViewWithText(root, new String[]{"ACCEPT", "SWIPE", "SLIDE", "ACCEPTAR", "ACEPTAR", "ACCEPT ORDER"});
                   float startX, endX, y;
                   if (swipeView != null) {
@@ -368,15 +366,14 @@ jobs:
                     startX = loc[0] + 20;
                     endX   = loc[0] + swipeView.getWidth() - 20;
                     y      = loc[1] + swipeView.getHeight() / 2f;
-                    android.util.Log.d("JahezHook", "Found swipe button at (" + startX + "," + y + ") to (" + endX + "," + y + ")");
+                    android.util.Log.d("JahezHook", "Found swipe button");
                   } else {
-                    // Fallback to screen coordinates (bottom area left->right)
                     DisplayMetrics dm = new DisplayMetrics();
                     act.getWindowManager().getDefaultDisplay().getMetrics(dm);
                     startX = dm.widthPixels * 0.2f;
                     endX   = dm.widthPixels * 0.8f;
                     y      = dm.heightPixels * 0.85f;
-                    android.util.Log.d("JahezHook", "No swipe button found, using fallback coordinates");
+                    android.util.Log.d("JahezHook", "Using fallback coordinates");
                   }
                   performSwipe(root, startX, endX, y);
                 } catch (Exception e) {
@@ -414,7 +411,7 @@ jobs:
               int steps = 15;
               for (int i = 1; i <= steps; i++) {
                 float stepX = startX + (endX - startX) * i / steps;
-                long eventTime = downTime + i * 10; // 10ms per step = fast
+                long eventTime = downTime + i * 10;
                 MotionEvent move = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_MOVE, stepX, y, 0);
                 root.dispatchTouchEvent(move);
                 move.recycle();
@@ -422,7 +419,6 @@ jobs:
               MotionEvent up = MotionEvent.obtain(downTime, downTime + steps * 10 + 20, MotionEvent.ACTION_UP, endX, y, 0);
               root.dispatchTouchEvent(up);
               up.recycle();
-              android.util.Log.d("JahezHook", "Fast swipe completed");
             }
             private double getDouble(Bundle b, String key) {
               try {
@@ -436,7 +432,7 @@ jobs:
           }
           HEOF
 
-      - name: Write AutoService (No auto-off, passes scan_delay)
+      - name: Write AutoService
         run: |
           cat > app/src/main/java/com/danish/jahez/AutoService.java << 'SEOF'
           package com.danish.jahez;
@@ -557,10 +553,9 @@ jobs:
                 int delay = prefs.getInt("scan_delay", 400);
                 acceptIntent.putExtra("scan_delay", delay);
                 sendBroadcast(acceptIntent);
-                // No auto-off – service stays ON
                 String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
                 toast(msg); saveLog(msg);
-                showServiceNotification(); // refresh notification
+                showServiceNotification();
               } else {
                 String reason = "";
                 if (!pickupOk) reason += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
