@@ -1,7 +1,6 @@
-name: Build JahezDiagnostic
+name: Build JahezAutoAccept
 
-on:
-  workflow_dispatch:
+on: [workflow_dispatch]
 
 jobs:
   build:
@@ -32,12 +31,11 @@ jobs:
 
       - name: Create Project Structure
         run: |
-          mkdir -p app/src/main/java/com/danish/diag
+          mkdir -p app/src/main/java/com/danish/jahez
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/mipmap-anydpi-v26
-          mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/assets
 
       - name: Write Gradle Files
@@ -52,7 +50,7 @@ jobs:
               maven { url 'https://api.xposed.info/' }
             }
           }
-          rootProject.name = "JahezDiagnostic"
+          rootProject.name = "JahezAutoAccept"
           include ':app'
           SEOF
 
@@ -62,17 +60,17 @@ jobs:
 
           cat > gradle.properties << 'GEOF'
           android.useAndroidX=true
-          android.enableJetifier=true
+          android.enableJetifier=false
           org.gradle.jvmargs=-Xmx2048m
           GEOF
 
           cat > app/build.gradle << 'ABEOF'
           plugins { id 'com.android.application' }
           android {
-            namespace 'com.danish.diag'
+            namespace 'com.danish.jahez'
             compileSdk 34
             defaultConfig {
-              applicationId 'com.danish.diag'
+              applicationId 'com.danish.jahez'
               minSdk 26
               targetSdk 34
               versionCode 1
@@ -87,7 +85,8 @@ jobs:
             }
           }
           dependencies {
-            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'androidx.appcompat:appcompat:1.7.0'
+            implementation 'com.google.android.material:material:1.12.0'
             compileOnly 'de.robv.android.xposed:api:82'
           }
           ABEOF
@@ -99,7 +98,7 @@ jobs:
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
             android:width="108dp" android:height="108dp"
             android:viewportWidth="108" android:viewportHeight="108">
-            <path android:fillColor="#1565C0"
+            <path android:fillColor="#1B5E20"
               android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
           </vector>
           BGEOF
@@ -110,7 +109,7 @@ jobs:
             android:width="108dp" android:height="108dp"
             android:viewportWidth="108" android:viewportHeight="108">
             <path android:fillColor="#FFFFFF"
-              android:pathData="M30,54 L50,30 L70,54 L58,54 L58,78 L42,78 L42,54 Z"/>
+              android:pathData="M25,54 L35,44 L47,60 L73,30 L83,40 L47,82 Z"/>
           </vector>
           FGEOF
 
@@ -130,9 +129,9 @@ jobs:
           </adaptive-icon>
           RNDEOF
 
-      - name: Write Xposed Files
+      - name: Write Xposed Init
         run: |
-          echo "com.danish.diag.DiagHook" > app/src/main/assets/xposed_init
+          echo "com.danish.jahez.SanedHook" > app/src/main/assets/xposed_init
 
       - name: Write Manifest
         run: |
@@ -145,33 +144,25 @@ jobs:
             <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
             <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
             <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-            <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
             <application
-              android:label="Jahez Diag"
+              android:label="Jahez Auto"
               android:icon="@mipmap/ic_launcher"
               android:roundIcon="@mipmap/ic_launcher_round"
               android:theme="@style/AppTheme"
               android:allowBackup="false">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Jahez diagnostic hook"/>
+              <meta-data android:name="xposeddescription" android:value="Jahez order hook"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
-              <activity android:name=".MainActivity" android:exported="true">
+              <activity android:name=".MainActivity" android:exported="true"
+                android:windowSoftInputMode="stateHidden|adjustPan">
                 <intent-filter>
                   <action android:name="android.intent.action.MAIN"/>
                   <category android:name="android.intent.category.LAUNCHER"/>
                 </intent-filter>
               </activity>
               <activity android:name=".LogActivity" android:exported="false"/>
-              <service android:name=".DiagService" android:exported="false"
+              <service android:name=".AutoService" android:exported="false"
                 android:foregroundServiceType="dataSync"/>
-              <service android:name=".DiagAccessibility" android:exported="true"
-                android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-                <intent-filter>
-                  <action android:name="android.accessibilityservice.AccessibilityService"/>
-                </intent-filter>
-                <meta-data android:name="android.accessibilityservice"
-                  android:resource="@xml/accessibility_config"/>
-              </service>
               <receiver android:name=".BootReceiver" android:exported="true">
                 <intent-filter>
                   <action android:name="android.intent.action.BOOT_COMPLETED"/>
@@ -181,201 +172,282 @@ jobs:
           </manifest>
           MEOF
 
-      - name: Write DiagHook (Fixed – No AndroidAppHelper, Multi‑network hooks)
+      - name: Write MainActivity
         run: |
-          cat > app/src/main/java/com/danish/diag/DiagHook.java << 'HEOF'
-          package com.danish.diag;
+          cat > app/src/main/java/com/danish/jahez/MainActivity.java << 'JEOF'
+          package com.danish.jahez;
+          import android.app.Activity;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.content.SharedPreferences;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.view.inputmethod.InputMethodManager;
+          import android.widget.*;
+          import android.widget.SeekBar;
+          public class MainActivity extends Activity {
+            SharedPreferences prefs;
+            Switch swEnable;
+            TextView tvStatus;
+            final BroadcastReceiver offReceiver = new BroadcastReceiver() {
+              @Override public void onReceive(Context ctx, Intent intent) {
+                if (swEnable != null)
+                  swEnable.setChecked("JAHEZ_AUTO_ON".equals(intent.getAction()));
+                refreshStatus();
+              }
+            };
+            @Override protected void onCreate(Bundle saved) {
+              super.onCreate(saved);
+              setContentView(R.layout.activity_main);
+              prefs = getSharedPreferences("cfg", MODE_PRIVATE);
+              EditText etPickup = findViewById(R.id.et_pickup);
+              EditText etDrop   = findViewById(R.id.et_drop);
+              SeekBar sbDelay   = findViewById(R.id.sb_delay);
+              TextView tvDelay  = findViewById(R.id.tv_delay);
+              swEnable = findViewById(R.id.sw_enable);
+              tvStatus = findViewById(R.id.tv_status);
+              Button btnSave = findViewById(R.id.btn_save);
+              etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
+              etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
+              int savedDelay = prefs.getInt("scan_delay", 400);
+              sbDelay.setProgress(savedDelay - 50);
+              tvDelay.setText(savedDelay + "ms");
+              sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                public void onProgressChanged(SeekBar sb, int p, boolean u) { tvDelay.setText((p + 50) + "ms"); }
+                public void onStartTrackingTouch(SeekBar sb) {}
+                public void onStopTrackingTouch(SeekBar sb) {
+                  prefs.edit().putInt("scan_delay", sb.getProgress() + 50).apply();
+                }
+              });
+              swEnable.setChecked(prefs.getBoolean("enabled", false));
+              if (Build.VERSION.SDK_INT >= 33)
+                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
+              requestPermissions(new String[]{
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_COARSE_LOCATION"}, 1);
+              IntentFilter filter = new IntentFilter();
+              filter.addAction("JAHEZ_AUTO_OFF");
+              filter.addAction("JAHEZ_AUTO_ON");
+              if (Build.VERSION.SDK_INT >= 33)
+                registerReceiver(offReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+              else
+                registerReceiver(offReceiver, filter);
+              swEnable.setOnCheckedChangeListener((btn, checked) -> {
+                prefs.edit().putBoolean("enabled", checked).apply();
+                sendBroadcast(new Intent("JAHEZ_STATE_CHANGED"));
+                refreshStatus();
+              });
+              btnSave.setOnClickListener(v -> {
+                float pk = parseFloat(etPickup.getText().toString(), 2.0f);
+                float dk = parseFloat(etDrop.getText().toString(), 5.0f);
+                prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
+                Toast.makeText(this, "Saved! Pickup<=" + pk + "km Drop<=" + dk + "km", Toast.LENGTH_LONG).show();
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
+                etPickup.clearFocus(); etDrop.clearFocus();
+              });
+              findViewById(R.id.btn_logs).setOnClickListener(v ->
+                startActivity(new Intent(this, LogActivity.class))
+              );
+              // Start foreground service
+              Intent svc = new Intent(this, AutoService.class);
+              if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
+              else startService(svc);
+            }
+            @Override protected void onResume() {
+              super.onResume();
+              refreshStatus();
+            }
+            @Override protected void onDestroy() {
+              super.onDestroy();
+              unregisterReceiver(offReceiver);
+            }
+            void refreshStatus() {
+              if (tvStatus == null) return;
+              boolean en = prefs.getBoolean("enabled", false);
+              tvStatus.setText(en ? "AUTO ACCEPT: ON" : "AUTO ACCEPT: OFF");
+              tvStatus.setTextColor(en ? 0xFF4CAF50 : 0xFFFF5555);
+              if (swEnable != null) swEnable.setVisibility(android.view.View.VISIBLE);
+            }
+            float parseFloat(String s, float def) {
+              try { return Float.parseFloat(s.trim()); } catch (Exception e) { return def; }
+            }
+          }
+          JEOF
+
+      - name: Write SanedHook (FIXED SWIPE)
+        run: |
+          cat > app/src/main/java/com/danish/jahez/SanedHook.java << 'HEOF'
+          package com.danish.jahez;
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.XC_MethodHook;
-          import de.robv.android.xposed.XposedBridge;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
           import android.content.BroadcastReceiver;
           import android.content.Context;
           import android.content.Intent;
+          import android.content.IntentFilter;
           import android.os.Bundle;
-          import android.util.Log;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.os.SystemClock;
+          import android.util.DisplayMetrics;
           import android.view.MotionEvent;
-          import java.net.HttpURLConnection;
-
-          public class DiagHook implements IXposedHookLoadPackage {
-              static final String TARGET = "net.jahez.fleets";
-              static final String TAG = "JahezDiag";
-
-              @Override
-              public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
-                  if (!TARGET.equals(lp.packageName)) return;
-                  log("✅ Hook loaded for: " + lp.packageName);
-
-                  // 1. BroadcastReceiver – captures order data (EXTRA_DISTANCE, lat/lon, requestId)
-                  try {
-                      XposedHelpers.findAndHookMethod(BroadcastReceiver.class, "onReceive",
-                          Context.class, Intent.class, new XC_MethodHook() {
-                              @Override
-                              protected void beforeHookedMethod(MethodHookParam param) {
-                                  Intent intent = (Intent) param.args[1];
-                                  if (intent == null) return;
-                                  Bundle extras = intent.getExtras();
-                                  if (extras != null && extras.containsKey("EXTRA_DISPATCH_TYPE")) {
-                                      StringBuilder sb = new StringBuilder("📡 ORDER BROADCAST:");
-                                      for (String key : extras.keySet()) {
-                                          Object val = extras.get(key);
-                                          sb.append("\n    ").append(key).append(" = ").append(val);
-                                      }
-                                      String msg = sb.toString();
-                                      log(msg);
-                                      // send to service using the context from the receiver
-                                      Context ctx = (Context) param.args[0];
-                                      sendBroadcast(ctx, msg);
-                                  }
-                              }
-                          });
-                      log("✅ BroadcastReceiver hook installed");
-                  } catch (Throwable t) { log("❌ Broadcast hook failed: " + t); }
-
-                  // 2. HttpURLConnection – reliable, never obfuscated
-                  try {
-                      XposedHelpers.findAndHookMethod(HttpURLConnection.class, "connect", new XC_MethodHook() {
-                          @Override
-                          protected void beforeHookedMethod(MethodHookParam param) {
-                              HttpURLConnection conn = (HttpURLConnection) param.thisObject;
-                              try {
-                                  String url = conn.getURL().toString();
-                                  String method = conn.getRequestMethod();
-                                  String msg = "🌐 [HttpURL] " + method + " " + url;
-                                  log(msg);
-                                  // we don't have a context here, so only Xposed log
-                              } catch (Exception e) {}
-                          }
-                      });
-                      log("✅ HttpURLConnection hook installed");
-                  } catch (Throwable t) { log("⚠️ HttpURLConnection hook failed: " + t); }
-
-                  // 3. OkHttp – try multiple possible class names (obfuscation‑resilient)
-                  String[] okhttpNames = {
-                      "okhttp3.RealCall",
-                      "okhttp3.internal.connection.RealCall",
-                      "okhttp3.Call"
-                  };
-                  boolean hooked = false;
-                  for (String name : okhttpNames) {
-                      try {
-                          Class<?> callClass = XposedHelpers.findClass(name, lp.classLoader);
-                          // synchronous call
-                          XposedHelpers.findAndHookMethod(callClass, "execute", new XC_MethodHook() {
-                              @Override
-                              protected void afterHookedMethod(MethodHookParam param) {
-                                  try {
-                                      Object response = param.getResult();
-                                      Object request = XposedHelpers.callMethod(response, "request");
-                                      String method = (String) XposedHelpers.callMethod(request, "method");
-                                      String url = XposedHelpers.callMethod(request, "url").toString();
-                                      String msg = "🌐 [OkHttp] " + method + " " + url;
-                                      log(msg);
-                                      // No context here, only Xposed log
-                                  } catch (Exception e) {}
-                              }
-                          });
-                          // asynchronous call
-                          XposedHelpers.findAndHookMethod(callClass, "enqueue", Object.class, new XC_MethodHook() {
-                              @Override
-                              protected void beforeHookedMethod(MethodHookParam param) {
-                                  try {
-                                      Object request = XposedHelpers.callMethod(param.thisObject, "request");
-                                      String method = (String) XposedHelpers.callMethod(request, "method");
-                                      String url = XposedHelpers.callMethod(request, "url").toString();
-                                      String msg = "🌐 [OkHttp Async] " + method + " " + url;
-                                      log(msg);
-                                  } catch (Exception e) {}
-                              }
-                          });
-                          log("✅ OkHttp hook installed via: " + name);
-                          hooked = true;
-                          break;
-                      } catch (Throwable t) { /* try next name */ }
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.view.WindowManager;
+          import android.widget.Button;
+          import android.widget.TextView;
+          public class SanedHook implements IXposedHookLoadPackage {
+            static final String TARGET  = "net.jahez.fleets";
+            static final String OUR_PKG = "com.danish.jahez";
+            static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
+            private long lastBcast = 0;
+            private volatile android.app.Activity currentActivity = null;
+            @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
+              if (!TARGET.equals(lp.packageName)) return;
+              XposedHelpers.findAndHookMethod(
+                "android.app.Activity", lp.classLoader, "onResume",
+                new XC_MethodHook() {
+                  @Override protected void afterHookedMethod(MethodHookParam param) {
+                    if (!ORDER_ACTIVITY.equals(param.thisObject.getClass().getName())) return;
+                    long now = System.currentTimeMillis();
+                    if (now - lastBcast < 2000) return;
+                    lastBcast = now;
+                    android.app.Activity act = (android.app.Activity) param.thisObject;
+                    currentActivity = act;
+                    try {
+                      IntentFilter filter = new IntentFilter("JAHEZ_DO_ACCEPT");
+                      act.registerReceiver(new BroadcastReceiver() {
+                        @Override public void onReceive(Context ctx, Intent intent) {
+                          int delay = intent.getIntExtra("scan_delay", 400);
+                          new Handler(Looper.getMainLooper()).postDelayed(() -> doSwipe(), delay);
+                        }
+                      }, filter);
+                    } catch (Exception e) { android.util.Log.e("JahezHook", "Receiver reg fail", e); }
+                    try {
+                      android.content.Intent actIntent = act.getIntent();
+                      Bundle extras = actIntent != null ? actIntent.getExtras() : null;
+                      if (extras == null) return;
+                      double pickupLat = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
+                      double pickupLon = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
+                      double dropDist  = getDouble(extras, "EXTRA_DISTANCE");
+                      double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
+                      double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
+                      Intent intent = new Intent("JAHEZ_ORDER_DATA");
+                      intent.setPackage(OUR_PKG);
+                      intent.putExtra("pickup_lat", pickupLat);
+                      intent.putExtra("pickup_lon", pickupLon);
+                      intent.putExtra("drop_dist",  dropDist);
+                      intent.putExtra("price",      price);
+                      intent.putExtra("bonus",      bonus);
+                      intent.putExtra("is_order",   true);
+                      act.sendBroadcast(intent);
+                    } catch (Exception e) { android.util.Log.e("JahezHook", "Order data error", e); }
                   }
-                  if (!hooked) log("⚠️ OkHttp hook failed (all class names tried)");
-
-                  // 4. Activity onResume – log activity name and intent extras
-                  try {
-                      XposedHelpers.findAndHookMethod("android.app.Activity", lp.classLoader, "onResume",
-                          new XC_MethodHook() {
-                              @Override
-                              protected void afterHookedMethod(MethodHookParam param) {
-                                  android.app.Activity act = (android.app.Activity) param.thisObject;
-                                  String className = act.getClass().getName();
-                                  String msg = "📱 Activity: " + className;
-                                  log(msg);
-                                  sendBroadcast(act, msg);
-                                  // Log intent extras if any
-                                  Intent intent = act.getIntent();
-                                  if (intent != null && intent.getExtras() != null && !intent.getExtras().isEmpty()) {
-                                      Bundle extras = intent.getExtras();
-                                      StringBuilder sb = new StringBuilder("📦 Intent Extras:");
-                                      for (String key : extras.keySet()) {
-                                          sb.append("\n    ").append(key).append(" = ").append(extras.get(key));
-                                      }
-                                      String extraMsg = sb.toString();
-                                      log(extraMsg);
-                                      sendBroadcast(act, extraMsg);
-                                  }
-                              }
-                          });
-                      log("✅ Activity hook installed");
-                  } catch (Throwable t) { log("❌ Activity hook failed: " + t); }
-
-                  // 5. Touch events on Activity
-                  try {
-                      XposedHelpers.findAndHookMethod("android.app.Activity", lp.classLoader, "dispatchTouchEvent",
-                          MotionEvent.class, new XC_MethodHook() {
-                              @Override
-                              protected void beforeHookedMethod(MethodHookParam param) {
-                                  MotionEvent ev = (MotionEvent) param.args[0];
-                                  if (ev == null) return;
-                                  int action = ev.getActionMasked();
-                                  if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_UP) return;
-                                  android.app.Activity act = (android.app.Activity) param.thisObject;
-                                  android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
-                                  act.getWindowManager().getDefaultDisplay().getMetrics(dm);
-                                  int W = dm.widthPixels, H = dm.heightPixels;
-                                  String actName = act.getClass().getSimpleName();
-                                  String actionName = (action == MotionEvent.ACTION_DOWN) ? "DOWN" : "UP";
-                                  String msg = String.format("👆 TOUCH %s x=%.1f y=%.1f (%.2f,%.2f) screen=%dx%d act=%s",
-                                      actionName, ev.getRawX(), ev.getRawY(),
-                                      ev.getRawX()/W, ev.getRawY()/H, W, H, actName);
-                                  log(msg);
-                                  sendBroadcast(act, msg);
-                              }
-                          });
-                      log("✅ Touch hook installed");
-                  } catch (Throwable t) { log("❌ Touch hook failed: " + t); }
+                }
+              );
+            }
+            private void doSwipe() {
+              android.app.Activity act = currentActivity;
+              if (act == null || act.isFinishing()) {
+                android.util.Log.e("JahezHook", "Activity null/finishing");
+                return;
               }
-
-              private void log(String msg) {
-                  Log.d(TAG, msg);
-                  XposedBridge.log("[JahezDiag] " + msg);
-              }
-
-              private void sendBroadcast(Context ctx, String msg) {
-                  try {
-                      Intent intent = new Intent("JAHEZ_DIAG_LOG");
-                      intent.putExtra("msg", msg);
-                      intent.setPackage("com.danish.diag");
-                      ctx.sendBroadcast(intent);
-                  } catch (Exception e) {
-                      Log.e(TAG, "Broadcast failed: " + e.getMessage());
+              new Handler(Looper.getMainLooper()).post(() -> {
+                try {
+                  View root = act.getWindow().getDecorView();
+                  WindowManager wm = act.getWindowManager();
+                  DisplayMetrics dm = new DisplayMetrics();
+                  wm.getDefaultDisplay().getMetrics(dm);
+                  int W = dm.widthPixels;
+                  int H = dm.heightPixels;
+                  float startX = W * 0.15f;
+                  float endX   = W * 0.85f;
+                  float y      = H * 0.87f;
+                  View swipeView = findSwipeButton(root);
+                  if (swipeView != null) {
+                    int[] loc = new int[2];
+                    swipeView.getLocationOnScreen(loc);
+                    startX = loc[0] + swipeView.getWidth() * 0.1f;
+                    endX   = loc[0] + swipeView.getWidth() * 0.9f;
+                    y      = loc[1] + swipeView.getHeight() / 2f;
+                    android.util.Log.d("JahezHook", "Found swipe view");
                   }
+                  long downTime = SystemClock.uptimeMillis();
+                  long eventTime = downTime;
+                  MotionEvent down = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_DOWN, startX, y, 0);
+                  root.dispatchTouchEvent(down);
+                  down.recycle();
+                  int steps = 10;
+                  for (int i = 1; i <= steps; i++) {
+                    float stepX = startX + (endX - startX) * i / steps;
+                    eventTime = downTime + i * 50;
+                    MotionEvent move = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_MOVE, stepX, y, 0);
+                    root.dispatchTouchEvent(move);
+                    move.recycle();
+                    Thread.sleep(30);
+                  }
+                  eventTime = downTime + (steps * 50) + 50;
+                  MotionEvent up = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_UP, endX, y, 0);
+                  root.dispatchTouchEvent(up);
+                  up.recycle();
+                  android.util.Log.d("JahezHook", "Swipe done");
+                } catch (Exception e) {
+                  android.util.Log.e("JahezHook", "Swipe error", e);
+                }
+              });
+            }
+            private View findSwipeButton(View root) {
+              if (root == null) return null;
+              String[] ids = {"btn_accept", "swipe_button", "accept_button", "slide_to_accept"};
+              for (String idName : ids) {
+                int id = root.getResources().getIdentifier(idName, "id", TARGET);
+                if (id != 0) {
+                  View v = root.findViewById(id);
+                  if (v != null && v.isShown()) return v;
+                }
               }
+              if (root instanceof ViewGroup) {
+                ViewGroup group = (ViewGroup) root;
+                for (int i = 0; i < group.getChildCount(); i++) {
+                  View child = group.getChildAt(i);
+                  View found = findSwipeButton(child);
+                  if (found != null) return found;
+                  if (child instanceof Button || child instanceof TextView) {
+                    String text = "";
+                    if (child instanceof Button) text = ((Button) child).getText().toString().toLowerCase();
+                    if (child instanceof TextView) text = ((TextView) child).getText().toString().toLowerCase();
+                    if (text.contains("accept") || text.contains("swipe") || text.contains("slide")) {
+                      return child;
+                    }
+                  }
+                }
+              }
+              return null;
+            }
+            private double getDouble(Bundle b, String key) {
+              try {
+                Object v = b.get(key);
+                if (v instanceof Double) return (Double) v;
+                if (v instanceof Float)  return (Float) v;
+                if (v instanceof String) return Double.parseDouble((String) v);
+              } catch (Exception ignored) {}
+              return -1;
+            }
           }
           HEOF
 
-      - name: Write DiagService
+      - name: Write AutoService (AUTO-OFF REMOVED)
         run: |
-          cat > app/src/main/java/com/danish/diag/DiagService.java << 'SEOF'
-          package com.danish.diag;
+          cat > app/src/main/java/com/danish/jahez/AutoService.java << 'SEOF'
+          package com.danish.jahez;
           import android.app.Notification;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
+          import android.app.PendingIntent;
           import android.app.Service;
           import android.content.BroadcastReceiver;
           import android.content.Context;
@@ -383,288 +455,304 @@ jobs:
           import android.content.IntentFilter;
           import android.content.SharedPreferences;
           import android.os.Build;
+          import android.os.Handler;
           import android.os.IBinder;
+          import android.os.Looper;
           import android.util.Log;
-          public class DiagService extends Service {
-              static final String TAG   = "JahezDiag";
-              static final String CH_ID = "diag_svc";
-              SharedPreferences prefs;
-              final BroadcastReceiver diagReceiver = new BroadcastReceiver() {
-                  @Override public void onReceive(Context ctx, Intent intent) {
-                      String msg = intent.getStringExtra("msg");
-                      if (msg != null) saveLog(msg);
-                  }
-              };
-              @Override public void onCreate() {
-                  super.onCreate();
-                  prefs = getSharedPreferences("diag_cfg", MODE_PRIVATE);
-                  IntentFilter f = new IntentFilter("JAHEZ_DIAG_LOG");
-                  if (Build.VERSION.SDK_INT >= 33)
-                      registerReceiver(diagReceiver, f, Context.RECEIVER_NOT_EXPORTED);
-                  else
-                      registerReceiver(diagReceiver, f);
-                  showNotification();
-                  Log.d(TAG, "DiagService started");
+          public class AutoService extends Service {
+            static final String TAG = "JahezAuto";
+            SharedPreferences prefs;
+            long lastEvent = 0;
+            final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
+              @Override public void onReceive(Context ctx, Intent intent) {
+                boolean isOrder = intent.getBooleanExtra("is_order", false);
+                if (!isOrder) return;
+                double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
+                double pickupLon = intent.getDoubleExtra("pickup_lon", -1);
+                double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
+                double price     = intent.getDoubleExtra("price",       0);
+                double bonus     = intent.getDoubleExtra("bonus",       0);
+                saveLog("🪝 Order! drop=" + String.format("%.2f", dropDist) + "km price=" + price + " bonus=" + bonus);
+                processOrderGps(pickupLat, pickupLon, dropDist);
               }
-              @Override public int onStartCommand(Intent intent, int flags, int startId) { return START_STICKY; }
-              @Override public IBinder onBind(Intent intent) { return null; }
-              void showNotification() {
-                  NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      NotificationChannel channel = new NotificationChannel(CH_ID, "Jahez Diagnostic", NotificationManager.IMPORTANCE_LOW);
-                      nm.createNotificationChannel(channel);
-                  }
-                  Notification notif = new Notification.Builder(this, CH_ID)
-                      .setContentTitle("Jahez Diagnostic")
-                      .setContentText("Logging events...")
-                      .setSmallIcon(android.R.drawable.ic_menu_info_details)
-                      .setOngoing(true)
-                      .build();
-                  startForeground(1, notif);
+            };
+            final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
+              @Override public void onReceive(Context ctx, Intent intent) {
+                if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
+                String action = intent.getAction();
+                if ("JAHEZ_TOGGLE".equals(action)) {
+                  boolean current = prefs.getBoolean("enabled", false);
+                  prefs.edit().putBoolean("enabled", !current).apply();
+                  sendBroadcast(new Intent(!current ? "JAHEZ_AUTO_ON" : "JAHEZ_AUTO_OFF"));
+                  log("Toggle: " + (!current ? "ON" : "OFF"));
+                }
+                showServiceNotification();
               }
-              void saveLog(String msg) {
-                  java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
-                  String entry = "[" + sdf.format(new java.util.Date()) + "] " + msg;
-                  String existing = prefs.getString("logs", "");
-                  String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
-                  StringBuilder sb = new StringBuilder(entry);
-                  for (int i = 0; i < lines.length && i < 199; i++) sb.append("\n").append(lines[i]);
-                  prefs.edit().putString("logs", sb.toString()).apply();
+            };
+            @Override public void onCreate() {
+              super.onCreate();
+              prefs = getSharedPreferences("cfg", MODE_PRIVATE);
+              IntentFilter f = new IntentFilter("JAHEZ_TOGGLE");
+              f.addAction("JAHEZ_STATE_CHANGED");
+              if (Build.VERSION.SDK_INT >= 33)
+                registerReceiver(toggleReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+              else
+                registerReceiver(toggleReceiver, f);
+              IntentFilter of = new IntentFilter("JAHEZ_ORDER_DATA");
+              if (Build.VERSION.SDK_INT >= 33)
+                registerReceiver(orderReceiver, of, Context.RECEIVER_EXPORTED);
+              else
+                registerReceiver(orderReceiver, of);
+              showServiceNotification();
+              log("Service started");
+            }
+            @Override public int onStartCommand(Intent intent, int flags, int startId) {
+              return START_STICKY;
+            }
+            @Override public IBinder onBind(Intent intent) { return null; }
+            void showServiceNotification() {
+              boolean enabled = prefs != null && prefs.getBoolean("enabled", false);
+              NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+              if (Build.VERSION.SDK_INT >= 26) {
+                NotificationChannel ch = new NotificationChannel("jahez_svc", "Jahez Auto Service", NotificationManager.IMPORTANCE_LOW);
+                nm.createNotificationChannel(ch);
               }
-              @Override public void onDestroy() {
-                  super.onDestroy();
-                  try { unregisterReceiver(diagReceiver); } catch (Exception ignored) {}
+              Intent toggleIntent = new Intent("JAHEZ_TOGGLE").setPackage(getPackageName());
+              PendingIntent togglePending = PendingIntent.getBroadcast(this, 0, toggleIntent,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+              Notification.Action action = new Notification.Action.Builder(
+                enabled ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                enabled ? "✅ ON  —  tap to OFF" : "⏸ OFF  —  tap to ON",
+                togglePending).build();
+              Notification.Builder builder = new Notification.Builder(this, "jahez_svc")
+                .setContentTitle("Jahez Auto")
+                .setContentText(enabled ? "Auto Accept: ON" : "Auto Accept: OFF")
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setOngoing(true);
+              if (Build.VERSION.SDK_INT >= 23) builder.addAction(action);
+              startForeground(1, builder.build());
+            }
+            void processOrderGps(double pickupLat, double pickupLon, double dropDist) {
+              if (prefs == null || !prefs.getBoolean("enabled", false)) return;
+              long now = System.currentTimeMillis();
+              if (now - lastEvent < 1500) return;
+              lastEvent = now;
+              float pickupDistKm = -1;
+              try {
+                android.location.LocationManager lm = (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
+                android.location.Location loc = null;
+                try { loc = lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER); } catch (Exception ignored) {}
+                if (loc == null) { try { loc = lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER); } catch (Exception ignored) {} }
+                if (loc != null && pickupLat > 0 && pickupLon > 0) {
+                  float[] res = new float[1];
+                  android.location.Location.distanceBetween(loc.getLatitude(), loc.getLongitude(), pickupLat, pickupLon, res);
+                  pickupDistKm = res[0] / 1000f;
+                }
+              } catch (Exception e) { saveLog("GPS error: " + e.getMessage()); }
+              float maxPickup = prefs.getFloat("max_pickup", 2.0f);
+              float maxDrop   = prefs.getFloat("max_drop",   5.0f);
+              float dropKm    = (float) dropDist;
+              saveLog(String.format("Pickup=%.2fkm(max%.1f) Drop=%.2fkm(max%.1f)", pickupDistKm, maxPickup, dropKm, maxDrop));
+              boolean pickupOk = pickupDistKm < 0 || pickupDistKm <= maxPickup;
+              boolean dropOk   = dropKm < 0      || dropKm      <= maxDrop;
+              if (pickupOk && dropOk) {
+                Intent acceptIntent = new Intent("JAHEZ_DO_ACCEPT");
+                acceptIntent.setPackage("net.jahez.fleets");
+                int delay = prefs.getInt("scan_delay", 400);
+                acceptIntent.putExtra("scan_delay", delay);
+                sendBroadcast(acceptIntent);
+                // ❌ AUTO-OFF REMOVED: Service stays ON for next orders
+                // prefs.edit().putBoolean("enabled", false).apply();
+                // sendBroadcast(new Intent("JAHEZ_AUTO_OFF"));
+                showServiceNotification(); // just refresh notification (still ON)
+                String msg = "✅ ACCEPTED — Pickup " + fmt(pickupDistKm) + "km | Drop " + fmt(dropKm) + "km";
+                toast(msg); saveLog(msg);
+              } else {
+                String reason = "";
+                if (!pickupOk) reason += "Pickup " + fmt(pickupDistKm) + "km > max " + fmt(maxPickup) + "km";
+                if (!dropOk)   reason += (!reason.isEmpty() ? " | " : "") + "Drop " + fmt(dropKm) + "km > max " + fmt(maxDrop) + "km";
+                String msg = "❌ SKIP — " + reason;
+                toast(msg); saveLog(msg);
               }
+            }
+            void saveLog(String msg) {
+              java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
+              String entry = "[" + sdf.format(new java.util.Date()) + "]  " + msg;
+              String existing = prefs.getString("logs", "");
+              String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
+              StringBuilder sb = new StringBuilder(entry);
+              for (int i = 0; i < lines.length && i < 99; i++) sb.append("\n").append(lines[i]);
+              prefs.edit().putString("logs", sb.toString()).apply();
+            }
+            void toast(final String msg) {
+              new Handler(Looper.getMainLooper()).post(() ->
+                android.widget.Toast.makeText(getApplicationContext(), msg, android.widget.Toast.LENGTH_LONG).show()
+              );
+            }
+            String fmt(float v) { return v < 0 ? "?" : String.format("%.1f", v); }
+            void log(String msg) { Log.d(TAG, msg); }
+            @Override public void onDestroy() {
+              super.onDestroy();
+              try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
+              try { unregisterReceiver(orderReceiver); } catch (Exception ignored) {}
+            }
           }
           SEOF
 
-      - name: Write DiagAccessibility
+      - name: Write BootReceiver
         run: |
-          cat > app/src/main/res/xml/accessibility_config.xml << 'ACEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-            android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked"
-            android:accessibilityFeedbackType="feedbackGeneric"
-            android:accessibilityFlags="flagDefault|flagReportViewIds"
-            android:canRetrieveWindowContent="true"
-            android:notificationTimeout="100"
-            android:packageNames="net.jahez.fleets"/>
-          ACEOF
-
-          cat > app/src/main/java/com/danish/diag/DiagAccessibility.java << 'JAEOF'
-          package com.danish.diag;
-          import android.accessibilityservice.AccessibilityService;
-          import android.content.SharedPreferences;
-          import android.view.accessibility.AccessibilityEvent;
-          import android.view.accessibility.AccessibilityNodeInfo;
-          import android.util.Log;
-          public class DiagAccessibility extends AccessibilityService {
-              private SharedPreferences prefs;
-              @Override public void onServiceConnected() {
-                  super.onServiceConnected();
-                  prefs = getSharedPreferences("diag_cfg", MODE_PRIVATE);
-                  saveLog("♿ Accessibility Service connected");
-              }
-              @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-                  if (!"net.jahez.fleets".equals(event.getPackageName())) return;
-                  int type = event.getEventType();
-                  String className = event.getClassName() != null ? event.getClassName().toString() : "";
-                  if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-                      saveLog("🖥 Screen: " + className);
-                      dumpUI();
-                  } else if (type == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-                      String text = !event.getText().isEmpty() ? event.getText().get(0).toString() : "";
-                      saveLog("🖱 Click: " + text);
-                  }
-              }
-              private void dumpUI() {
-                  AccessibilityNodeInfo root = getRootInActiveWindow();
-                  if (root == null) return;
-                  StringBuilder dump = new StringBuilder("📱 UI Dump:");
-                  dumpNode(root, dump, 0);
-                  if (dump.length() > 2000) dump.setLength(2000);
-                  saveLog(dump.toString());
-                  root.recycle();
-              }
-              private void dumpNode(AccessibilityNodeInfo node, StringBuilder sb, int depth) {
-                  if (node == null || depth > 4) return;
-                  String text = node.getText() != null ? node.getText().toString() : "";
-                  String id = node.getViewIdResourceName() != null ? node.getViewIdResourceName() : "";
-                  if (!text.isEmpty() || !id.isEmpty()) {
-                      for (int i = 0; i < depth; i++) sb.append("  ");
-                      sb.append("• ");
-                      if (!id.isEmpty()) sb.append("[").append(id).append("] ");
-                      if (!text.isEmpty()) sb.append("\"").append(text.substring(0, Math.min(text.length(), 60))).append("\"");
-                      if (node.isClickable()) sb.append(" (clickable)");
-                      sb.append("\n");
-                  }
-                  for (int i = 0; i < node.getChildCount(); i++) {
-                      AccessibilityNodeInfo child = node.getChild(i);
-                      if (child != null) {
-                          dumpNode(child, sb, depth + 1);
-                          child.recycle();
-                      }
-                  }
-              }
-              private void saveLog(String msg) {
-                  if (prefs == null) return;
-                  java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault());
-                  String entry = "[" + sdf.format(new java.util.Date()) + "] " + msg;
-                  String existing = prefs.getString("logs", "");
-                  String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
-                  StringBuilder sb = new StringBuilder(entry);
-                  for (int i = 0; i < lines.length && i < 199; i++) sb.append("\n").append(lines[i]);
-                  prefs.edit().putString("logs", sb.toString()).apply();
-              }
-              @Override public void onInterrupt() {}
-          }
-          JAEOF
-
-      - name: Write MainActivity
-        run: |
-          cat > app/src/main/java/com/danish/diag/MainActivity.java << 'JEOF'
-          package com.danish.diag;
-          import android.app.Activity;
+          cat > app/src/main/java/com/danish/jahez/BootReceiver.java << 'BEOF'
+          package com.danish.jahez;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
           import android.content.Intent;
-          import android.content.SharedPreferences;
-          import android.net.Uri;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.provider.Settings;
-          import android.widget.*;
-          public class MainActivity extends Activity {
-              @Override protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_main);
-                  Intent svc = new Intent(this, DiagService.class);
-                  if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
-                  else startService(svc);
-                  if (Build.VERSION.SDK_INT >= 33)
-                      requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
-                  requestPermissions(new String[]{
-                      "android.permission.ACCESS_FINE_LOCATION",
-                      "android.permission.ACCESS_COARSE_LOCATION"}, 1);
-                  if (!Settings.canDrawOverlays(this)) {
-                      startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                          Uri.parse("package:" + getPackageName())));
-                  }
-                  if (!isA11yEnabled()) {
-                      Toast.makeText(this, "Enable Accessibility for Jahez Diag", Toast.LENGTH_LONG).show();
-                      startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                  }
-                  findViewById(R.id.btn_logs).setOnClickListener(v -> startActivity(new Intent(this, LogActivity.class)));
-                  findViewById(R.id.btn_clear).setOnClickListener(v -> {
-                      getSharedPreferences("diag_cfg", MODE_PRIVATE).edit().remove("logs").apply();
-                      Toast.makeText(this, "Logs cleared", Toast.LENGTH_SHORT).show();
-                  });
-                  updateStatus();
+          public class BootReceiver extends BroadcastReceiver {
+            @Override public void onReceive(Context ctx, Intent intent) {
+              if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+                Intent svc = new Intent(ctx, AutoService.class);
+                if (android.os.Build.VERSION.SDK_INT >= 26)
+                  ctx.startForegroundService(svc);
+                else
+                  ctx.startService(svc);
               }
-              private boolean isA11yEnabled() {
-                  String svc = getPackageName() + "/" + DiagAccessibility.class.getName();
-                  String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-                  return enabled != null && enabled.contains(svc);
-              }
-              private void updateStatus() {
-                  TextView tv = findViewById(R.id.tv_status);
-                  tv.setText("LSPosed: scope net.jahez.fleets\n" +
-                      "Accessibility: " + (isA11yEnabled() ? "✅ ON" : "❌ OFF") + "\n" +
-                      "Open Saned → order accept karo\n" +
-                      "Phir logs yahan dekho");
-              }
-              @Override protected void onResume() { super.onResume(); updateStatus(); }
+            }
           }
-          JEOF
+          BEOF
 
       - name: Write LogActivity
         run: |
-          cat > app/src/main/java/com/danish/diag/LogActivity.java << 'LEOF'
-          package com.danish.diag;
+          cat > app/src/main/java/com/danish/jahez/LogActivity.java << 'LEOF'
+          package com.danish.jahez;
           import android.app.Activity;
           import android.content.SharedPreferences;
           import android.os.Bundle;
           import android.widget.*;
           public class LogActivity extends Activity {
-              @Override protected void onCreate(Bundle saved) {
-                  super.onCreate(saved);
-                  setContentView(R.layout.activity_log);
-                  SharedPreferences prefs = getSharedPreferences("diag_cfg", MODE_PRIVATE);
-                  TextView tvLog = findViewById(R.id.tv_log);
-                  Button btnClear = findViewById(R.id.btn_clear);
-                  Button btnBack = findViewById(R.id.btn_back);
-                  String logs = prefs.getString("logs", "");
-                  tvLog.setText(logs.isEmpty() ? "No logs yet.\nOpen Saned and accept an order." : logs);
-                  btnClear.setOnClickListener(v -> {
-                      prefs.edit().remove("logs").apply();
-                      tvLog.setText("Cleared.");
-                  });
-                  btnBack.setOnClickListener(v -> finish());
-              }
+            @Override protected void onCreate(Bundle saved) {
+              super.onCreate(saved);
+              setContentView(R.layout.activity_log);
+              SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
+              TextView tvLog = findViewById(R.id.tv_log);
+              Button btnClear = findViewById(R.id.btn_clear);
+              Button btnBack = findViewById(R.id.btn_back);
+              loadLogs(tvLog, prefs);
+              btnClear.setOnClickListener(v -> {
+                prefs.edit().remove("logs").apply();
+                tvLog.setText("Log saaf ho gaya.");
+              });
+              btnBack.setOnClickListener(v -> finish());
+            }
+            void loadLogs(TextView tv, SharedPreferences prefs) {
+              String logs = prefs.getString("logs", "");
+              tv.setText(logs.isEmpty() ? "Abhi koi log nahi hai.\nJahez Fleets mein order aane do." : logs);
+            }
           }
           LEOF
 
-      - name: Write BootReceiver
-        run: |
-          cat > app/src/main/java/com/danish/diag/BootReceiver.java << 'BEOF'
-          package com.danish.diag;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          public class BootReceiver extends BroadcastReceiver {
-              @Override public void onReceive(Context ctx, Intent intent) {
-                  if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-                      ctx.startService(new Intent(ctx, DiagService.class));
-                  }
-              }
-          }
-          BEOF
-
-      - name: Write Layouts
+      - name: Write Layout Files
         run: |
           cat > app/src/main/res/layout/activity_main.xml << 'LEOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
             android:layout_width="match_parent" android:layout_height="match_parent"
-            android:orientation="vertical" android:padding="20dp" android:background="#0A0A0A">
-            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-              android:text="Jahez Diagnostic" android:textSize="26sp" android:textColor="#2196F3"
-              android:textStyle="bold" android:gravity="center" android:layout_marginBottom="8dp"/>
-            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-              android:text="Logs all API calls, touches, screen changes" android:textSize="12sp"
-              android:textColor="#666" android:gravity="center" android:layout_marginBottom="20dp"/>
-            <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
-              android:layout_height="wrap_content" android:text="Checking..." android:textSize="13sp"
-              android:textColor="#FF9800" android:background="#1A1A1A" android:padding="16dp"
-              android:layout_marginBottom="20dp" android:fontFamily="monospace" android:lineSpacingExtra="4dp"/>
-            <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
-              android:layout_height="56dp" android:text="View Logs" android:backgroundTint="#2196F3"
-              android:textColor="#FFF" android:textStyle="bold" android:layout_marginBottom="12dp"/>
-            <Button android:id="@+id/btn_clear" android:layout_width="match_parent"
-              android:layout_height="48dp" android:text="Clear Logs" android:backgroundTint="#B71C1C"
-              android:textColor="#FFF"/>
-          </LinearLayout>
+            android:background="#0A0A0A">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:orientation="vertical" android:padding="20dp">
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Jahez Auto" android:textSize="30sp" android:textColor="#4CAF50"
+                android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Auto Accept Orders" android:textSize="12sp"
+                android:textColor="#666" android:gravity="center" android:layout_marginBottom="20dp"/>
+              <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
+                android:textSize="24sp" android:textColor="#FF5555"
+                android:textStyle="bold" android:gravity="center" android:layout_marginBottom="28dp"/>
+              <View android:layout_width="match_parent" android:layout_height="1dp"
+                android:background="#222" android:layout_marginBottom="20dp"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Max Pickup Distance (Km From You)"
+                android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
+              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
+                android:layout_height="56dp" android:inputType="numberDecimal" android:text="2.0"
+                android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
+                android:padding="12dp" android:layout_marginBottom="16dp"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Max Drop Distance (Km From Pickup)"
+                android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
+              <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
+                android:layout_height="56dp" android:inputType="numberDecimal" android:text="5.0"
+                android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
+                android:padding="12dp" android:layout_marginBottom="20dp"/>
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginBottom="4dp">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                  android:layout_weight="1" android:text="Swipe Delay (after order screen appears)"
+                  android:textColor="#AAA" android:textSize="13sp"/>
+                <TextView android:id="@+id/tv_delay" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:text="400ms"
+                  android:textColor="#4CAF50" android:textSize="14sp" android:textStyle="bold"/>
+              </LinearLayout>
+              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:max="1450" android:progress="350"
+                android:progressTint="#4CAF50" android:thumbTint="#4CAF50"
+                android:layout_marginBottom="6dp"/>
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginBottom="20dp">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                  android:layout_weight="1" android:text="50ms" android:textColor="#555" android:textSize="11sp"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                  android:layout_weight="1" android:text="750ms" android:textColor="#555"
+                  android:textSize="11sp" android:gravity="center"/>
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                  android:layout_weight="1" android:text="1500ms" android:textColor="#555"
+                  android:textSize="11sp" android:gravity="end"/>
+              </LinearLayout>
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent"
+                android:layout_height="54dp" android:text="Save Settings"
+                android:backgroundTint="#2196F3" android:textColor="#FFF"
+                android:textStyle="bold" android:layout_marginBottom="16dp"/>
+              <Switch android:id="@+id/sw_enable" android:layout_width="match_parent"
+                android:layout_height="58dp" android:text="  Enable Auto Accept"
+                android:textColor="#FFF" android:textSize="16sp"
+                android:background="#1A1A1A" android:padding="16dp"
+                android:layout_gravity="center_horizontal" android:layout_marginBottom="12dp"/>
+              <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
+                android:layout_height="54dp" android:text="📋  View Logs"
+                android:backgroundTint="#333" android:textColor="#FFF"
+                android:textStyle="bold" android:layout_marginBottom="20dp"/>
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Setup:\n1. LSPosed mein Jahez Auto enable karo (scope: net.jahez.fleets)\n2. Distance set karo → Save\n3. Toggle ON karo\n4. Saned kholo — orders auto accept!"
+                android:textColor="#555" android:textSize="12sp"
+                android:gravity="center" android:lineSpacingExtra="4dp"/>
+            </LinearLayout>
+          </ScrollView>
           LEOF
 
           cat > app/src/main/res/layout/activity_log.xml << 'LOGEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
             android:layout_width="match_parent" android:layout_height="match_parent"
-            android:orientation="vertical" android:background="#0A0A0A" android:padding="12dp">
+            android:orientation="vertical" android:background="#0A0A0A" android:padding="16dp">
             <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-              android:text="Diagnostic Log" android:textSize="20sp" android:textColor="#2196F3"
-              android:textStyle="bold" android:layout_marginBottom="10dp"/>
+              android:text="Activity Log" android:textSize="22sp" android:textColor="#4CAF50"
+              android:textStyle="bold" android:layout_marginBottom="12dp"/>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-              android:orientation="horizontal" android:layout_marginBottom="10dp">
-              <Button android:id="@+id/btn_back" android:layout_width="0dp" android:layout_height="44dp"
-                android:layout_weight="1" android:text="Back" android:backgroundTint="#333"
+              android:orientation="horizontal" android:layout_marginBottom="12dp">
+              <Button android:id="@+id/btn_back" android:layout_width="0dp"
+                android:layout_height="46dp" android:layout_weight="1"
+                android:text="Back" android:backgroundTint="#333"
                 android:textColor="#FFF" android:layout_marginEnd="8dp"/>
-              <Button android:id="@+id/btn_clear" android:layout_width="0dp" android:layout_height="44dp"
-                android:layout_weight="1" android:text="Clear" android:backgroundTint="#B71C1C"
+              <Button android:id="@+id/btn_clear" android:layout_width="0dp"
+                android:layout_height="46dp" android:layout_weight="1"
+                android:text="Clear" android:backgroundTint="#B71C1C"
                 android:textColor="#FFF"/>
             </LinearLayout>
             <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
               <TextView android:id="@+id/tv_log" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:text="Loading..." android:textColor="#CCC"
-                android:textSize="11sp" android:fontFamily="monospace" android:lineSpacingExtra="4dp"
+                android:layout_height="wrap_content" android:text="Loading..."
+                android:textColor="#CCC" android:textSize="13sp"
+                android:fontFamily="monospace" android:lineSpacingExtra="6dp"
                 android:padding="8dp" android:background="#111"/>
             </ScrollView>
           </LinearLayout>
@@ -675,7 +763,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml << 'REOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-            <string name="app_name">Jahez Diagnostic</string>
+            <string name="app_name">Jahez Auto</string>
           </resources>
           REOF
 
@@ -683,8 +771,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
             <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
-              <item name="colorPrimary">#2196F3</item>
-              <item name="colorPrimaryDark">#1565C0</item>
+              <item name="colorPrimary">#4CAF50</item>
+              <item name="colorPrimaryDark">#388E3C</item>
               <item name="colorAccent">#FF9800</item>
             </style>
           </resources>
@@ -695,23 +783,24 @@ jobs:
 
       - name: Sign APK
         run: |
-          keytool -genkey -v -keystore /tmp/key.keystore -alias diag \
+          keytool -genkey -v -keystore /tmp/key.keystore -alias jahez \
             -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Danish,O=JahezDiag,C=SA" \
+            -dname "CN=Danish,O=JahezAuto,C=SA" \
             -storepass danish123 -keypass danish123 2>/dev/null
           APK=$(find app/build -name "*release-unsigned*.apk" | head -1)
           if [ -z "$APK" ]; then APK=$(find app/build -name "*release*.apk" | head -1); fi
           echo "Signing: $APK"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name "apksigner" -type f | sort -V | tail -1)
           if [ -z "$APKSIGNER" ]; then echo "apksigner not found!"; exit 1; fi
-          $APKSIGNER sign --ks /tmp/key.keystore --ks-key-alias diag \
+          echo "Using: $APKSIGNER"
+          $APKSIGNER sign --ks /tmp/key.keystore --ks-key-alias jahez \
             --ks-pass pass:danish123 --key-pass pass:danish123 \
-            --out app/build/JahezDiagnostic.apk "$APK"
+            --out app/build/JahezAutoAccept.apk "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: JahezDiagnostic
+          name: JahezAutoAccept
           path: |
-            app/build/JahezDiagnostic.apk
+            app/build/JahezAutoAccept.apk
             app/build/outputs/apk/**/*.apk
