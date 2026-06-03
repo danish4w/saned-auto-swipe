@@ -74,8 +74,8 @@ jobs:
               applicationId 'com.auto.driver'
               minSdk 26
               targetSdk 34
-              versionCode 5
-              versionName '5.0'
+              versionCode 6
+              versionName '6.0'
             }
             buildTypes {
               release { minifyEnabled false }
@@ -102,7 +102,6 @@ jobs:
             <path android:fillColor="#1B5E20" android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
           </vector>
           BGEOF
-
           cat > app/src/main/res/drawable/ic_launcher_foreground.xml << 'FGEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -111,7 +110,6 @@ jobs:
             <path android:fillColor="#FFFFFF" android:pathData="M25,54 L35,44 L47,60 L73,30 L83,40 L47,82 Z"/>
           </vector>
           FGEOF
-
           cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'ICEOF'
           <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
@@ -119,7 +117,6 @@ jobs:
             <foreground android:drawable="@drawable/ic_launcher_foreground"/>
           </adaptive-icon>
           ICEOF
-
           cp app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 
       - name: Write Network Security Config
@@ -156,7 +153,7 @@ jobs:
               android:allowBackup="false"
               android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v5 - Direct API accept"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v6"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -182,10 +179,7 @@ jobs:
           cat > app/src/main/java/com/auto/driver/SanedHook.java << 'HEOF'
           package com.auto.driver;
 
-          import android.content.Context;
           import android.content.Intent;
-          import android.location.Location;
-          import android.location.LocationManager;
           import android.os.Bundle;
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -195,42 +189,21 @@ jobs:
 
           public class SanedHook implements IXposedHookLoadPackage {
 
-              static final String TARGET          = "net.jahez.fleets";
-              static final String OUR_PKG         = "com.auto.driver";
-              static final String ORDER_ACTIVITY  = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
+              static final String TARGET         = "net.jahez.fleets";
+              static final String OUR_PKG        = "com.auto.driver";
+              static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
 
-              // Captured Bearer token — updated by OkHttp hook
-              private volatile String capturedToken = "";
+              // Hardcoded Basic auth — extracted directly from Saned APK
+              // Decoded: drivers:c23f3a87-aaf3-4a44-a82e-fb6cac81bd20
+              static final String BASIC_AUTH = "Basic ZHJpdmVyczpjMjNmM2E4Ny1hYWYzLTRhNDQtYTgyZS1mYjZjYWM4MWJkMjA=";
+
               private long lastBcast = 0;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
 
-                  // ── Hook 1: OkHttp → capture Authorization: Bearer <token> ──
-                  // Fires on every API call made by Saned, so token stays fresh
-                  try {
-                      XposedHelpers.findAndHookMethod(
-                          "okhttp3.Request$Builder", lp.classLoader, "build",
-                          new XC_MethodHook() {
-                              @Override
-                              protected void afterHookedMethod(MethodHookParam param) {
-                                  try {
-                                      Object request = param.getResult();
-                                      Object headers = XposedHelpers.callMethod(request, "headers");
-                                      String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
-                                      if (auth != null && auth.startsWith("Bearer ") && auth.length() > 20) {
-                                          capturedToken = auth;
-                                      }
-                                  } catch (Throwable ignored) {}
-                              }
-                          }
-                      );
-                  } catch (Throwable e) {
-                      sendLog(null, "⚠️ OkHttp hook failed: " + e.getMessage());
-                  }
-
-                  // ── Hook 2: IncomingDispatchActivity.onResume() → extract + broadcast order data ──
+                  // Hook: IncomingDispatchActivity.onResume() → order data extract karo
                   XposedHelpers.findAndHookMethod(
                       "android.app.Activity", lp.classLoader, "onResume",
                       new XC_MethodHook() {
@@ -239,45 +212,38 @@ jobs:
                               android.app.Activity act = (android.app.Activity) param.thisObject;
                               if (!ORDER_ACTIVITY.equals(act.getClass().getName())) return;
 
-                              // Debounce: same order screen can fire multiple times
+                              // Debounce — same screen multiple baar fire hoti hai
                               long now = System.currentTimeMillis();
                               if (now - lastBcast < 2000) return;
                               lastBcast = now;
 
                               try {
-                                  Intent actIntent = act.getIntent();
-                                  Bundle extras = (actIntent != null) ? actIntent.getExtras() : null;
+                                  Bundle extras = act.getIntent() != null ? act.getIntent().getExtras() : null;
                                   if (extras == null) {
-                                      sendLog(act, "⚠️ Intent extras null — cannot read order");
+                                      sendLog(act, "⚠️ Intent extras null");
                                       return;
                                   }
 
-                                  // requestId: try String first, then Long, then Integer
                                   String requestId = extractRequestId(extras);
-
                                   double pickupLat = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
                                   double pickupLon = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LONGITUDE");
                                   double dropDist  = getDouble(extras, "EXTRA_DISTANCE");
                                   double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
                                   double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
 
-                                  sendLog(act,
-                                      "📦 id=" + requestId
+                                  sendLog(act, "📦 id=" + requestId
                                       + " drop=" + String.format("%.2f", dropDist) + "km"
-                                      + " price=" + price
-                                      + " bonus=" + bonus
-                                      + " token=" + (capturedToken.length() > 20 ? "✅" : "❌"));
+                                      + " price=" + price + " bonus=" + bonus);
 
                                   Intent broadcast = new Intent("JAHEZ_ORDER_DATA");
                                   broadcast.setPackage(OUR_PKG);
-                                  broadcast.putExtra("request_id",  requestId);
-                                  broadcast.putExtra("pickup_lat",  pickupLat);
-                                  broadcast.putExtra("pickup_lon",  pickupLon);
-                                  broadcast.putExtra("drop_dist",   dropDist);
-                                  broadcast.putExtra("price",       price);
-                                  broadcast.putExtra("bonus",       bonus);
-                                  broadcast.putExtra("auth_token",  capturedToken);
-                                  broadcast.putExtra("is_order",    true);
+                                  broadcast.putExtra("request_id", requestId);
+                                  broadcast.putExtra("pickup_lat", pickupLat);
+                                  broadcast.putExtra("pickup_lon", pickupLon);
+                                  broadcast.putExtra("drop_dist",  dropDist);
+                                  broadcast.putExtra("price",      price);
+                                  broadcast.putExtra("bonus",      bonus);
+                                  broadcast.putExtra("is_order",   true);
                                   act.sendBroadcast(broadcast);
 
                               } catch (Throwable e) {
@@ -288,18 +254,15 @@ jobs:
                   );
               }
 
-              // requestId could be String, Long, or Integer depending on Saned version
+              // requestId String ya Long ya Integer ho sakta hai
               private String extractRequestId(Bundle b) {
                   try {
-                      // Try String
                       Object v = b.get("EXTRA_DISPATCH_REQUEST_ID");
                       if (v instanceof String && !((String) v).isEmpty()) return (String) v;
                       if (v instanceof Long)    return String.valueOf(v);
                       if (v instanceof Integer) return String.valueOf(v);
-                      // Fallback: getString with null default
                       String s = b.getString("EXTRA_DISPATCH_REQUEST_ID");
                       if (s != null && !s.isEmpty()) return s;
-                      // Last resort: getLong
                       long l = b.getLong("EXTRA_DISPATCH_REQUEST_ID", -1L);
                       if (l > 0) return String.valueOf(l);
                   } catch (Throwable ignored) {}
@@ -311,7 +274,7 @@ jobs:
                       Intent i = new Intent("JAHEZ_HOOK_LOG");
                       i.setPackage(OUR_PKG);
                       i.putExtra("log", msg);
-                      if (act != null) act.sendBroadcast(i);
+                      act.sendBroadcast(i);
                   } catch (Throwable ignored) {}
               }
 
@@ -360,13 +323,16 @@ jobs:
 
           public class AutoService extends Service {
 
-              // ── API endpoint from APK decompile ──
+              // API endpoint — Saned APK se milا
               static final String ACCEPT_URL = "https://gateway.saned.io/api/v1/dispatch/accept-dispatch/";
+
+              // Hardcoded Basic auth — Saned APK se extracted
+              // drivers:c23f3a87-aaf3-4a44-a82e-fb6cac81bd20
+              static final String BASIC_AUTH = "Basic ZHJpdmVyczpjMjNmM2E4Ny1hYWYzLTRhNDQtYTgyZS1mYjZjYWM4MWJkMjA=";
 
               SharedPreferences prefs;
               long lastEvent = 0;
 
-              // ── Receive logs from SanedHook (runs inside Saned process) ──
               private final BroadcastReceiver hookLogReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
                       String msg = intent.getStringExtra("log");
@@ -374,29 +340,20 @@ jobs:
                   }
               };
 
-              // ── Receive order data from SanedHook ──
               private final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
                       if (!intent.getBooleanExtra("is_order", false)) return;
-
-                      // Verify sender is from Saned package (security: check calling package if possible)
                       String requestId = intent.getStringExtra("request_id");
-                      String authToken = intent.getStringExtra("auth_token");
                       double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
                       double pickupLon = intent.getDoubleExtra("pickup_lon", -1);
                       double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
                       double price     = intent.getDoubleExtra("price",       0);
                       double bonus     = intent.getDoubleExtra("bonus",       0);
-
-                      saveLog("🪝 Order: id=" + requestId
-                          + " drop=" + fmt2(dropDist) + "km"
-                          + " ₿" + price + "+" + bonus);
-
-                      processOrder(requestId, authToken, pickupLat, pickupLon, dropDist);
+                      saveLog("🪝 Order: id=" + requestId + " drop=" + fmt2(dropDist) + "km price=" + price + " bonus=" + bonus);
+                      processOrder(requestId, pickupLat, pickupLon, dropDist);
                   }
               };
 
-              // ── Toggle from notification button ──
               private final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
                       if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
@@ -404,7 +361,7 @@ jobs:
                           boolean cur = prefs.getBoolean("enabled", false);
                           prefs.edit().putBoolean("enabled", !cur).apply();
                           sendBroadcast(new Intent(!cur ? "JAHEZ_AUTO_ON" : "JAHEZ_AUTO_OFF"));
-                          saveLog(!cur ? "▶️ Enabled via notification" : "⏸ Disabled via notification");
+                          saveLog(!cur ? "▶️ Enabled" : "⏸ Disabled");
                       }
                       showNotification();
                   }
@@ -413,105 +370,63 @@ jobs:
               @Override public void onCreate() {
                   super.onCreate();
                   prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-
-                  // Toggle + state change
                   IntentFilter tf = new IntentFilter("JAHEZ_TOGGLE");
                   tf.addAction("JAHEZ_STATE_CHANGED");
-                  registerReceiverCompat(toggleReceiver, tf, false);
-
-                  // Order data — EXPORTED so SanedHook (different process) can send
-                  registerReceiverCompat(orderReceiver, new IntentFilter("JAHEZ_ORDER_DATA"), true);
-
-                  // Hook logs — EXPORTED so SanedHook can send
-                  registerReceiverCompat(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"), true);
-
+                  reg(toggleReceiver, tf, false);
+                  reg(orderReceiver,  new IntentFilter("JAHEZ_ORDER_DATA"), true);
+                  reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),  true);
                   showNotification();
-                  saveLog("✅ AutoService started v5");
+                  saveLog("✅ AutoService v6 started");
               }
 
-              private void registerReceiverCompat(BroadcastReceiver r, IntentFilter f, boolean exported) {
-                  if (Build.VERSION.SDK_INT >= 33) {
+              void reg(BroadcastReceiver r, IntentFilter f, boolean exported) {
+                  if (Build.VERSION.SDK_INT >= 33)
                       registerReceiver(r, f, exported ? Context.RECEIVER_EXPORTED : Context.RECEIVER_NOT_EXPORTED);
-                  } else {
+                  else
                       registerReceiver(r, f);
-                  }
               }
 
               @Override public int onStartCommand(Intent i, int flags, int id) { return START_STICKY; }
               @Override public IBinder onBind(Intent i) { return null; }
 
-              // ════════════════════════════════════════════════════════
-              // Core logic: distance filter → API call
-              // ════════════════════════════════════════════════════════
-              void processOrder(String requestId, String authToken,
-                                double pickupLat, double pickupLon, double dropDist) {
+              void processOrder(String requestId, double pickupLat, double pickupLon, double dropDist) {
+                  if (!prefs.getBoolean("enabled", false)) { saveLog("⏸ Disabled"); return; }
 
-                  if (!prefs.getBoolean("enabled", false)) {
-                      saveLog("⏸ Disabled");
-                      return;
-                  }
-
-                  // Debounce — prevent duplicate from rapid onResume calls
                   long now = System.currentTimeMillis();
-                  if (now - lastEvent < 2000) {
-                      saveLog("⚡ Debounce skip");
-                      return;
-                  }
+                  if (now - lastEvent < 2000) { saveLog("⚡ Debounce"); return; }
                   lastEvent = now;
 
-                  // Validate inputs before GPS calculation
                   if (requestId == null || requestId.isEmpty()) {
-                      saveLog("❌ SKIP — requestId empty");
-                      return;
-                  }
-                  if (authToken == null || authToken.length() < 20) {
-                      saveLog("❌ SKIP — token missing. Saned mein koi action karo to token capture ho");
-                      toast("Token nahi mila! Saned scroll karo phir retry");
-                      return;
+                      saveLog("❌ SKIP — requestId empty"); return;
                   }
 
-                  // ── GPS: calculate pickup distance ──
-                  float pickupDistKm = calcPickupDist(pickupLat, pickupLon);
-
+                  // GPS: pickup distance
+                  float pickupKm = calcPickupDist(pickupLat, pickupLon);
                   float maxPickup = prefs.getFloat("max_pickup", 2.0f);
                   float maxDrop   = prefs.getFloat("max_drop",   5.0f);
-                  float dropKm    = (dropDist > 0) ? (float) dropDist : -1f;
+                  float dropKm    = dropDist > 0 ? (float) dropDist : -1f;
 
                   saveLog(String.format("📏 Pickup=%s/%skm  Drop=%s/%skm",
-                      fmt1(pickupDistKm), fmt1(maxPickup),
-                      fmt1(dropKm),       fmt1(maxDrop)));
+                      fmt1(pickupKm), fmt1(maxPickup), fmt1(dropKm), fmt1(maxDrop)));
 
-                  boolean pickupOk = (pickupDistKm < 0) || (pickupDistKm <= maxPickup);
-                  boolean dropOk   = (dropKm < 0)       || (dropKm <= maxDrop);
+                  boolean pickupOk = pickupKm < 0 || pickupKm <= maxPickup;
+                  boolean dropOk   = dropKm   < 0 || dropKm   <= maxDrop;
 
                   if (!pickupOk || !dropOk) {
-                      StringBuilder reason = new StringBuilder();
-                      if (!pickupOk) reason.append("Pickup ").append(fmt1(pickupDistKm))
-                                           .append(">").append(fmt1(maxPickup)).append("km");
-                      if (!dropOk) {
-                          if (reason.length() > 0) reason.append("  ");
-                          reason.append("Drop ").append(fmt1(dropKm))
-                                .append(">").append(fmt1(maxDrop)).append("km");
-                      }
-                      String msg = "❌ SKIP — " + reason;
-                      toast(msg); saveLog(msg);
-                      return;
+                      StringBuilder r = new StringBuilder();
+                      if (!pickupOk) r.append("Pickup ").append(fmt1(pickupKm)).append(">").append(fmt1(maxPickup)).append("km");
+                      if (!dropOk) { if (r.length()>0) r.append("  "); r.append("Drop ").append(fmt1(dropKm)).append(">").append(fmt1(maxDrop)).append("km"); }
+                      String msg = "❌ SKIP — " + r;
+                      toast(msg); saveLog(msg); return;
                   }
 
-                  // ── All filters passed → call API after configured delay ──
                   int delay = prefs.getInt("scan_delay", 500);
                   saveLog("✅ Filter pass! API call in " + delay + "ms → id=" + requestId);
-
                   new Handler(Looper.getMainLooper()).postDelayed(
-                      () -> callAcceptApi(requestId, authToken, pickupDistKm, dropKm),
-                      delay
-                  );
+                      () -> callAcceptApi(requestId, pickupKm, dropKm), delay);
               }
 
-              // ════════════════════════════════════════════════════════
-              // HTTP PUT to accept order
-              // ════════════════════════════════════════════════════════
-              void callAcceptApi(String requestId, String authToken, float pickupKm, float dropKm) {
+              void callAcceptApi(String requestId, float pickupKm, float dropKm) {
                   new Thread(() -> {
                       String urlStr = ACCEPT_URL + requestId;
                       saveLog("🌐 PUT " + urlStr);
@@ -519,91 +434,64 @@ jobs:
                       try {
                           conn = (HttpURLConnection) new URL(urlStr).openConnection();
                           conn.setRequestMethod("PUT");
-                          conn.setRequestProperty("Authorization", authToken);
+                          conn.setRequestProperty("Authorization", BASIC_AUTH);
                           conn.setRequestProperty("Content-Type", "application/json");
                           conn.setRequestProperty("Accept", "application/json");
-                          conn.setConnectTimeout(5000);  // 5s — order expires fast
+                          conn.setConnectTimeout(5000);
                           conn.setReadTimeout(5000);
                           conn.setDoOutput(false);
 
                           int code = conn.getResponseCode();
-
                           if (code == 200 || code == 201 || code == 204) {
-                              String msg = "🎉 ACCEPTED! HTTP " + code
-                                  + "  Pickup=" + fmt1(pickupKm) + "km"
-                                  + "  Drop=" + fmt1(dropKm) + "km";
+                              String msg = "🎉 ACCEPTED! HTTP " + code + "  Pickup=" + fmt1(pickupKm) + "km  Drop=" + fmt1(dropKm) + "km";
                               toast(msg); saveLog(msg);
                           } else {
-                              // Read error body for debugging
-                              String body = readStream(conn.getErrorStream(), 300);
-                              String msg = "❌ API HTTP " + code + " — " + body;
-
-                              // Token expired?
-                              if (code == 401) {
-                                  msg += " (Token expired — Saned mein login refresh karo)";
-                              }
+                              String body = readStream(conn.getErrorStream(), 400);
+                              String msg = "❌ HTTP " + code + " — " + body;
+                              if (code == 401) msg += " (Auth fail — APK update hogi, contact dev)";
+                              if (code == 409) msg += " (Order already accepted)";
+                              if (code == 404) msg += " (Order expire ho gayi)";
                               toast(msg); saveLog(msg);
                           }
                           showNotification();
-
                       } catch (Exception e) {
                           String msg = "❌ Network: " + e.getMessage();
                           toast(msg); saveLog(msg);
                       } finally {
                           if (conn != null) conn.disconnect();
                       }
-                  }, "accept-api-thread").start();
+                  }, "accept-thread").start();
               }
 
-              // ════════════════════════════════════════════════════════
-              // GPS helper — returns -1 if location unavailable
-              // ════════════════════════════════════════════════════════
-              float calcPickupDist(double pickupLat, double pickupLon) {
-                  if (pickupLat <= 0 || pickupLon <= 0) return -1;
+              float calcPickupDist(double lat, double lon) {
+                  if (lat <= 0 || lon <= 0) return -1;
                   try {
                       LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
                       Location loc = null;
-                      // Try GPS first, then network
                       for (String p : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
                           try {
                               Location l = lm.getLastKnownLocation(p);
                               if (l != null) {
-                                  // Reject stale location (older than 5 minutes)
-                                  if ((System.currentTimeMillis() - l.getTime()) < 5 * 60 * 1000) {
-                                      loc = l; break;
-                                  } else if (loc == null) {
-                                      loc = l; // Use stale if nothing else
-                                  }
+                                  if (System.currentTimeMillis() - l.getTime() < 5 * 60 * 1000L) { loc = l; break; }
+                                  else if (loc == null) loc = l;
                               }
                           } catch (SecurityException ignored) {}
                       }
-                      if (loc == null) {
-                          saveLog("⚠️ GPS: no location available, pickup filter skip");
-                          return -1;
-                      }
+                      if (loc == null) { saveLog("⚠️ GPS unavailable, pickup filter skip"); return -1; }
                       float[] res = new float[1];
-                      Location.distanceBetween(loc.getLatitude(), loc.getLongitude(), pickupLat, pickupLon, res);
+                      Location.distanceBetween(loc.getLatitude(), loc.getLongitude(), lat, lon, res);
                       return res[0] / 1000f;
-                  } catch (Exception e) {
-                      saveLog("⚠️ GPS error: " + e.getMessage());
-                      return -1;
-                  }
+                  } catch (Exception e) { saveLog("⚠️ GPS: " + e.getMessage()); return -1; }
               }
 
-              // ════════════════════════════════════════════════════════
-              // Notification
-              // ════════════════════════════════════════════════════════
               void showNotification() {
                   boolean on = prefs != null && prefs.getBoolean("enabled", false);
                   NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                  if (Build.VERSION.SDK_INT >= 26) {
-                      nm.createNotificationChannel(new NotificationChannel(
-                          "auto_svc", "Auto Driver", NotificationManager.IMPORTANCE_LOW));
-                  }
+                  if (Build.VERSION.SDK_INT >= 26)
+                      nm.createNotificationChannel(new NotificationChannel("auto_svc", "Auto Driver", NotificationManager.IMPORTANCE_LOW));
                   Intent ti = new Intent("JAHEZ_TOGGLE").setPackage(getPackageName());
-                  PendingIntent tp = PendingIntent.getBroadcast(this, 0, ti,
-                      PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-                  Notification.Action action = new Notification.Action.Builder(
+                  PendingIntent tp = PendingIntent.getBroadcast(this, 0, ti, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+                  Notification.Action a = new Notification.Action.Builder(
                       on ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
                       on ? "✅ ON — tap OFF" : "⏸ OFF — tap ON", tp).build();
                   Notification.Builder b = new Notification.Builder(this, "auto_svc")
@@ -611,16 +499,12 @@ jobs:
                       .setContentText(on ? "Auto Accept: ON" : "Auto Accept: OFF")
                       .setSmallIcon(android.R.drawable.ic_media_play)
                       .setOngoing(true);
-                  if (Build.VERSION.SDK_INT >= 23) b.addAction(action);
+                  if (Build.VERSION.SDK_INT >= 23) b.addAction(a);
                   startForeground(1, b.build());
               }
 
-              // ════════════════════════════════════════════════════════
-              // Helpers
-              // ════════════════════════════════════════════════════════
               void saveLog(String msg) {
-                  String entry = "[" + new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
-                      .format(new Date()) + "]  " + msg;
+                  String entry = "[" + new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(new Date()) + "]  " + msg;
                   String existing = prefs.getString("logs", "");
                   String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
                   StringBuilder sb = new StringBuilder(entry);
@@ -635,14 +519,10 @@ jobs:
 
               String fmt1(float v)  { return v < 0 ? "?" : String.format("%.1f", v); }
               String fmt2(double v) { return v < 0 ? "?" : String.format("%.2f", v); }
-
-              String readStream(InputStream is, int maxBytes) {
+              String readStream(InputStream is, int max) {
                   if (is == null) return "";
-                  try {
-                      byte[] buf = new byte[maxBytes];
-                      int n = is.read(buf);
-                      return n > 0 ? new String(buf, 0, n).trim() : "";
-                  } catch (Exception e) { return ""; }
+                  try { byte[] b = new byte[max]; int n = is.read(b); return n > 0 ? new String(b, 0, n).trim() : ""; }
+                  catch (Exception e) { return ""; }
               }
 
               @Override public void onDestroy() {
@@ -788,7 +668,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Direct API Accept — v5" android:textSize="12sp"
+                android:text="Direct API Accept — v6" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -848,7 +728,7 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed: Auto Driver enable karo (scope: net.jahez.fleets)\n2. Saned kholo — token auto capture hoga\n3. Distance set → Save\n4. Toggle ON\n5. Orders auto accept!"
+                android:text="Setup:\n1. LSPosed: Auto Driver enable karo (scope: net.jahez.fleets)\n2. Saned kholo\n3. Distance set → Save\n4. Toggle ON\n5. Orders auto accept!"
                 android:textColor="#444" android:textSize="12sp"
                 android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
@@ -920,7 +800,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v5
+          name: AutoDriver-v6
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
