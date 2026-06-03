@@ -74,8 +74,8 @@ jobs:
               applicationId 'com.auto.driver'
               minSdk 26
               targetSdk 34
-              versionCode 7
-              versionName '7.0'
+              versionCode 8
+              versionName '8.0'
             }
             buildTypes {
               release { minifyEnabled false }
@@ -153,7 +153,7 @@ jobs:
               android:allowBackup="false"
               android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v7"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v8"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -184,6 +184,7 @@ jobs:
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
+          import de.robv.android.xposed.XposedBridge;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
@@ -193,54 +194,78 @@ jobs:
               static final String OUR_PKG        = "com.auto.driver";
               static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
 
-              // Token captured from OkHttp — gateway.saned.io wali requests se
+              // Token captured from RealInterceptorChain — gateway.saned.io requests se
               private volatile String capturedToken = "";
-              private volatile int tokenUpdateCount = 0;
+              private volatile String capturedAcceptToken = ""; // manual accept se
+              private volatile int tokenCount = 0;
               private long lastBcast = 0;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
 
-                  // ── Hook 1: OkHttp Request$Builder.build() ──
-                  // gateway.saned.io ki har request ka Authorization header capture karo
+                  XposedBridge.log("[AutoDriver] v8 loading into " + lp.packageName);
+
+                  // ── Hook 1: RealInterceptorChain.proceed() ──
+                  // Har HTTP request isse guzarti hai — Request$Builder se zyada reliable
+                  // Manual accept bhi capture karega
                   try {
                       XposedHelpers.findAndHookMethod(
-                          "okhttp3.Request$Builder", lp.classLoader, "build",
+                          "okhttp3.internal.http.RealInterceptorChain",
+                          lp.classLoader,
+                          "proceed",
+                          XposedHelpers.findClass("okhttp3.Request", lp.classLoader),
                           new XC_MethodHook() {
                               @Override
-                              protected void afterHookedMethod(MethodHookParam param) {
+                              protected void beforeHookedMethod(MethodHookParam param) {
                                   try {
-                                      Object request = param.getResult();
-
-                                      // URL check — sirf gateway.saned.io ki requests
+                                      Object request = param.args[0];
                                       Object httpUrl = XposedHelpers.callMethod(request, "url");
-                                      String urlStr  = httpUrl.toString();
-                                      if (!urlStr.contains("saned.io") && !urlStr.contains("jahez")) return;
+                                      String url = httpUrl.toString();
+
+                                      // Sirf gateway.saned.io ki requests
+                                      if (!url.contains("saned.io")) return;
 
                                       Object headers = XposedHelpers.callMethod(request, "headers");
                                       String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
+                                      String method = (String) XposedHelpers.callMethod(request, "method");
 
                                       if (auth != null && auth.length() > 10) {
                                           boolean changed = !auth.equals(capturedToken);
                                           capturedToken = auth;
-                                          tokenUpdateCount++;
-                                          // Sirf change hone par log karo
+                                          tokenCount++;
+
                                           if (changed) {
-                                              sendGlobalLog("🔑 Token captured #" + tokenUpdateCount
-                                                  + ": " + auth.substring(0, Math.min(30, auth.length())) + "...");
+                                              XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                                                  + " captured from " + method + " " + url.replaceAll("\\?.*", ""));
+                                              sendGlobalLog("🔑 Token #" + tokenCount + " ["
+                                                  + auth.substring(0, Math.min(30, auth.length())) + "...]"
+                                                  + " from " + method);
+                                          }
+
+                                          // Manual accept capture — accept-dispatch URL se
+                                          if (url.contains("accept-dispatch") || url.contains("accept/")) {
+                                              capturedAcceptToken = auth;
+                                              XposedBridge.log("[AutoDriver] 🎯 ACCEPT API captured! URL=" + url + " Auth=" + auth.substring(0, Math.min(40, auth.length())));
+                                              sendGlobalLog("🎯 Manual accept API! URL=" + url
+                                                  + "\n   Auth=" + auth.substring(0, Math.min(50, auth.length())) + "...");
                                           }
                                       }
                                   } catch (Throwable ignored) {}
                               }
                           }
                       );
-                      sendGlobalLog("✅ OkHttp hook registered OK");
+                      XposedBridge.log("[AutoDriver] ✅ RealInterceptorChain hook OK");
+                      sendGlobalLog("✅ RealInterceptorChain hook OK");
                   } catch (Throwable e) {
-                      sendGlobalLog("❌ OkHttp hook FAILED: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ RealInterceptorChain hook FAILED: " + e.getMessage());
+                      sendGlobalLog("❌ RealInterceptorChain FAILED: " + e.getMessage());
+
+                      // Fallback: Request$Builder.build() try karo
+                      tryRequestBuilderHook(lp);
                   }
 
-                  // ── Hook 2: Activity.onResume() → order data extract ──
+                  // ── Hook 2: Activity.onResume() → order data ──
                   try {
                       XposedHelpers.findAndHookMethod(
                           "android.app.Activity", lp.classLoader, "onResume",
@@ -256,10 +281,7 @@ jobs:
 
                                   try {
                                       Bundle extras = act.getIntent() != null ? act.getIntent().getExtras() : null;
-                                      if (extras == null) {
-                                          sendLog(act, "⚠️ Intent extras null");
-                                          return;
-                                      }
+                                      if (extras == null) { sendLog(act, "⚠️ extras null"); return; }
 
                                       String requestId = extractRequestId(extras);
                                       double pickupLat = getDouble(extras, "EXTRA_DISPATCH_PICKUP_LATITUDE");
@@ -268,41 +290,71 @@ jobs:
                                       double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
                                       double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
 
-                                      // Token status bhi log karo
-                                      String tokenStatus = capturedToken.isEmpty()
+                                      // Token status
+                                      String tkStatus = capturedToken.isEmpty()
                                           ? "❌ NO TOKEN"
-                                          : "✅ token#" + tokenUpdateCount + "=" + capturedToken.substring(0, Math.min(20, capturedToken.length()));
+                                          : "✅ #" + tokenCount + "=" + capturedToken.substring(0, Math.min(20, capturedToken.length()));
 
                                       sendLog(act, "📦 id=" + requestId
                                           + " drop=" + String.format("%.2f", dropDist) + "km"
-                                          + " price=" + price + " bonus=" + bonus
-                                          + " | " + tokenStatus);
+                                          + " ₿" + price + "+" + bonus
+                                          + " | " + tkStatus);
 
-                                      Intent broadcast = new Intent("JAHEZ_ORDER_DATA");
-                                      broadcast.setPackage(OUR_PKG);
-                                      broadcast.putExtra("request_id",  requestId);
-                                      broadcast.putExtra("pickup_lat",  pickupLat);
-                                      broadcast.putExtra("pickup_lon",  pickupLon);
-                                      broadcast.putExtra("drop_dist",   dropDist);
-                                      broadcast.putExtra("price",       price);
-                                      broadcast.putExtra("bonus",       bonus);
-                                      broadcast.putExtra("auth_token",  capturedToken);
-                                      broadcast.putExtra("is_order",    true);
-                                      act.sendBroadcast(broadcast);
+                                      Intent bc = new Intent("JAHEZ_ORDER_DATA");
+                                      bc.setPackage(OUR_PKG);
+                                      bc.putExtra("request_id",  requestId);
+                                      bc.putExtra("pickup_lat",  pickupLat);
+                                      bc.putExtra("pickup_lon",  pickupLon);
+                                      bc.putExtra("drop_dist",   dropDist);
+                                      bc.putExtra("price",       price);
+                                      bc.putExtra("bonus",       bonus);
+                                      bc.putExtra("auth_token",  capturedToken);
+                                      bc.putExtra("is_order",    true);
+                                      act.sendBroadcast(bc);
 
                                   } catch (Throwable e) {
-                                      sendLog(act, "❌ onResume hook error: " + e.getMessage());
+                                      sendLog(act, "❌ onResume error: " + e.getMessage());
                                   }
                               }
                           }
                       );
-                      sendGlobalLog("✅ Activity hook registered OK");
+                      XposedBridge.log("[AutoDriver] ✅ Activity hook OK");
                   } catch (Throwable e) {
-                      sendGlobalLog("❌ Activity hook FAILED: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ Activity hook FAILED: " + e.getMessage());
                   }
               }
 
-              // requestId — String / Long / Integer teeno handle
+              // Fallback hook agar RealInterceptorChain fail ho
+              private void tryRequestBuilderHook(XC_LoadPackage.LoadPackageParam lp) {
+                  try {
+                      XposedHelpers.findAndHookMethod(
+                          "okhttp3.Request$Builder", lp.classLoader, "build",
+                          new XC_MethodHook() {
+                              @Override
+                              protected void afterHookedMethod(MethodHookParam param) {
+                                  try {
+                                      Object request = param.getResult();
+                                      Object httpUrl = XposedHelpers.callMethod(request, "url");
+                                      if (!httpUrl.toString().contains("saned.io")) return;
+                                      Object headers = XposedHelpers.callMethod(request, "headers");
+                                      String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
+                                      if (auth != null && auth.length() > 10 && !auth.equals(capturedToken)) {
+                                          capturedToken = auth;
+                                          tokenCount++;
+                                          sendGlobalLog("🔑 [Fallback] Token #" + tokenCount + " captured");
+                                      }
+                                  } catch (Throwable ignored) {}
+                              }
+                          }
+                      );
+                      XposedBridge.log("[AutoDriver] ✅ Fallback Request$Builder hook OK");
+                      sendGlobalLog("✅ Fallback hook OK");
+                  } catch (Throwable e2) {
+                      XposedBridge.log("[AutoDriver] ❌ Fallback also FAILED: " + e2.getMessage());
+                      sendGlobalLog("❌ Both hooks failed — " + e2.getMessage());
+                  }
+              }
+
               private String extractRequestId(Bundle b) {
                   try {
                       Object v = b.get("EXTRA_DISPATCH_REQUEST_ID");
@@ -317,7 +369,6 @@ jobs:
                   return "";
               }
 
-              // Activity context se log bhejo
               private void sendLog(android.app.Activity act, String msg) {
                   try {
                       Intent i = new Intent("JAHEZ_HOOK_LOG");
@@ -327,13 +378,8 @@ jobs:
                   } catch (Throwable ignored) {}
               }
 
-              // Activity context ke bina log — hook registration status ke liye
-              // Application context use karta hai
               private void sendGlobalLog(String msg) {
-                  try {
-                      // XposedBridge log mein bhi dalo (LSPosed verbose logs mein dikhega)
-                      de.robv.android.xposed.XposedBridge.log("[AutoDriver] " + msg);
-                  } catch (Throwable ignored) {}
+                  try { XposedBridge.log("[AutoDriver] " + msg); } catch (Throwable ignored) {}
               }
 
               private double getDouble(Bundle b, String key) {
@@ -366,8 +412,10 @@ jobs:
           import android.content.IntentFilter;
           import android.content.SharedPreferences;
           import android.location.Location;
+          import android.location.LocationListener;
           import android.location.LocationManager;
           import android.os.Build;
+          import android.os.Bundle;
           import android.os.Handler;
           import android.os.IBinder;
           import android.os.Looper;
@@ -382,11 +430,13 @@ jobs:
           public class AutoService extends Service {
 
               static final String ACCEPT_URL = "https://gateway.saned.io/api/v1/dispatch/accept-dispatch/";
-              // Fallback: agar token na mile to Basic use karo
               static final String BASIC_AUTH = "Basic ZHJpdmVyczpjMjNmM2E4Ny1hYWYzLTRhNDQtYTgyZS1mYjZjYWM4MWJkMjA=";
 
               SharedPreferences prefs;
               long lastEvent = 0;
+
+              // Live location — LocationListener se update hoti hai
+              private volatile Location lastLocation = null;
 
               private final BroadcastReceiver hookLogReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
@@ -405,7 +455,7 @@ jobs:
                       double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
                       double price     = intent.getDoubleExtra("price",       0);
                       double bonus     = intent.getDoubleExtra("bonus",       0);
-                      saveLog("🪝 Order: id=" + requestId + " drop=" + fmt2(dropDist) + "km price=" + price + " bonus=" + bonus);
+                      saveLog("🪝 id=" + requestId + " drop=" + fmt2(dropDist) + "km ₿" + price + "+" + bonus);
                       processOrder(requestId, authToken, pickupLat, pickupLon, dropDist);
                   }
               };
@@ -431,8 +481,47 @@ jobs:
                   reg(toggleReceiver, tf, false);
                   reg(orderReceiver,   new IntentFilter("JAHEZ_ORDER_DATA"), true);
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
+                  startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v7 started");
+                  saveLog("✅ AutoService v8 started");
+              }
+
+              // ── Location: har 30 second ya 10 meter movement pe update ──
+              void startLocationUpdates() {
+                  try {
+                      LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+                      LocationListener listener = new LocationListener() {
+                          @Override public void onLocationChanged(Location loc) {
+                              lastLocation = loc;
+                          }
+                          @Override public void onStatusChanged(String p, int s, Bundle e) {}
+                          @Override public void onProviderEnabled(String p) {}
+                          @Override public void onProviderDisabled(String p) {}
+                      };
+                      // GPS provider
+                      try {
+                          lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30000, 10, listener);
+                          saveLog("📍 GPS location updates started");
+                      } catch (SecurityException e) {
+                          saveLog("⚠️ GPS permission nahi: " + e.getMessage());
+                      }
+                      // Network provider bhi
+                      try {
+                          lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000, 10, listener);
+                          saveLog("📍 Network location updates started");
+                      } catch (SecurityException e) {
+                          saveLog("⚠️ Network location permission nahi");
+                      }
+                      // Seed: last known location se shuru karo
+                      for (String p : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
+                          try {
+                              Location l = lm.getLastKnownLocation(p);
+                              if (l != null && lastLocation == null) { lastLocation = l; break; }
+                          } catch (SecurityException ignored) {}
+                      }
+                  } catch (Exception e) {
+                      saveLog("❌ Location init failed: " + e.getMessage());
+                  }
               }
 
               void reg(BroadcastReceiver r, IntentFilter f, boolean exported) {
@@ -455,27 +544,30 @@ jobs:
                   lastEvent = now;
 
                   if (requestId == null || requestId.isEmpty()) {
-                      saveLog("❌ SKIP — requestId empty"); return;
+                      saveLog("❌ requestId empty"); return;
                   }
 
-                  // Token decision — captured token prefer karo, fallback Basic
+                  // Auth: captured token prefer karo, fallback Basic
                   String finalAuth;
                   if (authToken != null && authToken.length() > 10) {
                       finalAuth = authToken;
-                      saveLog("🔑 Using captured token: " + authToken.substring(0, Math.min(25, authToken.length())) + "...");
+                      saveLog("🔑 Token: " + authToken.substring(0, Math.min(25, authToken.length())) + "...");
                   } else {
                       finalAuth = BASIC_AUTH;
-                      saveLog("🔑 Using Basic auth (no token captured yet)");
+                      saveLog("🔑 Basic auth (token abhi capture nahi hua)");
                   }
 
-                  // GPS
+                  // GPS — live location use karo
                   float pickupKm = calcPickupDist(pickupLat, pickupLon);
                   float maxPickup = prefs.getFloat("max_pickup", 2.0f);
                   float maxDrop   = prefs.getFloat("max_drop",   5.0f);
                   float dropKm    = dropDist > 0 ? (float) dropDist : -1f;
 
-                  saveLog(String.format("📏 Pickup=%s/%skm  Drop=%s/%skm",
-                      fmt1(pickupKm), fmt1(maxPickup), fmt1(dropKm), fmt1(maxDrop)));
+                  String locAge = lastLocation != null
+                      ? ((System.currentTimeMillis() - lastLocation.getTime()) / 1000) + "s ago"
+                      : "unavailable";
+                  saveLog(String.format("📏 Pickup=%s/%skm Drop=%s/%skm (loc: %s)",
+                      fmt1(pickupKm), fmt1(maxPickup), fmt1(dropKm), fmt1(maxDrop), locAge));
 
                   boolean pickupOk = pickupKm < 0 || pickupKm <= maxPickup;
                   boolean dropOk   = dropKm   < 0 || dropKm   <= maxDrop;
@@ -489,7 +581,7 @@ jobs:
                   }
 
                   int delay = prefs.getInt("scan_delay", 500);
-                  saveLog("✅ Filter pass! API in " + delay + "ms → id=" + requestId);
+                  saveLog("✅ Filter pass! API in " + delay + "ms");
                   final String fa = finalAuth;
                   new Handler(Looper.getMainLooper()).postDelayed(
                       () -> callAcceptApi(requestId, fa, pickupKm, dropKm), delay);
@@ -499,7 +591,6 @@ jobs:
                   new Thread(() -> {
                       String urlStr = ACCEPT_URL + requestId;
                       saveLog("🌐 PUT " + urlStr);
-                      saveLog("🔑 Auth: " + authHeader.substring(0, Math.min(40, authHeader.length())) + "...");
                       HttpURLConnection conn = null;
                       try {
                           conn = (HttpURLConnection) new URL(urlStr).openConnection();
@@ -513,14 +604,14 @@ jobs:
 
                           int code = conn.getResponseCode();
                           if (code == 200 || code == 201 || code == 204) {
-                              String msg = "🎉 ACCEPTED! HTTP " + code + "  Pickup=" + fmt1(pickupKm) + "km  Drop=" + fmt1(dropKm) + "km";
+                              String msg = "🎉 ACCEPTED! HTTP " + code + " Pickup=" + fmt1(pickupKm) + "km Drop=" + fmt1(dropKm) + "km";
                               toast(msg); saveLog(msg);
                           } else {
                               String body = readStream(conn.getErrorStream(), 400);
                               String msg = "❌ HTTP " + code + " — " + body;
-                              if (code == 401) msg += " → Token galat/expire, OkHttp hook check karo";
-                              if (code == 409) msg += " → Order already accepted";
-                              if (code == 404) msg += " → Order expire ho gayi";
+                              if (code == 401) msg += " → Token galat, manual accept karo to capture hoga";
+                              if (code == 409) msg += " → Already accepted";
+                              if (code == 404) msg += " → Order expire";
                               toast(msg); saveLog(msg);
                           }
                           showNotification();
@@ -534,23 +625,12 @@ jobs:
 
               float calcPickupDist(double lat, double lon) {
                   if (lat <= 0 || lon <= 0) return -1;
+                  if (lastLocation == null) { saveLog("⚠️ GPS unavailable, pickup filter skip"); return -1; }
                   try {
-                      LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
-                      Location loc = null;
-                      for (String p : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
-                          try {
-                              Location l = lm.getLastKnownLocation(p);
-                              if (l != null) {
-                                  if (System.currentTimeMillis() - l.getTime() < 5 * 60 * 1000L) { loc = l; break; }
-                                  else if (loc == null) loc = l;
-                              }
-                          } catch (SecurityException ignored) {}
-                      }
-                      if (loc == null) { saveLog("⚠️ GPS unavailable, pickup filter skip"); return -1; }
                       float[] res = new float[1];
-                      Location.distanceBetween(loc.getLatitude(), loc.getLongitude(), lat, lon, res);
+                      Location.distanceBetween(lastLocation.getLatitude(), lastLocation.getLongitude(), lat, lon, res);
                       return res[0] / 1000f;
-                  } catch (Exception e) { saveLog("⚠️ GPS: " + e.getMessage()); return -1; }
+                  } catch (Exception e) { return -1; }
               }
 
               void showNotification() {
@@ -577,7 +657,7 @@ jobs:
                   String existing = prefs.getString("logs", "");
                   String[] lines = existing.isEmpty() ? new String[0] : existing.split("\n");
                   StringBuilder sb = new StringBuilder(entry);
-                  for (int i = 0; i < lines.length && i < 99; i++) sb.append("\n").append(lines[i]);
+                  for (int i = 0; i < lines.length && i < 150; i++) sb.append("\n").append(lines[i]);
                   prefs.edit().putString("logs", sb.toString()).apply();
               }
 
@@ -737,7 +817,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Direct API Accept — v7" android:textSize="12sp"
+                android:text="Direct API Accept — v8" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -797,7 +877,7 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed: Auto Driver enable karo (scope: net.jahez.fleets)\n2. Saned kholo\n3. Distance set → Save\n4. Toggle ON\n5. Orders auto accept!"
+                android:text="Setup:\n1. LSPosed: Auto Driver enable karo (scope: net.jahez.fleets)\n2. Saned kholo\n3. Distance set → Save\n4. Toggle ON\n5. Ek order manually accept karo — token capture hoga\n6. Agli orders auto accept!"
                 android:textColor="#444" android:textSize="12sp"
                 android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
@@ -869,7 +949,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v7
+          name: AutoDriver-v8
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
