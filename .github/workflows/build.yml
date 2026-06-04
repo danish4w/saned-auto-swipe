@@ -74,8 +74,8 @@ jobs:
               applicationId 'com.auto.driver'
               minSdk 26
               targetSdk 34
-              versionCode 9
-              versionName '9.0'
+              versionCode 10
+              versionName '10.0'
             }
             buildTypes {
               release { minifyEnabled false }
@@ -153,7 +153,7 @@ jobs:
               android:allowBackup="false"
               android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v9"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v10"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -194,7 +194,6 @@ jobs:
               static final String OUR_PKG        = "com.auto.driver";
               static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
 
-              // Token captured from SharedPreferences putString hook
               private volatile String capturedToken = "";
               private volatile int tokenCount = 0;
               private long lastBcast = 0;
@@ -202,94 +201,114 @@ jobs:
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v9 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v10 loading into " + lp.packageName);
 
-                  // ── Hook 1: SharedPreferences.putString() ──
-                  // Saned jo bhi string save kare — token jaisi value capture karo
-                  // (JWT tokens 100+ chars hote hain, "ey" se shuru)
-                  hookSharedPrefs(lp);
+                  // ── Hook 1: RealCall.execute() ──
+                  // OkHttp ka har synchronous HTTP call isse guzarta hai
+                  // No parameter needed — request field se URL + headers read karte hain
+                  hookRealCall(lp);
 
-                  // ── Hook 2: SharedPreferences.Editor.putString() ──
-                  // Android ka actual write method
-                  hookEditorPutString(lp);
+                  // ── Hook 2: RealCall.enqueue() ──
+                  // Async calls ke liye
+                  hookRealCallEnqueue(lp);
 
                   // ── Hook 3: Activity.onResume() → order data ──
                   hookActivity(lp);
               }
 
-              private void hookSharedPrefs(XC_LoadPackage.LoadPackageParam lp) {
-                  // Hook android.app.SharedPreferencesImpl$EditorImpl.putString
+              private void hookRealCall(XC_LoadPackage.LoadPackageParam lp) {
                   try {
                       XposedHelpers.findAndHookMethod(
-                          "android.app.SharedPreferencesImpl$EditorImpl",
+                          "okhttp3.internal.connection.RealCall",
                           lp.classLoader,
-                          "putString",
-                          String.class, String.class,
+                          "execute",
                           new XC_MethodHook() {
                               @Override
                               protected void beforeHookedMethod(MethodHookParam param) {
-                                  String key   = (String) param.args[0];
-                                  String value = (String) param.args[1];
-                                  checkAndCaptureToken(key, value, "SharedPrefs.putString");
+                                  extractFromRealCall(param.thisObject, "execute");
                               }
                           }
                       );
-                      XposedBridge.log("[AutoDriver] ✅ SharedPrefs putString hook OK");
+                      XposedBridge.log("[AutoDriver] ✅ RealCall.execute hook OK");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ SharedPrefs putString: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ RealCall.execute: " + e.getMessage());
                   }
               }
 
-              private void hookEditorPutString(XC_LoadPackage.LoadPackageParam lp) {
-                  // Hook android.content.SharedPreferences$Editor interface implementations
+              private void hookRealCallEnqueue(XC_LoadPackage.LoadPackageParam lp) {
                   try {
-                      // MemoryPreferencesEditor (some MIUI versions use this)
+                      // enqueue(Callback) — async call
                       XposedBridge.hookAllMethods(
-                          XposedHelpers.findClass("android.content.SharedPreferences$Editor", lp.classLoader),
-                          "putString",
+                          XposedHelpers.findClass("okhttp3.internal.connection.RealCall", lp.classLoader),
+                          "enqueue",
                           new XC_MethodHook() {
                               @Override
                               protected void beforeHookedMethod(MethodHookParam param) {
-                                  try {
-                                      String key   = (String) param.args[0];
-                                      String value = (String) param.args[1];
-                                      checkAndCaptureToken(key, value, "Editor.putString");
-                                  } catch (Throwable ignored) {}
+                                  extractFromRealCall(param.thisObject, "enqueue");
                               }
                           }
                       );
-                      XposedBridge.log("[AutoDriver] ✅ Editor putString hook OK");
+                      XposedBridge.log("[AutoDriver] ✅ RealCall.enqueue hook OK");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ Editor putString: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ RealCall.enqueue: " + e.getMessage());
                   }
               }
 
-              // Token detection logic — JWT ya Bearer token identify karo
-              private void checkAndCaptureToken(String key, String value, String source) {
-                  if (value == null || value.length() < 50) return;
+              // RealCall object se request → url + Authorization header extract karo
+              private void extractFromRealCall(Object realCall, String method) {
+                  try {
+                      // RealCall.originalRequest field
+                      Object request = XposedHelpers.getObjectField(realCall, "originalRequest");
+                      if (request == null) return;
 
-                  // JWT token "eyJ" se shuru hota hai (base64 encoded header)
-                  // Bearer token "Bearer eyJ" format mein hota hai
-                  boolean looksLikeToken = value.startsWith("eyJ") ||
-                                           value.startsWith("Bearer eyJ") ||
-                                           value.startsWith("Bearer ey") ||
-                                           (value.length() > 100 && value.matches("[A-Za-z0-9._\\-+/=]+"));
+                      Object httpUrl = XposedHelpers.callMethod(request, "url");
+                      String url = httpUrl.toString();
 
-                  if (looksLikeToken) {
-                      String formatted = value.startsWith("Bearer") ? value : "Bearer " + value;
-                      boolean changed = !formatted.equals(capturedToken);
-                      capturedToken = formatted;
-                      tokenCount++;
+                      // Sirf gateway.saned.io ki requests
+                      if (!url.contains("saned.io") && !url.contains("jahez")) return;
 
-                      if (changed) {
-                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
-                              + " from " + source + " key=" + key
-                              + " val=" + value.substring(0, Math.min(30, value.length())) + "...");
-                          sendGlobalLog("🔑 Token #" + tokenCount + " captured!"
-                              + " key=" + key
-                              + " src=" + source
-                              + " preview=" + value.substring(0, Math.min(20, value.length())));
+                      Object headers = XposedHelpers.callMethod(request, "headers");
+                      String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
+
+                      if (auth != null && auth.length() > 10) {
+                          boolean changed = !auth.equals(capturedToken);
+                          capturedToken = auth;
+                          tokenCount++;
+
+                          if (changed) {
+                              XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                                  + " [" + method + "] " + url.replaceAll("\\?.*", "")
+                                  + " auth=" + auth.substring(0, Math.min(40, auth.length())));
+                              sendGlobalLog("🔑 Token #" + tokenCount
+                                  + " from " + method
+                                  + " | " + auth.substring(0, Math.min(35, auth.length())) + "...");
+                          }
+
+                          // Accept API call capture — manual accept se token milega
+                          if (url.contains("accept-dispatch") || url.contains("/accept/")) {
+                              XposedBridge.log("[AutoDriver] 🎯 ACCEPT API! url=" + url
+                                  + " auth=" + auth.substring(0, Math.min(50, auth.length())));
+                              sendGlobalLog("🎯 Accept API captured! auth="
+                                  + auth.substring(0, Math.min(40, auth.length())) + "...");
+                          }
                       }
+                  } catch (Throwable e) {
+                      // Field name alag ho sakta hai — try 'request' field bhi
+                      try {
+                          Object request = XposedHelpers.getObjectField(realCall, "request");
+                          if (request == null) return;
+                          Object httpUrl = XposedHelpers.callMethod(request, "url");
+                          String url = httpUrl.toString();
+                          if (!url.contains("saned.io")) return;
+                          Object headers = XposedHelpers.callMethod(request, "headers");
+                          String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
+                          if (auth != null && auth.length() > 10 && !auth.equals(capturedToken)) {
+                              capturedToken = auth;
+                              tokenCount++;
+                              XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + " (field:request) auth=" + auth.substring(0, Math.min(40, auth.length())));
+                              sendGlobalLog("🔑 Token #" + tokenCount + " captured! " + auth.substring(0, Math.min(30, auth.length())) + "...");
+                          }
+                      } catch (Throwable ignored) {}
                   }
               }
 
@@ -319,7 +338,7 @@ jobs:
                                       double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
 
                                       String tkStatus = capturedToken.isEmpty()
-                                          ? "❌ NO TOKEN"
+                                          ? "❌ NO TOKEN — Saned mein koi screen open karo"
                                           : "✅ #" + tokenCount + "=" + capturedToken.substring(0, Math.min(25, capturedToken.length()));
 
                                       sendLog(act, "📦 id=" + requestId
@@ -340,7 +359,7 @@ jobs:
                                       act.sendBroadcast(bc);
 
                                   } catch (Throwable e) {
-                                      sendLog(act, "❌ onResume error: " + e.getMessage());
+                                      sendLog(act, "❌ onResume: " + e.getMessage());
                                   }
                               }
                           }
@@ -477,7 +496,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v9 started");
+                  saveLog("✅ AutoService v10 started");
               }
 
               void startLocationUpdates() {
@@ -491,13 +510,12 @@ jobs:
                       };
                       try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,     30000, 10, listener); } catch (SecurityException ignored) {}
                       try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000, 10, listener); } catch (SecurityException ignored) {}
-                      // Seed with last known
                       for (String p : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
                           try { Location l = lm.getLastKnownLocation(p); if (l != null && lastLocation == null) { lastLocation = l; break; } }
                           catch (SecurityException ignored) {}
                       }
-                      saveLog("📍 Location updates started" + (lastLocation != null ? " (seed ok)" : " (no seed)"));
-                  } catch (Exception e) { saveLog("❌ Location init: " + e.getMessage()); }
+                      saveLog("📍 Location started" + (lastLocation != null ? " ✅" : " ⚠️ no seed"));
+                  } catch (Exception e) { saveLog("❌ Location: " + e.getMessage()); }
               }
 
               void reg(BroadcastReceiver r, IntentFilter f, boolean exported) {
@@ -520,17 +538,15 @@ jobs:
 
                   if (requestId == null || requestId.isEmpty()) { saveLog("❌ requestId empty"); return; }
 
-                  // Auth: captured token prefer, fallback Basic
                   String finalAuth;
                   if (authToken != null && authToken.length() > 20) {
                       finalAuth = authToken;
                       saveLog("🔑 Token: " + authToken.substring(0, Math.min(30, authToken.length())) + "...");
                   } else {
                       finalAuth = BASIC_AUTH;
-                      saveLog("🔑 Basic auth (login karo → token capture hoga)");
+                      saveLog("🔑 Basic auth (Saned mein koi API call karo)");
                   }
 
-                  // GPS
                   float pickupKm = calcPickupDist(pickupLat, pickupLon);
                   float maxPickup = prefs.getFloat("max_pickup", 2.0f);
                   float maxDrop   = prefs.getFloat("max_drop",   5.0f);
@@ -582,7 +598,7 @@ jobs:
                           } else {
                               String body = readStream(conn.getErrorStream(), 400);
                               String msg = "❌ HTTP " + code + " — " + body;
-                              if (code == 401) msg += " → Token galat, Saned mein login/logout karo";
+                              if (code == 401) msg += " → Token galat";
                               if (code == 409) msg += " → Already accepted";
                               if (code == 404) msg += " → Order expire";
                               toast(msg); saveLog(msg);
@@ -790,7 +806,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Direct API Accept — v9" android:textSize="12sp"
+                android:text="Direct API Accept — v10" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -850,7 +866,7 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed: scope net.jahez.fleets\n2. Saned kholo → logout → login karo\n3. Log mein Token captured dikhega\n4. Distance set → Save → Toggle ON\n5. Auto accept shuru!"
+                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo — token auto capture\n3. Distance → Save → Toggle ON\n4. Auto accept!"
                 android:textColor="#444" android:textSize="12sp"
                 android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
@@ -921,7 +937,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v9
+          name: AutoDriver-v10
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
