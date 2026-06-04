@@ -180,7 +180,6 @@ jobs:
           package com.auto.driver;
 
           import android.content.Intent;
-          import android.content.SharedPreferences;
           import android.os.Bundle;
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -195,6 +194,7 @@ jobs:
               static final String OUR_PKG        = "com.auto.driver";
               static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
 
+              // Token captured from SharedPreferences putString hook
               private volatile String capturedToken = "";
               private volatile int tokenCount = 0;
               private long lastBcast = 0;
@@ -202,25 +202,23 @@ jobs:
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-
                   XposedBridge.log("[AutoDriver] v9 loading into " + lp.packageName);
 
                   // ── Hook 1: SharedPreferences.putString() ──
-                  // Token "authToken" key se save hota hai "authenticationPref" mein
-                  // Yeh android.app mein hai — split APK issue nahi hoga
-                  hookSharedPreferences(lp);
+                  // Saned jo bhi string save kare — token jaisi value capture karo
+                  // (JWT tokens 100+ chars hote hain, "ey" se shuru)
+                  hookSharedPrefs(lp);
 
-                  // ── Hook 2: SharedPreferences.getString() read on app start ──
-                  // App start par token read karta hai — wahan se bhi capture karo
-                  hookSharedPreferencesRead(lp);
+                  // ── Hook 2: SharedPreferences.Editor.putString() ──
+                  // Android ka actual write method
+                  hookEditorPutString(lp);
 
                   // ── Hook 3: Activity.onResume() → order data ──
-                  hookOrderActivity(lp);
+                  hookActivity(lp);
               }
 
-              void hookSharedPreferences(XC_LoadPackage.LoadPackageParam lp) {
+              private void hookSharedPrefs(XC_LoadPackage.LoadPackageParam lp) {
                   // Hook android.app.SharedPreferencesImpl$EditorImpl.putString
-                  // Jab bhi koi string save ho — authToken ya accessToken check karo
                   try {
                       XposedHelpers.findAndHookMethod(
                           "android.app.SharedPreferencesImpl$EditorImpl",
@@ -229,87 +227,73 @@ jobs:
                           String.class, String.class,
                           new XC_MethodHook() {
                               @Override
-                              protected void afterHookedMethod(MethodHookParam param) {
-                                  try {
-                                      String key   = (String) param.args[0];
-                                      String value = (String) param.args[1];
-                                      if (value == null || value.length() < 20) return;
-                                      // Token keys jo Saned use karta hai
-                                      if (key != null && (
-                                          key.equals("authToken") ||
-                                          key.equals("accessToken") ||
-                                          key.equals("access_token") ||
-                                          key.equals("token") ||
-                                          key.equals("jwt") ||
-                                          key.contains("Token") ||
-                                          key.contains("token")
-                                      )) {
-                                          // Bearer format mein wrap karo agar sirf token ho
-                                          String auth = value.startsWith("Bearer ") ? value : "Bearer " + value;
-                                          if (!auth.equals(capturedToken)) {
-                                              capturedToken = auth;
-                                              tokenCount++;
-                                              XposedBridge.log("[AutoDriver] 🔑 Token via SharedPrefs putString key='" + key + "' #" + tokenCount);
-                                              sendGlobalLog("🔑 Token #" + tokenCount + " captured! key='" + key + "' val=" + value.substring(0, Math.min(30, value.length())) + "...");
-                                          }
-                                      }
-                                  } catch (Throwable ignored) {}
+                              protected void beforeHookedMethod(MethodHookParam param) {
+                                  String key   = (String) param.args[0];
+                                  String value = (String) param.args[1];
+                                  checkAndCaptureToken(key, value, "SharedPrefs.putString");
                               }
                           }
                       );
                       XposedBridge.log("[AutoDriver] ✅ SharedPrefs putString hook OK");
-                      sendGlobalLog("✅ SharedPrefs write hook OK");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ SharedPrefs putString hook FAILED: " + e.getMessage());
-                      sendGlobalLog("❌ SharedPrefs write hook FAILED: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ SharedPrefs putString: " + e.getMessage());
                   }
               }
 
-              void hookSharedPreferencesRead(XC_LoadPackage.LoadPackageParam lp) {
-                  // App start par token read hota hai — wahan se capture karo
+              private void hookEditorPutString(XC_LoadPackage.LoadPackageParam lp) {
+                  // Hook android.content.SharedPreferences$Editor interface implementations
                   try {
-                      XposedHelpers.findAndHookMethod(
-                          "android.app.SharedPreferencesImpl",
-                          lp.classLoader,
-                          "getString",
-                          String.class, String.class,
+                      // MemoryPreferencesEditor (some MIUI versions use this)
+                      XposedBridge.hookAllMethods(
+                          XposedHelpers.findClass("android.content.SharedPreferences$Editor", lp.classLoader),
+                          "putString",
                           new XC_MethodHook() {
                               @Override
-                              protected void afterHookedMethod(MethodHookParam param) {
+                              protected void beforeHookedMethod(MethodHookParam param) {
                                   try {
-                                      String key    = (String) param.args[0];
-                                      String result = (String) param.getResult();
-                                      if (result == null || result.length() < 20) return;
-                                      if (key != null && (
-                                          key.equals("authToken") ||
-                                          key.equals("accessToken") ||
-                                          key.equals("access_token") ||
-                                          key.equals("token") ||
-                                          key.equals("jwt") ||
-                                          key.contains("Token") ||
-                                          key.contains("token")
-                                      )) {
-                                          String auth = result.startsWith("Bearer ") ? result : "Bearer " + result;
-                                          if (!auth.equals(capturedToken)) {
-                                              capturedToken = auth;
-                                              tokenCount++;
-                                              XposedBridge.log("[AutoDriver] 🔑 Token via SharedPrefs getString key='" + key + "' #" + tokenCount);
-                                              sendGlobalLog("🔑 Token #" + tokenCount + " (read) key='" + key + "'");
-                                          }
-                                      }
+                                      String key   = (String) param.args[0];
+                                      String value = (String) param.args[1];
+                                      checkAndCaptureToken(key, value, "Editor.putString");
                                   } catch (Throwable ignored) {}
                               }
                           }
                       );
-                      XposedBridge.log("[AutoDriver] ✅ SharedPrefs getString hook OK");
-                      sendGlobalLog("✅ SharedPrefs read hook OK");
+                      XposedBridge.log("[AutoDriver] ✅ Editor putString hook OK");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ SharedPrefs getString hook FAILED: " + e.getMessage());
-                      sendGlobalLog("❌ SharedPrefs read hook FAILED: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ Editor putString: " + e.getMessage());
                   }
               }
 
-              void hookOrderActivity(XC_LoadPackage.LoadPackageParam lp) {
+              // Token detection logic — JWT ya Bearer token identify karo
+              private void checkAndCaptureToken(String key, String value, String source) {
+                  if (value == null || value.length() < 50) return;
+
+                  // JWT token "eyJ" se shuru hota hai (base64 encoded header)
+                  // Bearer token "Bearer eyJ" format mein hota hai
+                  boolean looksLikeToken = value.startsWith("eyJ") ||
+                                           value.startsWith("Bearer eyJ") ||
+                                           value.startsWith("Bearer ey") ||
+                                           (value.length() > 100 && value.matches("[A-Za-z0-9._\\-+/=]+"));
+
+                  if (looksLikeToken) {
+                      String formatted = value.startsWith("Bearer") ? value : "Bearer " + value;
+                      boolean changed = !formatted.equals(capturedToken);
+                      capturedToken = formatted;
+                      tokenCount++;
+
+                      if (changed) {
+                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                              + " from " + source + " key=" + key
+                              + " val=" + value.substring(0, Math.min(30, value.length())) + "...");
+                          sendGlobalLog("🔑 Token #" + tokenCount + " captured!"
+                              + " key=" + key
+                              + " src=" + source
+                              + " preview=" + value.substring(0, Math.min(20, value.length())));
+                      }
+                  }
+              }
+
+              private void hookActivity(XC_LoadPackage.LoadPackageParam lp) {
                   try {
                       XposedHelpers.findAndHookMethod(
                           "android.app.Activity", lp.classLoader, "onResume",
@@ -336,7 +320,7 @@ jobs:
 
                                       String tkStatus = capturedToken.isEmpty()
                                           ? "❌ NO TOKEN"
-                                          : "✅ #" + tokenCount + " " + capturedToken.substring(0, Math.min(25, capturedToken.length()));
+                                          : "✅ #" + tokenCount + "=" + capturedToken.substring(0, Math.min(25, capturedToken.length()));
 
                                       sendLog(act, "📦 id=" + requestId
                                           + " drop=" + String.format("%.2f", dropDist) + "km"
@@ -363,7 +347,7 @@ jobs:
                       );
                       XposedBridge.log("[AutoDriver] ✅ Activity hook OK");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ Activity hook FAILED: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ Activity hook: " + e.getMessage());
                   }
               }
 
@@ -505,22 +489,21 @@ jobs:
                           @Override public void onProviderEnabled(String p) {}
                           @Override public void onProviderDisabled(String p) {}
                       };
-                      try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30000, 10, listener); saveLog("📍 GPS updates OK"); }
-                      catch (SecurityException e) { saveLog("⚠️ GPS permission: " + e.getMessage()); }
-                      try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000, 10, listener); saveLog("📍 Network location OK"); }
-                      catch (SecurityException ignored) {}
+                      try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,     30000, 10, listener); } catch (SecurityException ignored) {}
+                      try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000, 10, listener); } catch (SecurityException ignored) {}
+                      // Seed with last known
                       for (String p : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
                           try { Location l = lm.getLastKnownLocation(p); if (l != null && lastLocation == null) { lastLocation = l; break; } }
                           catch (SecurityException ignored) {}
                       }
+                      saveLog("📍 Location updates started" + (lastLocation != null ? " (seed ok)" : " (no seed)"));
                   } catch (Exception e) { saveLog("❌ Location init: " + e.getMessage()); }
               }
 
               void reg(BroadcastReceiver r, IntentFilter f, boolean exported) {
                   if (Build.VERSION.SDK_INT >= 33)
                       registerReceiver(r, f, exported ? Context.RECEIVER_EXPORTED : Context.RECEIVER_NOT_EXPORTED);
-                  else
-                      registerReceiver(r, f);
+                  else registerReceiver(r, f);
               }
 
               @Override public int onStartCommand(Intent i, int flags, int id) { return START_STICKY; }
@@ -537,14 +520,14 @@ jobs:
 
                   if (requestId == null || requestId.isEmpty()) { saveLog("❌ requestId empty"); return; }
 
-                  // Auth: captured token prefer karo, fallback Basic
+                  // Auth: captured token prefer, fallback Basic
                   String finalAuth;
-                  if (authToken != null && authToken.length() > 10) {
+                  if (authToken != null && authToken.length() > 20) {
                       finalAuth = authToken;
-                      saveLog("🔑 Using captured token: " + authToken.substring(0, Math.min(30, authToken.length())) + "...");
+                      saveLog("🔑 Token: " + authToken.substring(0, Math.min(30, authToken.length())) + "...");
                   } else {
                       finalAuth = BASIC_AUTH;
-                      saveLog("🔑 Using Basic auth (Saned login karo ya scroll karo)");
+                      saveLog("🔑 Basic auth (login karo → token capture hoga)");
                   }
 
                   // GPS
@@ -553,11 +536,11 @@ jobs:
                   float maxDrop   = prefs.getFloat("max_drop",   5.0f);
                   float dropKm    = dropDist > 0 ? (float) dropDist : -1f;
 
-                  String locAge = lastLocation != null
+                  String locInfo = lastLocation != null
                       ? ((System.currentTimeMillis() - lastLocation.getTime()) / 1000) + "s ago"
                       : "unavailable";
-                  saveLog(String.format("📏 Pickup=%s/%skm Drop=%s/%skm (loc: %s)",
-                      fmt1(pickupKm), fmt1(maxPickup), fmt1(dropKm), fmt1(maxDrop), locAge));
+                  saveLog(String.format("📏 Pickup=%s/%skm Drop=%s/%skm loc:%s",
+                      fmt1(pickupKm), fmt1(maxPickup), fmt1(dropKm), fmt1(maxDrop), locInfo));
 
                   boolean pickupOk = pickupKm < 0 || pickupKm <= maxPickup;
                   boolean dropOk   = dropKm   < 0 || dropKm   <= maxDrop;
@@ -571,7 +554,7 @@ jobs:
                   }
 
                   int delay = prefs.getInt("scan_delay", 500);
-                  saveLog("✅ Filter pass! API in " + delay + "ms");
+                  saveLog("✅ Filter pass! API in " + delay + "ms → id=" + requestId);
                   final String fa = finalAuth;
                   new Handler(Looper.getMainLooper()).postDelayed(
                       () -> callAcceptApi(requestId, fa, pickupKm, dropKm), delay);
@@ -599,7 +582,7 @@ jobs:
                           } else {
                               String body = readStream(conn.getErrorStream(), 400);
                               String msg = "❌ HTTP " + code + " — " + body;
-                              if (code == 401) msg += " → Token invalid, Saned logout/login karo";
+                              if (code == 401) msg += " → Token galat, Saned mein login/logout karo";
                               if (code == 409) msg += " → Already accepted";
                               if (code == 404) msg += " → Order expire";
                               toast(msg); saveLog(msg);
@@ -615,7 +598,7 @@ jobs:
 
               float calcPickupDist(double lat, double lon) {
                   if (lat <= 0 || lon <= 0) return -1;
-                  if (lastLocation == null) { saveLog("⚠️ GPS unavailable, pickup filter skip"); return -1; }
+                  if (lastLocation == null) { saveLog("⚠️ GPS unavailable, pickup skip"); return -1; }
                   try {
                       float[] res = new float[1];
                       Location.distanceBetween(lastLocation.getLatitude(), lastLocation.getLongitude(), lat, lon, res);
@@ -787,7 +770,7 @@ jobs:
               Button btnClear = findViewById(R.id.btn_clear);
               Button btnBack  = findViewById(R.id.btn_back);
               String logs = prefs.getString("logs", "");
-              tvLog.setText(logs.isEmpty() ? "No logs yet. Wait for an order." : logs);
+              tvLog.setText(logs.isEmpty() ? "No logs yet." : logs);
               btnClear.setOnClickListener(v -> { prefs.edit().remove("logs").apply(); tvLog.setText("Cleared."); });
               btnBack.setOnClickListener(v -> finish());
             }
@@ -867,7 +850,7 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed: Auto Driver enable (scope: net.jahez.fleets)\n2. Saned restart karo — token auto capture hoga\n3. Distance set → Save → Toggle ON\n4. Orders auto accept!"
+                android:text="Setup:\n1. LSPosed: scope net.jahez.fleets\n2. Saned kholo → logout → login karo\n3. Log mein Token captured dikhega\n4. Distance set → Save → Toggle ON\n5. Auto accept shuru!"
                 android:textColor="#444" android:textSize="12sp"
                 android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
@@ -930,7 +913,6 @@ jobs:
             -storepass danish123 -keypass danish123 2>/dev/null
           APK=$(find app/build -name "*release-unsigned*.apk" | head -1)
           if [ -z "$APK" ]; then APK=$(find app/build -name "*release*.apk" | head -1); fi
-          echo "Signing: $APK"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name "apksigner" -type f | sort -V | tail -1)
           $APKSIGNER sign --ks /tmp/key.keystore --ks-key-alias autodriver \
             --ks-pass pass:danish123 --key-pass pass:danish123 \
