@@ -59,7 +59,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 12; versionName '12.0'
+              versionCode 13; versionName '13.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -124,7 +124,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v12"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v13"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -150,8 +150,6 @@ jobs:
 
           import android.content.Intent;
           import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.Looper;
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
@@ -165,119 +163,115 @@ jobs:
               static final String OUR_PKG        = "com.auto.driver";
               static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
 
-              // Token captured from OkHttp interceptor chain
               private volatile String capturedToken = "";
               private volatile int tokenCount = 0;
+              private volatile boolean okHttpHooked = false;
               private long lastBcast = 0;
-              private volatile boolean realCallHooked = false;
-              private volatile boolean interceptorHooked = false;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v12 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v13 loading into " + lp.packageName);
 
-                  // ── Hook 1: Activity.onResume() — order data capture (instant, always works) ──
-                  hookActivity(lp);
+                  // KEY INSIGHT: lp.classLoader = base.apk only (classes1.dex)
+                  // OkHttp is in classes7.dex which is loaded by the APP's classLoader
+                  // Solution: Hook ANY Activity.onCreate first, then use that Activity's
+                  // classLoader to hook OkHttp — because by then classes7.dex IS loaded
 
-                  // ── Hook 2: OkHttp Interceptor chain — token capture ──
-                  // Strategy: Try multiple approaches in order
-                  // A) RealInterceptorChain.proceed() — if classes7 loaded
-                  // B) RealCall.execute/enqueue — fallback
-                  // C) Retry every 2s up to 30s
-                  tryAllTokenHooks(lp, 0);
-              }
+                  XposedHelpers.findAndHookMethod(
+                      "android.app.Activity", lp.classLoader, "onCreate",
+                      Bundle.class,
+                      new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) {
+                              if (okHttpHooked) return;
+                              android.app.Activity act = (android.app.Activity) param.thisObject;
 
-              private void tryAllTokenHooks(XC_LoadPackage.LoadPackageParam lp, int attempt) {
-                  if (realCallHooked || interceptorHooked) return;
-                  if (attempt > 15) {
-                      XposedBridge.log("[AutoDriver] ❌ All token hooks exhausted after 15 attempts");
-                      return;
-                  }
+                              // Only hook for Saned activities
+                              String actName = act.getClass().getName();
+                              if (!actName.startsWith("net.jahez") && !actName.startsWith("net.saned")) return;
 
-                  new Thread(() -> {
-                      boolean success = false;
+                              // Use THIS activity's classLoader — it has ALL dex files loaded
+                              ClassLoader actCl = act.getClassLoader();
+                              XposedBridge.log("[AutoDriver] 🎯 Got Activity classLoader from: " + actName);
 
-                      // Try A: RealInterceptorChain.proceed(Request)
-                      if (!success) success = tryInterceptorChain(lp);
-
-                      // Try B: RealCall.execute()
-                      if (!success) success = tryRealCall(lp);
-
-                      // Try C: okhttp3.Request$Builder.build() — simplest
-                      if (!success) success = tryRequestBuilder(lp);
-
-                      if (!success) {
-                          XposedBridge.log("[AutoDriver] ⏳ Retry #" + attempt + " in 2s...");
-                          new Handler(Looper.getMainLooper()).postDelayed(
-                              () -> tryAllTokenHooks(lp, attempt + 1), 2000);
+                              hookOkHttpWithClassLoader(actCl, act);
+                          }
                       }
-                  }, "hook-try-" + attempt).start();
+                  );
+
+                  // Also hook onResume for order capture
+                  hookOrderActivity(lp);
+
+                  XposedBridge.log("[AutoDriver] ✅ Activity.onCreate hook registered");
               }
 
-              private boolean tryInterceptorChain(XC_LoadPackage.LoadPackageParam lp) {
+              private void hookOkHttpWithClassLoader(ClassLoader cl, android.app.Activity act) {
+                  if (okHttpHooked) return;
+
+                  // Try A: RealInterceptorChain.proceed(Request)
                   try {
-                      Class<?> reqClass = lp.classLoader.loadClass("okhttp3.Request");
-                      Class<?> chainClass = lp.classLoader.loadClass("okhttp3.internal.http.RealInterceptorChain");
+                      Class<?> reqClass   = cl.loadClass("okhttp3.Request");
+                      Class<?> chainClass = cl.loadClass("okhttp3.internal.http.RealInterceptorChain");
                       XposedHelpers.findAndHookMethod(chainClass, "proceed", reqClass,
                           new XC_MethodHook() {
-                              @Override protected void beforeHookedMethod(MethodHookParam param) {
-                                  extractFromRequest(param.args[0], "Chain.proceed");
+                              @Override protected void beforeHookedMethod(MethodHookParam p) {
+                                  extractToken(p.args[0], "Chain");
                               }
                           }
                       );
-                      interceptorHooked = true;
-                      XposedBridge.log("[AutoDriver] ✅ RealInterceptorChain.proceed hook OK");
-                      return true;
+                      okHttpHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ RealInterceptorChain hook OK via Activity CL");
+                      sendLog(act, "✅ OkHttp Chain hook OK!");
+                      return;
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ Chain.proceed: " + e.getMessage());
-                      return false;
+                      XposedBridge.log("[AutoDriver] ⚠️ Chain: " + e.getMessage());
                   }
-              }
 
-              private boolean tryRealCall(XC_LoadPackage.LoadPackageParam lp) {
+                  // Try B: RealCall.execute/enqueue
                   try {
-                      Class<?> cls = lp.classLoader.loadClass("okhttp3.internal.connection.RealCall");
-                      XposedBridge.hookAllMethods(cls, "execute", new XC_MethodHook() {
+                      Class<?> rcClass = cl.loadClass("okhttp3.internal.connection.RealCall");
+                      XposedBridge.hookAllMethods(rcClass, "execute", new XC_MethodHook() {
                           @Override protected void beforeHookedMethod(MethodHookParam p) {
-                              extractFromRealCallObj(p.thisObject, "execute");
+                              extractTokenFromRealCall(p.thisObject, "execute");
                           }
                       });
-                      XposedBridge.hookAllMethods(cls, "enqueue", new XC_MethodHook() {
+                      XposedBridge.hookAllMethods(rcClass, "enqueue", new XC_MethodHook() {
                           @Override protected void beforeHookedMethod(MethodHookParam p) {
-                              extractFromRealCallObj(p.thisObject, "enqueue");
+                              extractTokenFromRealCall(p.thisObject, "enqueue");
                           }
                       });
-                      realCallHooked = true;
-                      XposedBridge.log("[AutoDriver] ✅ RealCall.execute/enqueue hook OK");
-                      return true;
+                      okHttpHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ RealCall hook OK via Activity CL");
+                      sendLog(act, "✅ OkHttp RealCall hook OK!");
+                      return;
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ⚠️ RealCall: " + e.getMessage());
-                      return false;
                   }
-              }
 
-              private boolean tryRequestBuilder(XC_LoadPackage.LoadPackageParam lp) {
+                  // Try C: Request$Builder.build()
                   try {
-                      XposedHelpers.findAndHookMethod(
-                          "okhttp3.Request$Builder", lp.classLoader, "build",
+                      Class<?> builderClass = cl.loadClass("okhttp3.Request$Builder");
+                      XposedHelpers.findAndHookMethod(builderClass, "build",
                           new XC_MethodHook() {
-                              @Override protected void afterHookedMethod(MethodHookParam param) {
-                                  extractFromRequest(param.getResult(), "Request$Builder");
+                              @Override protected void afterHookedMethod(MethodHookParam p) {
+                                  extractToken(p.getResult(), "Builder");
                               }
                           }
                       );
-                      realCallHooked = true;
-                      XposedBridge.log("[AutoDriver] ✅ Request$Builder.build hook OK");
-                      return true;
+                      okHttpHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ Request$Builder hook OK via Activity CL");
+                      sendLog(act, "✅ OkHttp Builder hook OK!");
+                      return;
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ Request$Builder: " + e.getMessage());
-                      return false;
+                      XposedBridge.log("[AutoDriver] ⚠️ Builder: " + e.getMessage());
                   }
+
+                  XposedBridge.log("[AutoDriver] ❌ All OkHttp hooks failed with Activity CL!");
+                  sendLog(act, "❌ OkHttp hooks failed — token capture nahi hoga");
               }
 
-              // Extract token from okhttp3.Request object
-              private void extractFromRequest(Object request, String source) {
+              private void extractToken(Object request, String source) {
                   if (request == null) return;
                   try {
                       String url = XposedHelpers.callMethod(request, "url").toString();
@@ -285,49 +279,50 @@ jobs:
 
                       Object headers = XposedHelpers.callMethod(request, "headers");
                       String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
+                      if (auth == null || auth.length() < 10) return;
 
-                      if (auth != null && auth.length() > 10) {
-                          boolean changed = !auth.equals(capturedToken);
-                          capturedToken = auth;
-                          tokenCount++;
-                          if (changed) {
-                              XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
-                                  + " [" + source + "] " + url.replaceAll("\\?.*","")
-                                  + " | " + auth.substring(0, Math.min(50, auth.length())));
-                          }
-                          if (url.contains("accept-dispatch") || url.contains("/accept/")) {
-                              XposedBridge.log("[AutoDriver] 🎯 ACCEPT API captured! "
-                                  + url + " auth=" + auth.substring(0, Math.min(60, auth.length())));
-                          }
+                      boolean changed = !auth.equals(capturedToken);
+                      capturedToken = auth;
+                      tokenCount++;
+
+                      if (changed) {
+                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                              + " [" + source + "] " + url.replaceAll("\\?.*", "")
+                              + " | " + auth.substring(0, Math.min(50, auth.length())));
+                      }
+
+                      if (url.contains("accept-dispatch") || url.contains("/accept/")) {
+                          XposedBridge.log("[AutoDriver] 🎯 ACCEPT API! url=" + url
+                              + " auth=" + auth.substring(0, Math.min(60, auth.length())));
                       }
                   } catch (Throwable ignored) {}
               }
 
-              // Extract token from RealCall object (field access)
-              private void extractFromRealCallObj(Object realCall, String method) {
+              private void extractTokenFromRealCall(Object realCall, String method) {
                   try {
-                      Object request = null;
-                      try { request = XposedHelpers.getObjectField(realCall, "originalRequest"); }
-                      catch (Throwable e1) {
-                          try { request = XposedHelpers.getObjectField(realCall, "request"); }
-                          catch (Throwable e2) { return; }
+                      Object req = null;
+                      try { req = XposedHelpers.getObjectField(realCall, "originalRequest"); }
+                      catch (Throwable e) {
+                          try { req = XposedHelpers.getObjectField(realCall, "request"); }
+                          catch (Throwable ignored) {}
                       }
-                      extractFromRequest(request, "RealCall." + method);
+                      extractToken(req, "RealCall." + method);
                   } catch (Throwable ignored) {}
               }
 
-              private void hookActivity(XC_LoadPackage.LoadPackageParam lp) {
+              private void hookOrderActivity(XC_LoadPackage.LoadPackageParam lp) {
                   try {
                       XposedHelpers.findAndHookMethod(
                           "android.app.Activity", lp.classLoader, "onResume",
                           new XC_MethodHook() {
-                              @Override
-                              protected void afterHookedMethod(MethodHookParam param) {
+                              @Override protected void afterHookedMethod(MethodHookParam param) {
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
                                   if (!ORDER_ACTIVITY.equals(act.getClass().getName())) return;
+
                                   long now = System.currentTimeMillis();
                                   if (now - lastBcast < 2000) return;
                                   lastBcast = now;
+
                                   try {
                                       Bundle extras = act.getIntent() != null ? act.getIntent().getExtras() : null;
                                       if (extras == null) { sendLog(act, "⚠️ extras null"); return; }
@@ -364,9 +359,9 @@ jobs:
                               }
                           }
                       );
-                      XposedBridge.log("[AutoDriver] ✅ Activity hook OK");
+                      XposedBridge.log("[AutoDriver] ✅ onResume hook registered");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ Activity hook: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ onResume hook: " + e.getMessage());
                   }
               }
 
@@ -439,7 +434,6 @@ jobs:
                       if (msg != null) saveLog(msg);
                   }
               };
-
               private final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
                       if (!intent.getBooleanExtra("is_order", false)) return;
@@ -454,7 +448,6 @@ jobs:
                       processOrder(requestId, authToken, pickupLat, pickupLon, dropDist);
                   }
               };
-
               private final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
                       if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
@@ -478,7 +471,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v12 started");
+                  saveLog("✅ AutoService v13 started");
               }
 
               void startLocationUpdates() {
@@ -521,14 +514,14 @@ jobs:
                       saveLog("🔑 " + authToken.substring(0, Math.min(30, authToken.length())) + "...");
                   } else {
                       finalAuth = BASIC_AUTH;
-                      saveLog("🔑 Basic auth (Saned use karte raho — token capture hoga)");
+                      saveLog("🔑 Basic auth fallback");
                   }
 
                   float pickupKm = calcPickupDist(pickupLat, pickupLon);
                   float maxPickup = prefs.getFloat("max_pickup", 2.0f);
                   float maxDrop   = prefs.getFloat("max_drop",   5.0f);
                   float dropKm    = dropDist > 0 ? (float) dropDist : -1f;
-                  String locInfo  = lastLocation != null ? ((System.currentTimeMillis()-lastLocation.getTime())/1000)+"s ago" : "N/A";
+                  String locInfo  = lastLocation != null ? ((System.currentTimeMillis()-lastLocation.getTime())/1000)+"s" : "N/A";
 
                   saveLog(String.format("📏 Pickup=%s/%skm Drop=%s/%skm loc:%s",
                       fmt1(pickupKm), fmt1(maxPickup), fmt1(dropKm), fmt1(maxDrop), locInfo));
@@ -651,6 +644,7 @@ jobs:
             }
           }
           EOF
+
           cat > app/src/main/java/com/auto/driver/LogActivity.java << 'EOF'
           package com.auto.driver;
           import android.app.Activity; import android.content.SharedPreferences; import android.os.Bundle; import android.widget.*;
@@ -666,6 +660,7 @@ jobs:
             }
           }
           EOF
+
           cat > app/src/main/java/com/auto/driver/MainActivity.java << 'EOF'
           package com.auto.driver;
           import android.app.Activity; import android.content.BroadcastReceiver; import android.content.Context;
@@ -733,7 +728,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v12 — Triple Hook Strategy" android:textSize="12sp"
+                android:text="v13 — Activity ClassLoader Hook" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -780,11 +775,12 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo — 30s wait karo\n3. LSPosed log mein hook OK dikhega\n4. Distance → Save → Toggle ON\n5. Auto accept!"
+                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo\n3. Log mein OkHttp hook OK dikhega\n4. Distance → Save → Toggle ON"
                 android:textColor="#444" android:textSize="12sp" android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
           </ScrollView>
           EOF
+
           cat > app/src/main/res/layout/activity_log.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -809,6 +805,7 @@ jobs:
             </ScrollView>
           </LinearLayout>
           EOF
+
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources><string name="app_name">Auto Driver</string></resources>
@@ -843,7 +840,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v12
+          name: AutoDriver-v13
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
