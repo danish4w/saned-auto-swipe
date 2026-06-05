@@ -7,12 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-
       - uses: android-actions/setup-android@v3
 
       - name: Download Gradle Wrapper
@@ -32,54 +30,38 @@ jobs:
       - name: Create Project Structure
         run: |
           mkdir -p app/src/main/java/com/auto/driver
-          mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/xml
-          mkdir -p app/src/main/res/drawable
-          mkdir -p app/src/main/res/mipmap-anydpi-v26
+          mkdir -p app/src/main/res/{layout,values,xml,drawable,mipmap-anydpi-v26}
           mkdir -p app/src/main/assets
 
       - name: Write Gradle Files
         run: |
-          cat > settings.gradle << 'SEOF'
-          pluginManagement {
-            repositories { google(); mavenCentral(); gradlePluginPortal() }
-          }
+          cat > settings.gradle << 'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement {
-            repositories {
-              google(); mavenCentral()
-              maven { url 'https://api.xposed.info/' }
-            }
+            repositories { google(); mavenCentral(); maven { url 'https://api.xposed.info/' } }
           }
           rootProject.name = "AutoDriver"
           include ':app'
-          SEOF
-
-          cat > build.gradle << 'BEOF'
+          EOF
+          cat > build.gradle << 'EOF'
           plugins { id 'com.android.application' version '8.5.2' apply false }
-          BEOF
-
-          cat > gradle.properties << 'GEOF'
+          EOF
+          cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=false
           org.gradle.jvmargs=-Xmx2048m
-          GEOF
-
-          cat > app/build.gradle << 'ABEOF'
+          EOF
+          cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
             namespace 'com.auto.driver'
             compileSdk 34
             defaultConfig {
               applicationId 'com.auto.driver'
-              minSdk 26
-              targetSdk 34
-              versionCode 10
-              versionName '10.0'
+              minSdk 26; targetSdk 34
+              versionCode 12; versionName '12.0'
             }
-            buildTypes {
-              release { minifyEnabled false }
-            }
+            buildTypes { release { minifyEnabled false } }
             compileOptions {
               sourceCompatibility JavaVersion.VERSION_17
               targetCompatibility JavaVersion.VERSION_17
@@ -90,52 +72,45 @@ jobs:
             implementation 'com.google.android.material:material:1.12.0'
             compileOnly 'de.robv.android.xposed:api:82'
           }
-          ABEOF
+          EOF
 
-      - name: Write Icons
+      - name: Write Icons and Config
         run: |
-          cat > app/src/main/res/drawable/ic_launcher_background.xml << 'BGEOF'
+          cat > app/src/main/res/drawable/ic_launcher_background.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
-            android:width="108dp" android:height="108dp"
-            android:viewportWidth="108" android:viewportHeight="108">
+            android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
             <path android:fillColor="#1B5E20" android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
           </vector>
-          BGEOF
-          cat > app/src/main/res/drawable/ic_launcher_foreground.xml << 'FGEOF'
+          EOF
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
-            android:width="108dp" android:height="108dp"
-            android:viewportWidth="108" android:viewportHeight="108">
+            android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
             <path android:fillColor="#FFFFFF" android:pathData="M25,54 L35,44 L47,60 L73,30 L83,40 L47,82 Z"/>
           </vector>
-          FGEOF
-          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'ICEOF'
+          EOF
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
             <background android:drawable="@drawable/ic_launcher_background"/>
             <foreground android:drawable="@drawable/ic_launcher_foreground"/>
           </adaptive-icon>
-          ICEOF
+          EOF
           cp app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
-
-      - name: Write Network Security Config
-        run: |
-          cat > app/src/main/res/xml/network_security_config.xml << 'NSEOF'
+          cat > app/src/main/res/xml/network_security_config.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <network-security-config>
             <base-config cleartextTrafficPermitted="false">
               <trust-anchors><certificates src="system"/></trust-anchors>
             </base-config>
           </network-security-config>
-          NSEOF
-
-      - name: Write Xposed Init
-        run: echo "com.auto.driver.SanedHook" > app/src/main/assets/xposed_init
+          EOF
+          echo "com.auto.driver.SanedHook" > app/src/main/assets/xposed_init
 
       - name: Write Manifest
         run: |
-          cat > app/src/main/AndroidManifest.xml << 'MEOF'
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <uses-permission android:name="android.permission.INTERNET"/>
@@ -145,15 +120,11 @@ jobs:
             <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
             <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
             <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-            <application
-              android:label="Auto Driver"
-              android:icon="@mipmap/ic_launcher"
-              android:roundIcon="@mipmap/ic_launcher_round"
-              android:theme="@style/AppTheme"
-              android:allowBackup="false"
-              android:networkSecurityConfig="@xml/network_security_config">
+            <application android:label="Auto Driver" android:icon="@mipmap/ic_launcher"
+              android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
+              android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v10"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v12"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -166,13 +137,11 @@ jobs:
               <service android:name=".AutoService" android:exported="false"
                 android:foregroundServiceType="dataSync"/>
               <receiver android:name=".BootReceiver" android:exported="true">
-                <intent-filter>
-                  <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                </intent-filter>
+                <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter>
               </receiver>
             </application>
           </manifest>
-          MEOF
+          EOF
 
       - name: Write SanedHook.java
         run: |
@@ -181,6 +150,8 @@ jobs:
 
           import android.content.Intent;
           import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
@@ -194,77 +165,122 @@ jobs:
               static final String OUR_PKG        = "com.auto.driver";
               static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
 
+              // Token captured from OkHttp interceptor chain
               private volatile String capturedToken = "";
               private volatile int tokenCount = 0;
               private long lastBcast = 0;
+              private volatile boolean realCallHooked = false;
+              private volatile boolean interceptorHooked = false;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v10 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v12 loading into " + lp.packageName);
 
-                  // ── Hook 1: RealCall.execute() ──
-                  // OkHttp ka har synchronous HTTP call isse guzarta hai
-                  // No parameter needed — request field se URL + headers read karte hain
-                  hookRealCall(lp);
-
-                  // ── Hook 2: RealCall.enqueue() ──
-                  // Async calls ke liye
-                  hookRealCallEnqueue(lp);
-
-                  // ── Hook 3: Activity.onResume() → order data ──
+                  // ── Hook 1: Activity.onResume() — order data capture (instant, always works) ──
                   hookActivity(lp);
+
+                  // ── Hook 2: OkHttp Interceptor chain — token capture ──
+                  // Strategy: Try multiple approaches in order
+                  // A) RealInterceptorChain.proceed() — if classes7 loaded
+                  // B) RealCall.execute/enqueue — fallback
+                  // C) Retry every 2s up to 30s
+                  tryAllTokenHooks(lp, 0);
               }
 
-              private void hookRealCall(XC_LoadPackage.LoadPackageParam lp) {
+              private void tryAllTokenHooks(XC_LoadPackage.LoadPackageParam lp, int attempt) {
+                  if (realCallHooked || interceptorHooked) return;
+                  if (attempt > 15) {
+                      XposedBridge.log("[AutoDriver] ❌ All token hooks exhausted after 15 attempts");
+                      return;
+                  }
+
+                  new Thread(() -> {
+                      boolean success = false;
+
+                      // Try A: RealInterceptorChain.proceed(Request)
+                      if (!success) success = tryInterceptorChain(lp);
+
+                      // Try B: RealCall.execute()
+                      if (!success) success = tryRealCall(lp);
+
+                      // Try C: okhttp3.Request$Builder.build() — simplest
+                      if (!success) success = tryRequestBuilder(lp);
+
+                      if (!success) {
+                          XposedBridge.log("[AutoDriver] ⏳ Retry #" + attempt + " in 2s...");
+                          new Handler(Looper.getMainLooper()).postDelayed(
+                              () -> tryAllTokenHooks(lp, attempt + 1), 2000);
+                      }
+                  }, "hook-try-" + attempt).start();
+              }
+
+              private boolean tryInterceptorChain(XC_LoadPackage.LoadPackageParam lp) {
+                  try {
+                      Class<?> reqClass = lp.classLoader.loadClass("okhttp3.Request");
+                      Class<?> chainClass = lp.classLoader.loadClass("okhttp3.internal.http.RealInterceptorChain");
+                      XposedHelpers.findAndHookMethod(chainClass, "proceed", reqClass,
+                          new XC_MethodHook() {
+                              @Override protected void beforeHookedMethod(MethodHookParam param) {
+                                  extractFromRequest(param.args[0], "Chain.proceed");
+                              }
+                          }
+                      );
+                      interceptorHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ RealInterceptorChain.proceed hook OK");
+                      return true;
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ⚠️ Chain.proceed: " + e.getMessage());
+                      return false;
+                  }
+              }
+
+              private boolean tryRealCall(XC_LoadPackage.LoadPackageParam lp) {
+                  try {
+                      Class<?> cls = lp.classLoader.loadClass("okhttp3.internal.connection.RealCall");
+                      XposedBridge.hookAllMethods(cls, "execute", new XC_MethodHook() {
+                          @Override protected void beforeHookedMethod(MethodHookParam p) {
+                              extractFromRealCallObj(p.thisObject, "execute");
+                          }
+                      });
+                      XposedBridge.hookAllMethods(cls, "enqueue", new XC_MethodHook() {
+                          @Override protected void beforeHookedMethod(MethodHookParam p) {
+                              extractFromRealCallObj(p.thisObject, "enqueue");
+                          }
+                      });
+                      realCallHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ RealCall.execute/enqueue hook OK");
+                      return true;
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ⚠️ RealCall: " + e.getMessage());
+                      return false;
+                  }
+              }
+
+              private boolean tryRequestBuilder(XC_LoadPackage.LoadPackageParam lp) {
                   try {
                       XposedHelpers.findAndHookMethod(
-                          "okhttp3.internal.connection.RealCall",
-                          lp.classLoader,
-                          "execute",
+                          "okhttp3.Request$Builder", lp.classLoader, "build",
                           new XC_MethodHook() {
-                              @Override
-                              protected void beforeHookedMethod(MethodHookParam param) {
-                                  extractFromRealCall(param.thisObject, "execute");
+                              @Override protected void afterHookedMethod(MethodHookParam param) {
+                                  extractFromRequest(param.getResult(), "Request$Builder");
                               }
                           }
                       );
-                      XposedBridge.log("[AutoDriver] ✅ RealCall.execute hook OK");
+                      realCallHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ Request$Builder.build hook OK");
+                      return true;
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ RealCall.execute: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ⚠️ Request$Builder: " + e.getMessage());
+                      return false;
                   }
               }
 
-              private void hookRealCallEnqueue(XC_LoadPackage.LoadPackageParam lp) {
+              // Extract token from okhttp3.Request object
+              private void extractFromRequest(Object request, String source) {
+                  if (request == null) return;
                   try {
-                      // enqueue(Callback) — async call
-                      XposedBridge.hookAllMethods(
-                          XposedHelpers.findClass("okhttp3.internal.connection.RealCall", lp.classLoader),
-                          "enqueue",
-                          new XC_MethodHook() {
-                              @Override
-                              protected void beforeHookedMethod(MethodHookParam param) {
-                                  extractFromRealCall(param.thisObject, "enqueue");
-                              }
-                          }
-                      );
-                      XposedBridge.log("[AutoDriver] ✅ RealCall.enqueue hook OK");
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ RealCall.enqueue: " + e.getMessage());
-                  }
-              }
-
-              // RealCall object se request → url + Authorization header extract karo
-              private void extractFromRealCall(Object realCall, String method) {
-                  try {
-                      // RealCall.originalRequest field
-                      Object request = XposedHelpers.getObjectField(realCall, "originalRequest");
-                      if (request == null) return;
-
-                      Object httpUrl = XposedHelpers.callMethod(request, "url");
-                      String url = httpUrl.toString();
-
-                      // Sirf gateway.saned.io ki requests
+                      String url = XposedHelpers.callMethod(request, "url").toString();
                       if (!url.contains("saned.io") && !url.contains("jahez")) return;
 
                       Object headers = XposedHelpers.callMethod(request, "headers");
@@ -274,42 +290,30 @@ jobs:
                           boolean changed = !auth.equals(capturedToken);
                           capturedToken = auth;
                           tokenCount++;
-
                           if (changed) {
                               XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
-                                  + " [" + method + "] " + url.replaceAll("\\?.*", "")
-                                  + " auth=" + auth.substring(0, Math.min(40, auth.length())));
-                              sendGlobalLog("🔑 Token #" + tokenCount
-                                  + " from " + method
-                                  + " | " + auth.substring(0, Math.min(35, auth.length())) + "...");
+                                  + " [" + source + "] " + url.replaceAll("\\?.*","")
+                                  + " | " + auth.substring(0, Math.min(50, auth.length())));
                           }
-
-                          // Accept API call capture — manual accept se token milega
                           if (url.contains("accept-dispatch") || url.contains("/accept/")) {
-                              XposedBridge.log("[AutoDriver] 🎯 ACCEPT API! url=" + url
-                                  + " auth=" + auth.substring(0, Math.min(50, auth.length())));
-                              sendGlobalLog("🎯 Accept API captured! auth="
-                                  + auth.substring(0, Math.min(40, auth.length())) + "...");
+                              XposedBridge.log("[AutoDriver] 🎯 ACCEPT API captured! "
+                                  + url + " auth=" + auth.substring(0, Math.min(60, auth.length())));
                           }
                       }
-                  } catch (Throwable e) {
-                      // Field name alag ho sakta hai — try 'request' field bhi
-                      try {
-                          Object request = XposedHelpers.getObjectField(realCall, "request");
-                          if (request == null) return;
-                          Object httpUrl = XposedHelpers.callMethod(request, "url");
-                          String url = httpUrl.toString();
-                          if (!url.contains("saned.io")) return;
-                          Object headers = XposedHelpers.callMethod(request, "headers");
-                          String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
-                          if (auth != null && auth.length() > 10 && !auth.equals(capturedToken)) {
-                              capturedToken = auth;
-                              tokenCount++;
-                              XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + " (field:request) auth=" + auth.substring(0, Math.min(40, auth.length())));
-                              sendGlobalLog("🔑 Token #" + tokenCount + " captured! " + auth.substring(0, Math.min(30, auth.length())) + "...");
-                          }
-                      } catch (Throwable ignored) {}
-                  }
+                  } catch (Throwable ignored) {}
+              }
+
+              // Extract token from RealCall object (field access)
+              private void extractFromRealCallObj(Object realCall, String method) {
+                  try {
+                      Object request = null;
+                      try { request = XposedHelpers.getObjectField(realCall, "originalRequest"); }
+                      catch (Throwable e1) {
+                          try { request = XposedHelpers.getObjectField(realCall, "request"); }
+                          catch (Throwable e2) { return; }
+                      }
+                      extractFromRequest(request, "RealCall." + method);
+                  } catch (Throwable ignored) {}
               }
 
               private void hookActivity(XC_LoadPackage.LoadPackageParam lp) {
@@ -321,11 +325,9 @@ jobs:
                               protected void afterHookedMethod(MethodHookParam param) {
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
                                   if (!ORDER_ACTIVITY.equals(act.getClass().getName())) return;
-
                                   long now = System.currentTimeMillis();
                                   if (now - lastBcast < 2000) return;
                                   lastBcast = now;
-
                                   try {
                                       Bundle extras = act.getIntent() != null ? act.getIntent().getExtras() : null;
                                       if (extras == null) { sendLog(act, "⚠️ extras null"); return; }
@@ -338,26 +340,24 @@ jobs:
                                       double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
 
                                       String tkStatus = capturedToken.isEmpty()
-                                          ? "❌ NO TOKEN — Saned mein koi screen open karo"
-                                          : "✅ #" + tokenCount + "=" + capturedToken.substring(0, Math.min(25, capturedToken.length()));
+                                          ? "❌ NO TOKEN"
+                                          : "✅ #" + tokenCount + " " + capturedToken.substring(0, Math.min(25, capturedToken.length()));
 
                                       sendLog(act, "📦 id=" + requestId
                                           + " drop=" + String.format("%.2f", dropDist) + "km"
-                                          + " ₿" + price + "+" + bonus
-                                          + " | " + tkStatus);
+                                          + " ₿" + price + "+" + bonus + " | " + tkStatus);
 
                                       Intent bc = new Intent("JAHEZ_ORDER_DATA");
                                       bc.setPackage(OUR_PKG);
-                                      bc.putExtra("request_id",  requestId);
-                                      bc.putExtra("pickup_lat",  pickupLat);
-                                      bc.putExtra("pickup_lon",  pickupLon);
-                                      bc.putExtra("drop_dist",   dropDist);
-                                      bc.putExtra("price",       price);
-                                      bc.putExtra("bonus",       bonus);
-                                      bc.putExtra("auth_token",  capturedToken);
-                                      bc.putExtra("is_order",    true);
+                                      bc.putExtra("request_id", requestId);
+                                      bc.putExtra("pickup_lat", pickupLat);
+                                      bc.putExtra("pickup_lon", pickupLon);
+                                      bc.putExtra("drop_dist",  dropDist);
+                                      bc.putExtra("price",      price);
+                                      bc.putExtra("bonus",      bonus);
+                                      bc.putExtra("auth_token", capturedToken);
+                                      bc.putExtra("is_order",   true);
                                       act.sendBroadcast(bc);
-
                                   } catch (Throwable e) {
                                       sendLog(act, "❌ onResume: " + e.getMessage());
                                   }
@@ -393,10 +393,6 @@ jobs:
                   } catch (Throwable ignored) {}
               }
 
-              private void sendGlobalLog(String msg) {
-                  try { XposedBridge.log("[AutoDriver] " + msg); } catch (Throwable ignored) {}
-              }
-
               private double getDouble(Bundle b, String key) {
                   try {
                       Object v = b.get(key);
@@ -416,34 +412,20 @@ jobs:
           cat > app/src/main/java/com/auto/driver/AutoService.java << 'SEOF'
           package com.auto.driver;
 
-          import android.app.Notification;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.app.PendingIntent;
-          import android.app.Service;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.content.SharedPreferences;
-          import android.location.Location;
-          import android.location.LocationListener;
-          import android.location.LocationManager;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.IBinder;
-          import android.os.Looper;
-
-          import java.io.InputStream;
-          import java.net.HttpURLConnection;
-          import java.net.URL;
-          import java.text.SimpleDateFormat;
-          import java.util.Date;
-          import java.util.Locale;
+          import android.app.Notification; import android.app.NotificationChannel;
+          import android.app.NotificationManager; import android.app.PendingIntent;
+          import android.app.Service; import android.content.BroadcastReceiver;
+          import android.content.Context; import android.content.Intent;
+          import android.content.IntentFilter; import android.content.SharedPreferences;
+          import android.location.Location; import android.location.LocationListener;
+          import android.location.LocationManager; import android.os.Build;
+          import android.os.Bundle; import android.os.Handler;
+          import android.os.IBinder; import android.os.Looper;
+          import java.io.InputStream; import java.net.HttpURLConnection;
+          import java.net.URL; import java.text.SimpleDateFormat;
+          import java.util.Date; import java.util.Locale;
 
           public class AutoService extends Service {
-
               static final String ACCEPT_URL = "https://gateway.saned.io/api/v1/dispatch/accept-dispatch/";
               static final String BASIC_AUTH = "Basic ZHJpdmVyczpjMjNmM2E4Ny1hYWYzLTRhNDQtYTgyZS1mYjZjYWM4MWJkMjA=";
 
@@ -496,25 +478,24 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v10 started");
+                  saveLog("✅ AutoService v12 started");
               }
 
               void startLocationUpdates() {
                   try {
                       LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
-                      LocationListener listener = new LocationListener() {
+                      LocationListener ll = new LocationListener() {
                           @Override public void onLocationChanged(Location loc) { lastLocation = loc; }
                           @Override public void onStatusChanged(String p, int s, Bundle e) {}
                           @Override public void onProviderEnabled(String p) {}
                           @Override public void onProviderDisabled(String p) {}
                       };
-                      try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,     30000, 10, listener); } catch (SecurityException ignored) {}
-                      try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000, 10, listener); } catch (SecurityException ignored) {}
+                      try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,     30000, 10, ll); } catch (SecurityException ignored) {}
+                      try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000, 10, ll); } catch (SecurityException ignored) {}
                       for (String p : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
-                          try { Location l = lm.getLastKnownLocation(p); if (l != null && lastLocation == null) { lastLocation = l; break; } }
-                          catch (SecurityException ignored) {}
+                          try { Location l = lm.getLastKnownLocation(p); if (l!=null&&lastLocation==null){lastLocation=l;break;} } catch (SecurityException ignored) {}
                       }
-                      saveLog("📍 Location started" + (lastLocation != null ? " ✅" : " ⚠️ no seed"));
+                      saveLog("📍 Location " + (lastLocation != null ? "✅" : "⚠️ no seed"));
                   } catch (Exception e) { saveLog("❌ Location: " + e.getMessage()); }
               }
 
@@ -527,34 +508,28 @@ jobs:
               @Override public int onStartCommand(Intent i, int flags, int id) { return START_STICKY; }
               @Override public IBinder onBind(Intent i) { return null; }
 
-              void processOrder(String requestId, String authToken,
-                                double pickupLat, double pickupLon, double dropDist) {
-
+              void processOrder(String requestId, String authToken, double pickupLat, double pickupLon, double dropDist) {
                   if (!prefs.getBoolean("enabled", false)) { saveLog("⏸ Disabled"); return; }
-
                   long now = System.currentTimeMillis();
                   if (now - lastEvent < 2000) { saveLog("⚡ Debounce"); return; }
                   lastEvent = now;
-
                   if (requestId == null || requestId.isEmpty()) { saveLog("❌ requestId empty"); return; }
 
                   String finalAuth;
                   if (authToken != null && authToken.length() > 20) {
                       finalAuth = authToken;
-                      saveLog("🔑 Token: " + authToken.substring(0, Math.min(30, authToken.length())) + "...");
+                      saveLog("🔑 " + authToken.substring(0, Math.min(30, authToken.length())) + "...");
                   } else {
                       finalAuth = BASIC_AUTH;
-                      saveLog("🔑 Basic auth (Saned mein koi API call karo)");
+                      saveLog("🔑 Basic auth (Saned use karte raho — token capture hoga)");
                   }
 
                   float pickupKm = calcPickupDist(pickupLat, pickupLon);
                   float maxPickup = prefs.getFloat("max_pickup", 2.0f);
                   float maxDrop   = prefs.getFloat("max_drop",   5.0f);
                   float dropKm    = dropDist > 0 ? (float) dropDist : -1f;
+                  String locInfo  = lastLocation != null ? ((System.currentTimeMillis()-lastLocation.getTime())/1000)+"s ago" : "N/A";
 
-                  String locInfo = lastLocation != null
-                      ? ((System.currentTimeMillis() - lastLocation.getTime()) / 1000) + "s ago"
-                      : "unavailable";
                   saveLog(String.format("📏 Pickup=%s/%skm Drop=%s/%skm loc:%s",
                       fmt1(pickupKm), fmt1(maxPickup), fmt1(dropKm), fmt1(maxDrop), locInfo));
 
@@ -564,7 +539,7 @@ jobs:
                   if (!pickupOk || !dropOk) {
                       StringBuilder r = new StringBuilder();
                       if (!pickupOk) r.append("Pickup ").append(fmt1(pickupKm)).append(">").append(fmt1(maxPickup)).append("km");
-                      if (!dropOk) { if (r.length()>0) r.append("  "); r.append("Drop ").append(fmt1(dropKm)).append(">").append(fmt1(maxDrop)).append("km"); }
+                      if (!dropOk) { if(r.length()>0) r.append("  "); r.append("Drop ").append(fmt1(dropKm)).append(">").append(fmt1(maxDrop)).append("km"); }
                       String msg = "❌ SKIP — " + r;
                       toast(msg); saveLog(msg); return;
                   }
@@ -572,8 +547,7 @@ jobs:
                   int delay = prefs.getInt("scan_delay", 500);
                   saveLog("✅ Filter pass! API in " + delay + "ms → id=" + requestId);
                   final String fa = finalAuth;
-                  new Handler(Looper.getMainLooper()).postDelayed(
-                      () -> callAcceptApi(requestId, fa, pickupKm, dropKm), delay);
+                  new Handler(Looper.getMainLooper()).postDelayed(() -> callAcceptApi(requestId, fa, pickupKm, dropKm), delay);
               }
 
               void callAcceptApi(String requestId, String authHeader, float pickupKm, float dropKm) {
@@ -587,10 +561,8 @@ jobs:
                           conn.setRequestProperty("Authorization", authHeader);
                           conn.setRequestProperty("Content-Type", "application/json");
                           conn.setRequestProperty("Accept", "application/json");
-                          conn.setConnectTimeout(5000);
-                          conn.setReadTimeout(5000);
+                          conn.setConnectTimeout(5000); conn.setReadTimeout(5000);
                           conn.setDoOutput(false);
-
                           int code = conn.getResponseCode();
                           if (code == 200 || code == 201 || code == 204) {
                               String msg = "🎉 ACCEPTED! HTTP " + code + " Pickup=" + fmt1(pickupKm) + "km Drop=" + fmt1(dropKm) + "km";
@@ -598,23 +570,20 @@ jobs:
                           } else {
                               String body = readStream(conn.getErrorStream(), 400);
                               String msg = "❌ HTTP " + code + " — " + body;
-                              if (code == 401) msg += " → Token galat";
+                              if (code == 401) msg += " → Token galat/expire";
                               if (code == 409) msg += " → Already accepted";
                               if (code == 404) msg += " → Order expire";
                               toast(msg); saveLog(msg);
                           }
                           showNotification();
-                      } catch (Exception e) {
-                          saveLog("❌ Network: " + e.getMessage());
-                      } finally {
-                          if (conn != null) conn.disconnect();
-                      }
+                      } catch (Exception e) { saveLog("❌ Network: " + e.getMessage()); }
+                      finally { if (conn != null) conn.disconnect(); }
                   }, "accept-thread").start();
               }
 
               float calcPickupDist(double lat, double lon) {
                   if (lat <= 0 || lon <= 0) return -1;
-                  if (lastLocation == null) { saveLog("⚠️ GPS unavailable, pickup skip"); return -1; }
+                  if (lastLocation == null) { saveLog("⚠️ GPS N/A, pickup skip"); return -1; }
                   try {
                       float[] res = new float[1];
                       Location.distanceBetween(lastLocation.getLatitude(), lastLocation.getLongitude(), lat, lon, res);
@@ -628,16 +597,13 @@ jobs:
                   if (Build.VERSION.SDK_INT >= 26)
                       nm.createNotificationChannel(new NotificationChannel("auto_svc", "Auto Driver", NotificationManager.IMPORTANCE_LOW));
                   Intent ti = new Intent("JAHEZ_TOGGLE").setPackage(getPackageName());
-                  PendingIntent tp = PendingIntent.getBroadcast(this, 0, ti, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-                  Notification.Action a = new Notification.Action.Builder(
-                      on ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
-                      on ? "✅ ON — tap OFF" : "⏸ OFF — tap ON", tp).build();
+                  PendingIntent tp = PendingIntent.getBroadcast(this, 0, ti, PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
                   Notification.Builder b = new Notification.Builder(this, "auto_svc")
-                      .setContentTitle("Auto Driver")
-                      .setContentText(on ? "Auto Accept: ON" : "Auto Accept: OFF")
-                      .setSmallIcon(android.R.drawable.ic_media_play)
-                      .setOngoing(true);
-                  if (Build.VERSION.SDK_INT >= 23) b.addAction(a);
+                      .setContentTitle("Auto Driver").setContentText(on ? "Auto Accept: ON" : "Auto Accept: OFF")
+                      .setSmallIcon(android.R.drawable.ic_media_play).setOngoing(true);
+                  if (Build.VERSION.SDK_INT >= 23) b.addAction(new Notification.Action.Builder(
+                      on ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                      on ? "✅ ON — tap OFF" : "⏸ OFF — tap ON", tp).build());
                   startForeground(1, b.build());
               }
 
@@ -659,7 +625,7 @@ jobs:
               String fmt2(double v) { return v < 0 ? "?" : String.format("%.2f", v); }
               String readStream(InputStream is, int max) {
                   if (is == null) return "";
-                  try { byte[] b = new byte[max]; int n = is.read(b); return n > 0 ? new String(b, 0, n).trim() : ""; }
+                  try { byte[] b = new byte[max]; int n = is.read(b); return n > 0 ? new String(b,0,n).trim() : ""; }
                   catch (Exception e) { return ""; }
               }
 
@@ -672,63 +638,55 @@ jobs:
           }
           SEOF
 
-      - name: Write BootReceiver.java
+      - name: Write Remaining Files
         run: |
-          cat > app/src/main/java/com/auto/driver/BootReceiver.java << 'BEOF'
+          cat > app/src/main/java/com/auto/driver/BootReceiver.java << 'EOF'
           package com.auto.driver;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
+          import android.content.BroadcastReceiver; import android.content.Context; import android.content.Intent;
           public class BootReceiver extends BroadcastReceiver {
             @Override public void onReceive(Context ctx, Intent intent) {
               if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
               Intent svc = new Intent(ctx, AutoService.class);
-              if (android.os.Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc);
-              else ctx.startService(svc);
+              if (android.os.Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc); else ctx.startService(svc);
             }
           }
-          BEOF
-
-      - name: Write MainActivity.java
-        run: |
-          cat > app/src/main/java/com/auto/driver/MainActivity.java << 'JEOF'
+          EOF
+          cat > app/src/main/java/com/auto/driver/LogActivity.java << 'EOF'
           package com.auto.driver;
-          import android.app.Activity;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.content.SharedPreferences;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.view.inputmethod.InputMethodManager;
-          import android.widget.*;
+          import android.app.Activity; import android.content.SharedPreferences; import android.os.Bundle; import android.widget.*;
+          public class LogActivity extends Activity {
+            @Override protected void onCreate(Bundle saved) {
+              super.onCreate(saved); setContentView(R.layout.activity_log);
+              SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
+              TextView tvLog = findViewById(R.id.tv_log);
+              String logs = prefs.getString("logs", "");
+              tvLog.setText(logs.isEmpty() ? "No logs yet." : logs);
+              ((Button)findViewById(R.id.btn_clear)).setOnClickListener(v -> { prefs.edit().remove("logs").apply(); tvLog.setText("Cleared."); });
+              ((Button)findViewById(R.id.btn_back)).setOnClickListener(v -> finish());
+            }
+          }
+          EOF
+          cat > app/src/main/java/com/auto/driver/MainActivity.java << 'EOF'
+          package com.auto.driver;
+          import android.app.Activity; import android.content.BroadcastReceiver; import android.content.Context;
+          import android.content.Intent; import android.content.IntentFilter; import android.content.SharedPreferences;
+          import android.os.Build; import android.os.Bundle; import android.view.inputmethod.InputMethodManager; import android.widget.*;
           public class MainActivity extends Activity {
-            SharedPreferences prefs;
-            Switch swEnable;
-            TextView tvStatus;
-            final BroadcastReceiver statusReceiver = new BroadcastReceiver() {
+            SharedPreferences prefs; Switch swEnable; TextView tvStatus;
+            final BroadcastReceiver sr = new BroadcastReceiver() {
               @Override public void onReceive(Context ctx, Intent intent) {
-                if (swEnable != null) swEnable.setChecked("JAHEZ_AUTO_ON".equals(intent.getAction()));
-                refreshStatus();
+                if (swEnable != null) swEnable.setChecked("JAHEZ_AUTO_ON".equals(intent.getAction())); refreshStatus();
               }
             };
             @Override protected void onCreate(Bundle saved) {
-              super.onCreate(saved);
-              setContentView(R.layout.activity_main);
+              super.onCreate(saved); setContentView(R.layout.activity_main);
               prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              EditText etPickup = findViewById(R.id.et_pickup);
-              EditText etDrop   = findViewById(R.id.et_drop);
-              SeekBar sbDelay   = findViewById(R.id.sb_delay);
-              TextView tvDelay  = findViewById(R.id.tv_delay);
-              swEnable = findViewById(R.id.sw_enable);
-              tvStatus = findViewById(R.id.tv_status);
-              Button btnSave = findViewById(R.id.btn_save);
+              EditText etPickup = findViewById(R.id.et_pickup); EditText etDrop = findViewById(R.id.et_drop);
+              SeekBar sbDelay = findViewById(R.id.sb_delay); TextView tvDelay = findViewById(R.id.tv_delay);
+              swEnable = findViewById(R.id.sw_enable); tvStatus = findViewById(R.id.tv_status);
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
-              int savedDelay = prefs.getInt("scan_delay", 500);
-              sbDelay.setProgress(savedDelay - 50);
-              tvDelay.setText(savedDelay + "ms");
+              int sd = prefs.getInt("scan_delay", 500); sbDelay.setProgress(sd-50); tvDelay.setText(sd+"ms");
               sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 public void onProgressChanged(SeekBar sb, int p, boolean u) { tvDelay.setText((p+50)+"ms"); }
                 public void onStartTrackingTouch(SeekBar sb) {}
@@ -738,27 +696,21 @@ jobs:
               if (Build.VERSION.SDK_INT >= 33) requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
               requestPermissions(new String[]{"android.permission.ACCESS_FINE_LOCATION","android.permission.ACCESS_COARSE_LOCATION"}, 1);
               IntentFilter f = new IntentFilter("JAHEZ_AUTO_OFF"); f.addAction("JAHEZ_AUTO_ON");
-              if (Build.VERSION.SDK_INT >= 33) registerReceiver(statusReceiver, f, Context.RECEIVER_NOT_EXPORTED);
-              else registerReceiver(statusReceiver, f);
-              swEnable.setOnCheckedChangeListener((btn, checked) -> {
-                prefs.edit().putBoolean("enabled", checked).apply();
-                sendBroadcast(new Intent("JAHEZ_STATE_CHANGED"));
-                refreshStatus();
-              });
-              btnSave.setOnClickListener(v -> {
-                float pk = parseF(etPickup.getText().toString(), 2f);
-                float dk = parseF(etDrop.getText().toString(), 5f);
+              if (Build.VERSION.SDK_INT >= 33) registerReceiver(sr, f, Context.RECEIVER_NOT_EXPORTED); else registerReceiver(sr, f);
+              swEnable.setOnCheckedChangeListener((btn, checked) -> { prefs.edit().putBoolean("enabled", checked).apply(); sendBroadcast(new Intent("JAHEZ_STATE_CHANGED")); refreshStatus(); });
+              ((Button)findViewById(R.id.btn_save)).setOnClickListener(v -> {
+                float pk = parseF(etPickup.getText().toString(), 2f); float dk = parseF(etDrop.getText().toString(), 5f);
                 prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
-                Toast.makeText(this, "Saved ✅  Pickup≤"+pk+"km  Drop≤"+dk+"km", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Saved ✅ Pickup≤"+pk+"km Drop≤"+dk+"km", Toast.LENGTH_LONG).show();
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
                 if (imm != null) imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
               });
-              findViewById(R.id.btn_logs).setOnClickListener(v -> startActivity(new Intent(this, LogActivity.class)));
+              ((Button)findViewById(R.id.btn_logs)).setOnClickListener(v -> startActivity(new Intent(this, LogActivity.class)));
               Intent svc = new Intent(this, AutoService.class);
               if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc); else startService(svc);
             }
             @Override protected void onResume()  { super.onResume();  refreshStatus(); }
-            @Override protected void onDestroy() { super.onDestroy(); try { unregisterReceiver(statusReceiver); } catch (Exception ignored) {} }
+            @Override protected void onDestroy() { super.onDestroy(); try { unregisterReceiver(sr); } catch (Exception ignored) {} }
             void refreshStatus() {
               if (tvStatus == null) return;
               boolean en = prefs.getBoolean("enabled", false);
@@ -767,63 +719,38 @@ jobs:
             }
             float parseF(String s, float def) { try { return Float.parseFloat(s.trim()); } catch (Exception e) { return def; } }
           }
-          JEOF
+          EOF
 
-      - name: Write LogActivity.java
+      - name: Write Layouts and Resources
         run: |
-          cat > app/src/main/java/com/auto/driver/LogActivity.java << 'LEOF'
-          package com.auto.driver;
-          import android.app.Activity;
-          import android.content.SharedPreferences;
-          import android.os.Bundle;
-          import android.widget.*;
-          public class LogActivity extends Activity {
-            @Override protected void onCreate(Bundle saved) {
-              super.onCreate(saved);
-              setContentView(R.layout.activity_log);
-              SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              TextView tvLog = findViewById(R.id.tv_log);
-              Button btnClear = findViewById(R.id.btn_clear);
-              Button btnBack  = findViewById(R.id.btn_back);
-              String logs = prefs.getString("logs", "");
-              tvLog.setText(logs.isEmpty() ? "No logs yet." : logs);
-              btnClear.setOnClickListener(v -> { prefs.edit().remove("logs").apply(); tvLog.setText("Cleared."); });
-              btnBack.setOnClickListener(v -> finish());
-            }
-          }
-          LEOF
-
-      - name: Write Layouts
-        run: |
-          cat > app/src/main/res/layout/activity_main.xml << 'LEOF'
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-            android:layout_width="match_parent" android:layout_height="match_parent"
-            android:background="#0A0A0A">
+            android:layout_width="match_parent" android:layout_height="match_parent" android:background="#0A0A0A">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
               android:orientation="vertical" android:padding="20dp">
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Direct API Accept — v10" android:textSize="12sp"
+                android:text="v12 — Triple Hook Strategy" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
-                android:textSize="24sp" android:textColor="#FF5555"
-                android:textStyle="bold" android:gravity="center" android:layout_marginBottom="24dp"/>
+                android:textSize="24sp" android:textColor="#FF5555" android:textStyle="bold"
+                android:gravity="center" android:layout_marginBottom="24dp"/>
               <View android:layout_width="match_parent" android:layout_height="1dp"
                 android:background="#222" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Max Pickup Distance (km from you)"
-                android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
+                android:text="Max Pickup Distance (km from you)" android:textColor="#AAA"
+                android:textSize="13sp" android:layout_marginBottom="4dp"/>
               <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
                 android:layout_height="56dp" android:inputType="numberDecimal"
                 android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
                 android:padding="12dp" android:layout_marginBottom="16dp"/>
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Max Drop Distance (km from pickup)"
-                android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
+                android:text="Max Drop Distance (km from pickup)" android:textColor="#AAA"
+                android:textSize="13sp" android:layout_marginBottom="4dp"/>
               <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
                 android:layout_height="56dp" android:inputType="numberDecimal"
                 android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
@@ -839,41 +766,26 @@ jobs:
               </LinearLayout>
               <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:max="1450" android:progress="450"
-                android:progressTint="#4CAF50" android:thumbTint="#4CAF50"
-                android:layout_marginBottom="6dp"/>
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="horizontal" android:layout_marginBottom="20dp">
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="50ms" android:textColor="#444" android:textSize="11sp"/>
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="750ms" android:textColor="#444"
-                  android:textSize="11sp" android:gravity="center"/>
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="1500ms" android:textColor="#444"
-                  android:textSize="11sp" android:gravity="end"/>
-              </LinearLayout>
+                android:progressTint="#4CAF50" android:thumbTint="#4CAF50" android:layout_marginBottom="20dp"/>
               <Button android:id="@+id/btn_save" android:layout_width="match_parent"
                 android:layout_height="54dp" android:text="Save Settings"
                 android:backgroundTint="#2196F3" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="16dp"/>
               <Switch android:id="@+id/sw_enable" android:layout_width="match_parent"
                 android:layout_height="58dp" android:text="  Enable Auto Accept"
-                android:textColor="#FFF" android:textSize="16sp"
-                android:background="#1A1A1A" android:padding="16dp"
-                android:layout_marginBottom="12dp"/>
+                android:textColor="#FFF" android:textSize="16sp" android:background="#1A1A1A"
+                android:padding="16dp" android:layout_marginBottom="12dp"/>
               <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
                 android:layout_height="54dp" android:text="View Logs"
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo — token auto capture\n3. Distance → Save → Toggle ON\n4. Auto accept!"
-                android:textColor="#444" android:textSize="12sp"
-                android:gravity="center" android:lineSpacingExtra="4dp"/>
+                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo — 30s wait karo\n3. LSPosed log mein hook OK dikhega\n4. Distance → Save → Toggle ON\n5. Auto accept!"
+                android:textColor="#444" android:textSize="12sp" android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
           </ScrollView>
-          LEOF
-
-          cat > app/src/main/res/layout/activity_log.xml << 'LOGEOF'
+          EOF
+          cat > app/src/main/res/layout/activity_log.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
             android:layout_width="match_parent" android:layout_height="match_parent"
@@ -883,31 +795,25 @@ jobs:
               android:textStyle="bold" android:layout_marginBottom="12dp"/>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
               android:orientation="horizontal" android:layout_marginBottom="12dp">
-              <Button android:id="@+id/btn_back" android:layout_width="0dp"
-                android:layout_height="46dp" android:layout_weight="1"
-                android:text="Back" android:backgroundTint="#333"
+              <Button android:id="@+id/btn_back" android:layout_width="0dp" android:layout_height="46dp"
+                android:layout_weight="1" android:text="Back" android:backgroundTint="#333"
                 android:textColor="#FFF" android:layout_marginEnd="8dp"/>
-              <Button android:id="@+id/btn_clear" android:layout_width="0dp"
-                android:layout_height="46dp" android:layout_weight="1"
-                android:text="Clear" android:backgroundTint="#B71C1C" android:textColor="#FFF"/>
+              <Button android:id="@+id/btn_clear" android:layout_width="0dp" android:layout_height="46dp"
+                android:layout_weight="1" android:text="Clear" android:backgroundTint="#B71C1C" android:textColor="#FFF"/>
             </LinearLayout>
             <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
               <TextView android:id="@+id/tv_log" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="Loading..."
-                android:textColor="#CCC" android:textSize="12sp"
-                android:fontFamily="monospace" android:lineSpacingExtra="6dp"
-                android:padding="8dp" android:background="#111"/>
+                android:textColor="#CCC" android:textSize="12sp" android:fontFamily="monospace"
+                android:lineSpacingExtra="6dp" android:padding="8dp" android:background="#111"/>
             </ScrollView>
           </LinearLayout>
-          LOGEOF
-
-      - name: Write Resources
-        run: |
-          cat > app/src/main/res/values/strings.xml << 'REOF'
+          EOF
+          cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources><string name="app_name">Auto Driver</string></resources>
-          REOF
-          cat > app/src/main/res/values/themes.xml << 'TEOF'
+          EOF
+          cat > app/src/main/res/values/themes.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
             <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
@@ -916,7 +822,7 @@ jobs:
               <item name="colorAccent">#FF9800</item>
             </style>
           </resources>
-          TEOF
+          EOF
 
       - name: Build APK
         run: ./gradlew assembleRelease --no-daemon 2>&1
@@ -937,7 +843,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v10
+          name: AutoDriver-v12
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
