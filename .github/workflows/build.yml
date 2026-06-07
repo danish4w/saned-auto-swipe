@@ -59,7 +59,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 14; versionName '14.0'
+              versionCode 15; versionName '15.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -124,7 +124,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v14"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v15"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -151,6 +151,8 @@ jobs:
           import android.content.Intent;
           import android.os.Bundle;
 
+          import java.net.HttpURLConnection;
+
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
           import de.robv.android.xposed.XposedBridge;
@@ -163,24 +165,121 @@ jobs:
               static final String OUR_PKG        = "com.auto.driver";
               static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
 
+              // KEY: Saned uses Ktor which internally uses HttpURLConnection
+              // HttpURLConnection is a JAVA class — always in system classLoader
+              // We hook setRequestProperty to capture Authorization header
+
               private volatile String capturedToken = "";
+              private volatile String capturedUrl   = "";
               private volatile int tokenCount = 0;
-              private volatile boolean okHttpHooked = false;
               private long lastBcast = 0;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v14 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v15 loading into " + lp.packageName);
 
-                  // Single hook: Activity.onResume
-                  // - Capture order data when IncomingDispatchActivity resumes
-                  // - Also install OkHttp hook using Activity's classLoader (first time only)
-                  //   Activity classLoader has ALL dex files including classes7.dex with OkHttp
-                  hookActivityOnResume(lp);
+                  // ── Hook 1: HttpURLConnection.setRequestProperty ──
+                  // Ktor Android engine sets headers here - always available in lp.classLoader
+                  hookHttpURLConnection(lp);
+
+                  // ── Hook 2: HttpURLConnection.addRequestProperty ──
+                  hookHttpURLConnectionAdd(lp);
+
+                  // ── Hook 3: Activity.onResume → order data ──
+                  hookOrderActivity(lp);
+
+                  XposedBridge.log("[AutoDriver] ✅ All hooks registered");
               }
 
-              private void hookActivityOnResume(XC_LoadPackage.LoadPackageParam lp) {
+              private void hookHttpURLConnection(XC_LoadPackage.LoadPackageParam lp) {
+                  try {
+                      // Hook java.net.HttpURLConnection.setRequestProperty(String key, String value)
+                      XposedHelpers.findAndHookMethod(
+                          "java.net.HttpURLConnection",
+                          lp.classLoader,
+                          "setRequestProperty",
+                          String.class, String.class,
+                          new XC_MethodHook() {
+                              @Override
+                              protected void beforeHookedMethod(MethodHookParam param) {
+                                  String key   = (String) param.args[0];
+                                  String value = (String) param.args[1];
+                                  if (!"Authorization".equals(key)) return;
+                                  if (value == null || value.length() < 10) return;
+
+                                  // Get URL from connection object
+                                  try {
+                                      Object conn = param.thisObject;
+                                      Object url = XposedHelpers.callMethod(conn, "getURL");
+                                      String urlStr = url != null ? url.toString() : "";
+
+                                      if (!urlStr.contains("saned.io") && !urlStr.contains("jahez")) return;
+
+                                      boolean changed = !value.equals(capturedToken);
+                                      capturedToken = value;
+                                      capturedUrl   = urlStr;
+                                      tokenCount++;
+
+                                      if (changed) {
+                                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                                              + " setRequestProperty url=" + urlStr.replaceAll("\\?.*","")
+                                              + " auth=" + value.substring(0, Math.min(50, value.length())));
+                                      }
+
+                                      if (urlStr.contains("accept-dispatch") || urlStr.contains("/accept/")) {
+                                          XposedBridge.log("[AutoDriver] 🎯 ACCEPT API! " + urlStr
+                                              + " auth=" + value.substring(0, Math.min(60, value.length())));
+                                      }
+
+                                  } catch (Throwable ignored) {
+                                      // URL not set yet - just capture token
+                                      if (!value.equals(capturedToken)) {
+                                          capturedToken = value;
+                                          tokenCount++;
+                                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                                              + " (no URL yet) auth=" + value.substring(0, Math.min(50, value.length())));
+                                      }
+                                  }
+                              }
+                          }
+                      );
+                      XposedBridge.log("[AutoDriver] ✅ HttpURLConnection.setRequestProperty hook OK");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ❌ setRequestProperty: " + e.getMessage());
+                  }
+              }
+
+              private void hookHttpURLConnectionAdd(XC_LoadPackage.LoadPackageParam lp) {
+                  try {
+                      XposedHelpers.findAndHookMethod(
+                          "java.net.URLConnection",
+                          lp.classLoader,
+                          "addRequestProperty",
+                          String.class, String.class,
+                          new XC_MethodHook() {
+                              @Override
+                              protected void beforeHookedMethod(MethodHookParam param) {
+                                  String key   = (String) param.args[0];
+                                  String value = (String) param.args[1];
+                                  if (!"Authorization".equals(key)) return;
+                                  if (value == null || value.length() < 10) return;
+                                  if (value.equals(capturedToken)) return;
+
+                                  capturedToken = value;
+                                  tokenCount++;
+                                  XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                                      + " addRequestProperty auth=" + value.substring(0, Math.min(50, value.length())));
+                              }
+                          }
+                      );
+                      XposedBridge.log("[AutoDriver] ✅ URLConnection.addRequestProperty hook OK");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ❌ addRequestProperty: " + e.getMessage());
+                  }
+              }
+
+              private void hookOrderActivity(XC_LoadPackage.LoadPackageParam lp) {
                   try {
                       XposedHelpers.findAndHookMethod(
                           "android.app.Activity", lp.classLoader, "onResume",
@@ -188,22 +287,7 @@ jobs:
                               @Override
                               protected void afterHookedMethod(MethodHookParam param) {
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
-                                  String actName = act.getClass().getName();
-
-                                  // Log every Saned activity for debugging
-                                  if (actName.startsWith("net.jahez") || actName.startsWith("net.saned")) {
-                                      XposedBridge.log("[AutoDriver] 📱 Activity: " + actName);
-                                  }
-
-                                  // Try OkHttp hook using this Activity's classLoader (once)
-                                  if (!okHttpHooked && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
-                                      ClassLoader cl = act.getClassLoader();
-                                      XposedBridge.log("[AutoDriver] 🔧 Trying OkHttp hook via " + actName + " CL");
-                                      tryOkHttpHook(cl, act);
-                                  }
-
-                                  // Order capture - only IncomingDispatchActivity
-                                  if (!ORDER_ACTIVITY.equals(actName)) return;
+                                  if (!ORDER_ACTIVITY.equals(act.getClass().getName())) return;
 
                                   long now = System.currentTimeMillis();
                                   if (now - lastBcast < 2000) return;
@@ -245,116 +329,10 @@ jobs:
                               }
                           }
                       );
-                      XposedBridge.log("[AutoDriver] ✅ onResume hook registered");
+                      XposedBridge.log("[AutoDriver] ✅ onResume hook OK");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ onResume hook failed: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ onResume: " + e.getMessage());
                   }
-              }
-
-              private void tryOkHttpHook(ClassLoader cl, android.app.Activity act) {
-                  // Try A: RealInterceptorChain
-                  try {
-                      Class<?> reqCls   = cl.loadClass("okhttp3.Request");
-                      Class<?> chainCls = cl.loadClass("okhttp3.internal.http.RealInterceptorChain");
-                      XposedHelpers.findAndHookMethod(chainCls, "proceed", reqCls,
-                          new XC_MethodHook() {
-                              @Override protected void beforeHookedMethod(MethodHookParam p) {
-                                  extractToken(p.args[0], "Chain");
-                              }
-                          });
-                      okHttpHooked = true;
-                      XposedBridge.log("[AutoDriver] ✅ Chain.proceed hook OK");
-                      sendLog(act, "✅ OkHttp Chain hook OK!");
-                      return;
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ Chain: " + e.getMessage());
-                  }
-
-                  // Try B: RealCall
-                  try {
-                      Class<?> rcCls = cl.loadClass("okhttp3.internal.connection.RealCall");
-                      XposedBridge.hookAllMethods(rcCls, "execute", new XC_MethodHook() {
-                          @Override protected void beforeHookedMethod(MethodHookParam p) {
-                              extractTokenFromObj(p.thisObject, "execute");
-                          }
-                      });
-                      XposedBridge.hookAllMethods(rcCls, "enqueue", new XC_MethodHook() {
-                          @Override protected void beforeHookedMethod(MethodHookParam p) {
-                              extractTokenFromObj(p.thisObject, "enqueue");
-                          }
-                      });
-                      okHttpHooked = true;
-                      XposedBridge.log("[AutoDriver] ✅ RealCall hook OK");
-                      sendLog(act, "✅ OkHttp RealCall hook OK!");
-                      return;
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ RealCall: " + e.getMessage());
-                  }
-
-                  // Try C: Request$Builder
-                  try {
-                      Class<?> bCls = cl.loadClass("okhttp3.Request$Builder");
-                      XposedHelpers.findAndHookMethod(bCls, "build",
-                          new XC_MethodHook() {
-                              @Override protected void afterHookedMethod(MethodHookParam p) {
-                                  extractToken(p.getResult(), "Builder");
-                              }
-                          });
-                      okHttpHooked = true;
-                      XposedBridge.log("[AutoDriver] ✅ Builder hook OK");
-                      sendLog(act, "✅ OkHttp Builder hook OK!");
-                      return;
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ Builder: " + e.getMessage());
-                  }
-
-                  // All failed - log available classes for debugging
-                  XposedBridge.log("[AutoDriver] ❌ All OkHttp hooks failed with Activity CL");
-                  try {
-                      // Log what IS available in this classloader
-                      cl.loadClass("okhttp3.OkHttpClient");
-                      XposedBridge.log("[AutoDriver] 📦 OkHttpClient IS available");
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] 📦 OkHttpClient NOT available either");
-                  }
-                  sendLog(act, "❌ OkHttp hooks failed — check LSPosed log");
-              }
-
-              private void extractToken(Object request, String source) {
-                  if (request == null) return;
-                  try {
-                      String url = XposedHelpers.callMethod(request, "url").toString();
-                      if (!url.contains("saned.io") && !url.contains("jahez")) return;
-
-                      Object headers = XposedHelpers.callMethod(request, "headers");
-                      String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
-                      if (auth == null || auth.length() < 10) return;
-
-                      boolean changed = !auth.equals(capturedToken);
-                      capturedToken = auth;
-                      tokenCount++;
-                      if (changed) {
-                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
-                              + " [" + source + "] " + url.replaceAll("\\?.*", "")
-                              + " | " + auth.substring(0, Math.min(50, auth.length())));
-                      }
-                      if (url.contains("accept-dispatch") || url.contains("/accept/")) {
-                          XposedBridge.log("[AutoDriver] 🎯 ACCEPT! " + url
-                              + " auth=" + auth.substring(0, Math.min(60, auth.length())));
-                      }
-                  } catch (Throwable ignored) {}
-              }
-
-              private void extractTokenFromObj(Object realCall, String method) {
-                  try {
-                      Object req = null;
-                      try { req = XposedHelpers.getObjectField(realCall, "originalRequest"); }
-                      catch (Throwable e) {
-                          try { req = XposedHelpers.getObjectField(realCall, "request"); }
-                          catch (Throwable ignored) {}
-                      }
-                      extractToken(req, "RealCall." + method);
-                  } catch (Throwable ignored) {}
               }
 
               private String extractRequestId(Bundle b) {
@@ -463,7 +441,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v14 started");
+                  saveLog("✅ AutoService v15 started");
               }
 
               void startLocationUpdates() {
@@ -718,7 +696,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v14 — Activity CL Hook" android:textSize="12sp"
+                android:text="v15 — HttpURLConnection Hook" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -765,7 +743,7 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo\n3. Log: Activity names dikhenge\n4. OkHttp hook OK dikhega\n5. Toggle ON → Auto accept!"
+                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo + koi bhi screen open karo\n3. LSPosed: setRequestProperty hook OK dikhega\n4. Toggle ON → Auto accept!"
                 android:textColor="#444" android:textSize="12sp" android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
           </ScrollView>
@@ -828,7 +806,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v14
+          name: AutoDriver-v15
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
