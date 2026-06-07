@@ -1,4 +1,4 @@
-name: Build AutoDriver with Pine
+name: Build AutoDriver
 
 on: [workflow_dispatch]
 
@@ -59,7 +59,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 14; versionName '14.0-pine'
+              versionCode 14; versionName '14.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -71,8 +71,6 @@ jobs:
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.google.android.material:material:1.12.0'
             compileOnly 'de.robv.android.xposed:api:82'
-            implementation 'top.canyie.pine:core:0.2.9'
-            implementation 'top.canyie.pine:xposed:0.2.9'
           }
           EOF
 
@@ -126,7 +124,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v14 (Pine)"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v14"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -145,25 +143,19 @@ jobs:
           </manifest>
           EOF
 
-      - name: Write SanedHook.java (Pine Version)
+      - name: Write SanedHook.java
         run: |
           cat > app/src/main/java/com/auto/driver/SanedHook.java << 'HEOF'
           package com.auto.driver;
 
-          import android.content.Context;
           import android.content.Intent;
           import android.os.Bundle;
-          import android.util.Log;
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
+          import de.robv.android.xposed.XposedBridge;
           import de.robv.android.xposed.XposedHelpers;
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
-
-          import top.canyie.pine.Pine;
-          import top.canyie.pine.PineConfig;
-          import top.canyie.pine.callback.MethodHook;
-          import top.canyie.pine.xposed.PineXposed;
 
           public class SanedHook implements IXposedHookLoadPackage {
 
@@ -173,122 +165,22 @@ jobs:
 
               private volatile String capturedToken = "";
               private volatile int tokenCount = 0;
+              private volatile boolean okHttpHooked = false;
               private long lastBcast = 0;
-              private static boolean pineReady = false;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  Log.i("AutoDriver", "v14 (Pine) loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v14 loading into " + lp.packageName);
 
-                  XposedHelpers.findAndHookMethod(
-                      "android.app.Activity", lp.classLoader, "onCreate", Bundle.class,
-                      new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) {
-                              android.app.Activity act = (android.app.Activity) param.thisObject;
-                              String actName = act.getClass().getName();
-                              if (!actName.startsWith("net.jahez") && !actName.startsWith("net.saned")) return;
-
-                              if (!pineReady) {
-                                  try {
-                                      Context ctx = act.getApplicationContext();
-                                      PineConfig.debug = true;
-                                      Pine.init(ctx);
-                                      PineXposed.init(ctx);
-                                      pineReady = true;
-                                      Log.i("AutoDriver", "✅ Pine initialized");
-                                      sendLog(act, "Pine framework ready");
-                                  } catch (Throwable e) {
-                                      Log.e("AutoDriver", "Pine init failed", e);
-                                      sendLog(act, "❌ Pine init: " + e.getMessage());
-                                  }
-                              }
-
-                              hookOkHttpWithPine(act.getClassLoader(), act);
-                          }
-                      }
-                  );
-
-                  hookOrderActivity(lp);
+                  // Single hook: Activity.onResume
+                  // - Capture order data when IncomingDispatchActivity resumes
+                  // - Also install OkHttp hook using Activity's classLoader (first time only)
+                  //   Activity classLoader has ALL dex files including classes7.dex with OkHttp
+                  hookActivityOnResume(lp);
               }
 
-              private void hookOkHttpWithPine(ClassLoader cl, android.app.Activity act) {
-                  boolean hooked = false;
-                  String[] possibleNames = {
-                      "okhttp3.internal.http.RealInterceptorChain",
-                      "okhttp3.internal.http.BridgeInterceptor",
-                      "okhttp3.internal.http.CallServerInterceptor"
-                  };
-                  for (String name : possibleNames) {
-                      try {
-                          Class<?> chainClass = cl.loadClass(name);
-                          java.lang.reflect.Method[] methods = chainClass.getDeclaredMethods();
-                          for (java.lang.reflect.Method m : methods) {
-                              if (m.getName().equals("proceed") && m.getParameterCount() == 1) {
-                                  Class<?> paramType = m.getParameterTypes()[0];
-                                  if (paramType.getName().equals("okhttp3.Request")) {
-                                      Pine.hook(m, new MethodHook() {
-                                          @Override
-                                          public void beforeCall(Pine.CallFrame callFrame) {
-                                              Object request = callFrame.args[0];
-                                              extractTokenFromRequest(request, "Pine-" + name);
-                                          }
-                                      });
-                                      hooked = true;
-                                      Log.i("AutoDriver", "✅ Pine hooked " + name + ".proceed");
-                                      sendLog(act, "✅ Pine hook on " + name);
-                                      break;
-                                  }
-                              }
-                          }
-                          if (hooked) break;
-                      } catch (Throwable e) {
-                          Log.d("AutoDriver", "Could not load " + name + ": " + e.getMessage());
-                      }
-                  }
-
-                  if (!hooked) {
-                      try {
-                          Class<?> builderClass = cl.loadClass("okhttp3.Request$Builder");
-                          java.lang.reflect.Method buildMethod = builderClass.getDeclaredMethod("build");
-                          Pine.hook(buildMethod, new MethodHook() {
-                              @Override
-                              public void afterCall(Pine.CallFrame callFrame) {
-                                  Object request = callFrame.getResult();
-                                  extractTokenFromRequest(request, "Builder.build");
-                              }
-                          });
-                          hooked = true;
-                          Log.i("AutoDriver", "✅ Pine hooked Request$Builder.build");
-                          sendLog(act, "✅ Pine builder hook");
-                      } catch (Throwable e) {
-                          Log.e("AutoDriver", "All OkHttp hooks failed", e);
-                          sendLog(act, "❌ Pine: no OkHttp hooks");
-                      }
-                  }
-              }
-
-              private void extractTokenFromRequest(Object request, String source) {
-                  if (request == null) return;
-                  try {
-                      Object headers = XposedHelpers.callMethod(request, "headers");
-                      String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
-                      if (auth == null || auth.length() < 10) return;
-
-                      boolean changed = !auth.equals(capturedToken);
-                      capturedToken = auth;
-                      tokenCount++;
-                      if (changed) {
-                          Log.i("AutoDriver", "🔑 Token #" + tokenCount + " [" + source + "] " +
-                              auth.substring(0, Math.min(50, auth.length())));
-                      }
-                  } catch (Throwable e) {
-                      Log.w("AutoDriver", "extractToken error: " + e.getMessage());
-                  }
-              }
-
-              private void hookOrderActivity(XC_LoadPackage.LoadPackageParam lp) {
+              private void hookActivityOnResume(XC_LoadPackage.LoadPackageParam lp) {
                   try {
                       XposedHelpers.findAndHookMethod(
                           "android.app.Activity", lp.classLoader, "onResume",
@@ -296,7 +188,22 @@ jobs:
                               @Override
                               protected void afterHookedMethod(MethodHookParam param) {
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
-                                  if (!ORDER_ACTIVITY.equals(act.getClass().getName())) return;
+                                  String actName = act.getClass().getName();
+
+                                  // Log every Saned activity for debugging
+                                  if (actName.startsWith("net.jahez") || actName.startsWith("net.saned")) {
+                                      XposedBridge.log("[AutoDriver] 📱 Activity: " + actName);
+                                  }
+
+                                  // Try OkHttp hook using this Activity's classLoader (once)
+                                  if (!okHttpHooked && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
+                                      ClassLoader cl = act.getClassLoader();
+                                      XposedBridge.log("[AutoDriver] 🔧 Trying OkHttp hook via " + actName + " CL");
+                                      tryOkHttpHook(cl, act);
+                                  }
+
+                                  // Order capture - only IncomingDispatchActivity
+                                  if (!ORDER_ACTIVITY.equals(actName)) return;
 
                                   long now = System.currentTimeMillis();
                                   if (now - lastBcast < 2000) return;
@@ -313,7 +220,9 @@ jobs:
                                       double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
                                       double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
 
-                                      String tkStatus = capturedToken.isEmpty() ? "❌ NO TOKEN" : "✅ #" + tokenCount;
+                                      String tkStatus = capturedToken.isEmpty()
+                                          ? "❌ NO TOKEN"
+                                          : "✅ #" + tokenCount + " " + capturedToken.substring(0, Math.min(25, capturedToken.length()));
 
                                       sendLog(act, "📦 id=" + requestId
                                           + " drop=" + String.format("%.2f", dropDist) + "km"
@@ -331,15 +240,121 @@ jobs:
                                       bc.putExtra("is_order",   true);
                                       act.sendBroadcast(bc);
                                   } catch (Throwable e) {
-                                      sendLog(act, "❌ onResume: " + e.getMessage());
+                                      sendLog(act, "❌ order: " + e.getMessage());
                                   }
                               }
                           }
                       );
-                      Log.i("AutoDriver", "✅ onResume hook registered");
+                      XposedBridge.log("[AutoDriver] ✅ onResume hook registered");
                   } catch (Throwable e) {
-                      Log.e("AutoDriver", "onResume hook failed", e);
+                      XposedBridge.log("[AutoDriver] ❌ onResume hook failed: " + e.getMessage());
                   }
+              }
+
+              private void tryOkHttpHook(ClassLoader cl, android.app.Activity act) {
+                  // Try A: RealInterceptorChain
+                  try {
+                      Class<?> reqCls   = cl.loadClass("okhttp3.Request");
+                      Class<?> chainCls = cl.loadClass("okhttp3.internal.http.RealInterceptorChain");
+                      XposedHelpers.findAndHookMethod(chainCls, "proceed", reqCls,
+                          new XC_MethodHook() {
+                              @Override protected void beforeHookedMethod(MethodHookParam p) {
+                                  extractToken(p.args[0], "Chain");
+                              }
+                          });
+                      okHttpHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ Chain.proceed hook OK");
+                      sendLog(act, "✅ OkHttp Chain hook OK!");
+                      return;
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ⚠️ Chain: " + e.getMessage());
+                  }
+
+                  // Try B: RealCall
+                  try {
+                      Class<?> rcCls = cl.loadClass("okhttp3.internal.connection.RealCall");
+                      XposedBridge.hookAllMethods(rcCls, "execute", new XC_MethodHook() {
+                          @Override protected void beforeHookedMethod(MethodHookParam p) {
+                              extractTokenFromObj(p.thisObject, "execute");
+                          }
+                      });
+                      XposedBridge.hookAllMethods(rcCls, "enqueue", new XC_MethodHook() {
+                          @Override protected void beforeHookedMethod(MethodHookParam p) {
+                              extractTokenFromObj(p.thisObject, "enqueue");
+                          }
+                      });
+                      okHttpHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ RealCall hook OK");
+                      sendLog(act, "✅ OkHttp RealCall hook OK!");
+                      return;
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ⚠️ RealCall: " + e.getMessage());
+                  }
+
+                  // Try C: Request$Builder
+                  try {
+                      Class<?> bCls = cl.loadClass("okhttp3.Request$Builder");
+                      XposedHelpers.findAndHookMethod(bCls, "build",
+                          new XC_MethodHook() {
+                              @Override protected void afterHookedMethod(MethodHookParam p) {
+                                  extractToken(p.getResult(), "Builder");
+                              }
+                          });
+                      okHttpHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ Builder hook OK");
+                      sendLog(act, "✅ OkHttp Builder hook OK!");
+                      return;
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ⚠️ Builder: " + e.getMessage());
+                  }
+
+                  // All failed - log available classes for debugging
+                  XposedBridge.log("[AutoDriver] ❌ All OkHttp hooks failed with Activity CL");
+                  try {
+                      // Log what IS available in this classloader
+                      cl.loadClass("okhttp3.OkHttpClient");
+                      XposedBridge.log("[AutoDriver] 📦 OkHttpClient IS available");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] 📦 OkHttpClient NOT available either");
+                  }
+                  sendLog(act, "❌ OkHttp hooks failed — check LSPosed log");
+              }
+
+              private void extractToken(Object request, String source) {
+                  if (request == null) return;
+                  try {
+                      String url = XposedHelpers.callMethod(request, "url").toString();
+                      if (!url.contains("saned.io") && !url.contains("jahez")) return;
+
+                      Object headers = XposedHelpers.callMethod(request, "headers");
+                      String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
+                      if (auth == null || auth.length() < 10) return;
+
+                      boolean changed = !auth.equals(capturedToken);
+                      capturedToken = auth;
+                      tokenCount++;
+                      if (changed) {
+                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                              + " [" + source + "] " + url.replaceAll("\\?.*", "")
+                              + " | " + auth.substring(0, Math.min(50, auth.length())));
+                      }
+                      if (url.contains("accept-dispatch") || url.contains("/accept/")) {
+                          XposedBridge.log("[AutoDriver] 🎯 ACCEPT! " + url
+                              + " auth=" + auth.substring(0, Math.min(60, auth.length())));
+                      }
+                  } catch (Throwable ignored) {}
+              }
+
+              private void extractTokenFromObj(Object realCall, String method) {
+                  try {
+                      Object req = null;
+                      try { req = XposedHelpers.getObjectField(realCall, "originalRequest"); }
+                      catch (Throwable e) {
+                          try { req = XposedHelpers.getObjectField(realCall, "request"); }
+                          catch (Throwable ignored) {}
+                      }
+                      extractToken(req, "RealCall." + method);
+                  } catch (Throwable ignored) {}
               }
 
               private String extractRequestId(Bundle b) {
@@ -448,7 +463,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v14 (Pine) started");
+                  saveLog("✅ AutoService v14 started");
               }
 
               void startLocationUpdates() {
@@ -465,7 +480,7 @@ jobs:
                       for (String p : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
                           try { Location l = lm.getLastKnownLocation(p); if (l!=null&&lastLocation==null){lastLocation=l;break;} } catch (SecurityException ignored) {}
                       }
-                      saveLog("📍 Location " + (lastLocation != null ? "✅" : "⚠️ no seed"));
+                      saveLog("📍 Location " + (lastLocation != null ? "✅" : "⚠️"));
                   } catch (Exception e) { saveLog("❌ Location: " + e.getMessage()); }
               }
 
@@ -491,7 +506,7 @@ jobs:
                       saveLog("🔑 " + authToken.substring(0, Math.min(30, authToken.length())) + "...");
                   } else {
                       finalAuth = BASIC_AUTH;
-                      saveLog("🔑 Basic auth fallback");
+                      saveLog("🔑 Basic fallback");
                   }
 
                   float pickupKm = calcPickupDist(pickupLat, pickupLon);
@@ -608,9 +623,9 @@ jobs:
           }
           SEOF
 
-      - name: Write BootReceiver.java
+      - name: Write Remaining Files
         run: |
-          cat > app/src/main/java/com/auto/driver/BootReceiver.java << 'BEOF'
+          cat > app/src/main/java/com/auto/driver/BootReceiver.java << 'EOF'
           package com.auto.driver;
           import android.content.BroadcastReceiver; import android.content.Context; import android.content.Intent;
           public class BootReceiver extends BroadcastReceiver {
@@ -620,11 +635,8 @@ jobs:
               if (android.os.Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc); else ctx.startService(svc);
             }
           }
-          BEOF
-
-      - name: Write LogActivity.java
-        run: |
-          cat > app/src/main/java/com/auto/driver/LogActivity.java << 'LEOF'
+          EOF
+          cat > app/src/main/java/com/auto/driver/LogActivity.java << 'EOF'
           package com.auto.driver;
           import android.app.Activity; import android.content.SharedPreferences; import android.os.Bundle; import android.widget.*;
           public class LogActivity extends Activity {
@@ -638,11 +650,8 @@ jobs:
               ((Button)findViewById(R.id.btn_back)).setOnClickListener(v -> finish());
             }
           }
-          LEOF
-
-      - name: Write MainActivity.java
-        run: |
-          cat > app/src/main/java/com/auto/driver/MainActivity.java << 'MAEOF'
+          EOF
+          cat > app/src/main/java/com/auto/driver/MainActivity.java << 'EOF'
           package com.auto.driver;
           import android.app.Activity; import android.content.BroadcastReceiver; import android.content.Context;
           import android.content.Intent; import android.content.IntentFilter; import android.content.SharedPreferences;
@@ -695,11 +704,11 @@ jobs:
             }
             float parseF(String s, float def) { try { return Float.parseFloat(s.trim()); } catch (Exception e) { return def; } }
           }
-          MAEOF
+          EOF
 
       - name: Write Layouts and Resources
         run: |
-          cat > app/src/main/res/layout/activity_main.xml << 'LAYEOF'
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
             android:layout_width="match_parent" android:layout_height="match_parent" android:background="#0A0A0A">
@@ -709,7 +718,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v14 — Pine Hook" android:textSize="12sp"
+                android:text="v14 — Activity CL Hook" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -756,13 +765,12 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo\n3. Log mein Pine hook OK dikhega\n4. Distance → Save → Toggle ON"
+                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo\n3. Log: Activity names dikhenge\n4. OkHttp hook OK dikhega\n5. Toggle ON → Auto accept!"
                 android:textColor="#444" android:textSize="12sp" android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
           </ScrollView>
-          LAYEOF
-
-          cat > app/src/main/res/layout/activity_log.xml << 'LOGLAYEOF'
+          EOF
+          cat > app/src/main/res/layout/activity_log.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
             android:layout_width="match_parent" android:layout_height="match_parent"
@@ -785,8 +793,7 @@ jobs:
                 android:lineSpacingExtra="6dp" android:padding="8dp" android:background="#111"/>
             </ScrollView>
           </LinearLayout>
-          LOGLAYEOF
-
+          EOF
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources><string name="app_name">Auto Driver</string></resources>
@@ -821,7 +828,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v14-Pine
+          name: AutoDriver-v14
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
