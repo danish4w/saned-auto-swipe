@@ -59,7 +59,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 17; versionName '17.0'
+              versionCode 18; versionName '18.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -124,7 +124,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v17"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v18"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -150,9 +150,8 @@ jobs:
 
           import android.content.Intent;
           import android.os.Bundle;
-          import java.lang.reflect.Field;
-          import java.util.List;
-          import java.util.Map;
+          import android.os.Handler;
+          import android.os.Looper;
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
@@ -166,181 +165,29 @@ jobs:
               static final String OUR_PKG        = "com.auto.driver";
               static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
 
+              // AuthAccessTokenDto class - classes7.dex mein
+              // Jab login ya token refresh hota hai yeh construct hoti hai
+              static final String AUTH_DTO = "net.saned.login.remote.model.dto.AuthAccessTokenDto";
+
               private volatile String capturedToken = "";
               private volatile int tokenCount = 0;
+              private volatile boolean dtoHooked = false;
               private long lastBcast = 0;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v17 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v18 loading into " + lp.packageName);
 
-                  // Strategy: Hook HttpURLConnection.connect() - called AFTER all headers set
-                  // At this point we can read ALL request headers via reflection
-                  hookConnect(lp);
+                  // Hook 1: Activity.onResume - order capture + try AuthAccessTokenDto hook
+                  // (using Activity's classLoader which has classes7.dex)
+                  hookActivityOnResume(lp);
 
-                  // Also keep addRequestProperty as backup
-                  hookAddRequestProperty(lp);
-
-                  // Order activity hook
-                  hookOrderActivity(lp);
+                  // Hook 2: setRequestProperty/addRequestProperty as backup
+                  hookRequestProperties(lp);
               }
 
-              private void hookConnect(XC_LoadPackage.LoadPackageParam lp) {
-                  try {
-                      Class<?> urlConnClass = lp.classLoader.loadClass("java.net.URLConnection");
-                      XposedBridge.hookAllMethods(urlConnClass, "connect", new XC_MethodHook() {
-                          @Override
-                          protected void beforeHookedMethod(MethodHookParam param) {
-                              try {
-                                  Object conn = param.thisObject;
-
-                                  // Get URL
-                                  String urlStr = "";
-                                  try {
-                                      Object url = XposedHelpers.callMethod(conn, "getURL");
-                                      if (url != null) urlStr = url.toString();
-                                  } catch (Throwable ignored) {}
-
-                                  if (!urlStr.contains("saned.io") && !urlStr.contains("jahez")) return;
-
-                                  XposedBridge.log("[AutoDriver] 🌐 connect() called: " + urlStr.replaceAll("\\?.*",""));
-
-                                  // Read headers via reflection - "requests" field in HttpURLConnection
-                                  String auth = readAuthHeader(conn);
-
-                                  if (auth != null && auth.length() > 10) {
-                                      boolean changed = !auth.equals(capturedToken);
-                                      capturedToken = auth;
-                                      tokenCount++;
-                                      if (changed) {
-                                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
-                                              + " from connect() " + urlStr.replaceAll("\\?.*","")
-                                              + " | " + auth.substring(0, Math.min(50, auth.length())));
-                                      }
-                                      if (urlStr.contains("accept-dispatch") || urlStr.contains("/accept/")) {
-                                          XposedBridge.log("[AutoDriver] 🎯 ACCEPT API! auth="
-                                              + auth.substring(0, Math.min(60, auth.length())));
-                                      }
-                                  } else {
-                                      XposedBridge.log("[AutoDriver] ⚠️ connect() - no auth header found for " + urlStr.replaceAll("\\?.*",""));
-                                  }
-                              } catch (Throwable e) {
-                                  XposedBridge.log("[AutoDriver] ⚠️ connect hook error: " + e.getMessage());
-                              }
-                          }
-                      });
-                      XposedBridge.log("[AutoDriver] ✅ URLConnection.connect() hook OK");
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ connect hook: " + e.getMessage());
-                  }
-              }
-
-              // Read Authorization header from URLConnection via reflection
-              private String readAuthHeader(Object conn) {
-                  // Try method 1: getRequestProperty
-                  try {
-                      String auth = (String) XposedHelpers.callMethod(conn, "getRequestProperty", "Authorization");
-                      if (auth != null && !auth.isEmpty()) return auth;
-                  } catch (Throwable ignored) {}
-
-                  // Try method 2: reflect into "requests" MessageHeader field
-                  try {
-                      Class<?> cls = conn.getClass();
-                      while (cls != null) {
-                          try {
-                              Field f = cls.getDeclaredField("requests");
-                              f.setAccessible(true);
-                              Object msgHeader = f.get(conn);
-                              if (msgHeader != null) {
-                                  // MessageHeader has getKey()/getValue() or nkeys/keys/values fields
-                                  try {
-                                      // Try getKey/getValue approach
-                                      int nkeys = (int) XposedHelpers.getObjectField(msgHeader, "nkeys");
-                                      Object[] keys = (Object[]) XposedHelpers.getObjectField(msgHeader, "keys");
-                                      Object[] values = (Object[]) XposedHelpers.getObjectField(msgHeader, "values");
-                                      for (int i = 0; i < nkeys; i++) {
-                                          if ("Authorization".equals(keys[i])) {
-                                              return (String) values[i];
-                                          }
-                                      }
-                                  } catch (Throwable ignored2) {}
-                              }
-                              break;
-                          } catch (NoSuchFieldException e) {
-                              cls = cls.getSuperclass();
-                          }
-                      }
-                  } catch (Throwable ignored) {}
-
-                  // Try method 3: reflect into "userHeaders" field
-                  try {
-                      Class<?> cls = conn.getClass();
-                      while (cls != null) {
-                          for (String fieldName : new String[]{"userHeaders", "headerFields", "headers"}) {
-                              try {
-                                  Field f = cls.getDeclaredField(fieldName);
-                                  f.setAccessible(true);
-                                  Object val = f.get(conn);
-                                  if (val instanceof Map) {
-                                      Map<?,?> map = (Map<?,?>) val;
-                                      for (Map.Entry<?,?> entry : map.entrySet()) {
-                                          if ("Authorization".equals(String.valueOf(entry.getKey()))) {
-                                              Object v = entry.getValue();
-                                              if (v instanceof List) return (String)((List<?>)v).get(0);
-                                              return String.valueOf(v);
-                                          }
-                                      }
-                                  }
-                              } catch (NoSuchFieldException ignored) {}
-                          }
-                          cls = cls.getSuperclass();
-                      }
-                  } catch (Throwable ignored) {}
-
-                  return null;
-              }
-
-              private void hookAddRequestProperty(XC_LoadPackage.LoadPackageParam lp) {
-                  XC_MethodHook hook = new XC_MethodHook() {
-                      @Override protected void beforeHookedMethod(MethodHookParam param) {
-                          try {
-                              String key   = (String) param.args[0];
-                              String value = (String) param.args[1];
-                              if (!"Authorization".equals(key)) return;
-                              if (value == null || value.length() < 10) return;
-
-                              String urlStr = "";
-                              try {
-                                  Object url = XposedHelpers.callMethod(param.thisObject, "getURL");
-                                  if (url != null) urlStr = url.toString();
-                              } catch (Throwable ignored) {}
-
-                              if (!urlStr.isEmpty() && !urlStr.contains("saned.io") && !urlStr.contains("jahez")) return;
-
-                              boolean changed = !value.equals(capturedToken);
-                              capturedToken = value;
-                              tokenCount++;
-                              if (changed) {
-                                  XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
-                                      + " [" + param.method.getName() + "] "
-                                      + " auth=" + value.substring(0, Math.min(50, value.length())));
-                              }
-                          } catch (Throwable ignored) {}
-                      }
-                  };
-
-                  try {
-                      Class<?> urlConnClass = lp.classLoader.loadClass("java.net.URLConnection");
-                      XposedBridge.hookAllMethods(urlConnClass, "setRequestProperty", hook);
-                      XposedBridge.hookAllMethods(urlConnClass, "addRequestProperty", hook);
-                      XposedBridge.log("[AutoDriver] ✅ setRequest/addRequest hooks OK");
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ request property hooks: " + e.getMessage());
-                  }
-              }
-
-              private void hookOrderActivity(XC_LoadPackage.LoadPackageParam lp) {
+              private void hookActivityOnResume(XC_LoadPackage.LoadPackageParam lp) {
                   try {
                       XposedHelpers.findAndHookMethod(
                           "android.app.Activity", lp.classLoader, "onResume",
@@ -348,8 +195,16 @@ jobs:
                               @Override
                               protected void afterHookedMethod(MethodHookParam param) {
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
-                                  if (!ORDER_ACTIVITY.equals(act.getClass().getName())) return;
+                                  String actName = act.getClass().getName();
 
+                                  // Try AuthAccessTokenDto hook using Activity's classLoader
+                                  // (classes7.dex is accessible via Activity CL)
+                                  if (!dtoHooked && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
+                                      tryHookAuthDto(act.getClassLoader(), act);
+                                  }
+
+                                  // Order capture
+                                  if (!ORDER_ACTIVITY.equals(actName)) return;
                                   long now = System.currentTimeMillis();
                                   if (now - lastBcast < 2000) return;
                                   lastBcast = now;
@@ -393,6 +248,110 @@ jobs:
                       XposedBridge.log("[AutoDriver] ✅ onResume hook OK");
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ❌ onResume: " + e.getMessage());
+                  }
+              }
+
+              private void tryHookAuthDto(ClassLoader cl, android.app.Activity act) {
+                  // Hook AuthAccessTokenDto constructor - fires on login/token refresh
+                  try {
+                      Class<?> dtoClass = cl.loadClass(AUTH_DTO);
+                      XposedBridge.hookAllMethods(dtoClass, "<init>", new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) {
+                              try {
+                                  // accessToken field
+                                  String token = null;
+                                  try { token = (String) XposedHelpers.getObjectField(param.thisObject, "accessToken"); }
+                                  catch (Throwable e1) {
+                                      // Try component1() - Kotlin data class
+                                      try { token = (String) XposedHelpers.callMethod(param.thisObject, "component1"); }
+                                      catch (Throwable e2) {
+                                          // Try getAccessToken()
+                                          try { token = (String) XposedHelpers.callMethod(param.thisObject, "getAccessToken"); }
+                                          catch (Throwable ignored) {}
+                                      }
+                                  }
+
+                                  if (token != null && token.length() > 10) {
+                                      String bearer = token.startsWith("Bearer ") ? token : "Bearer " + token;
+                                      boolean changed = !bearer.equals(capturedToken);
+                                      capturedToken = bearer;
+                                      tokenCount++;
+                                      if (changed) {
+                                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                                              + " from AuthAccessTokenDto: "
+                                              + token.substring(0, Math.min(40, token.length())));
+                                          sendLog(act, "🔑 Token captured from DTO! #" + tokenCount);
+                                      }
+                                  }
+                              } catch (Throwable e) {
+                                  XposedBridge.log("[AutoDriver] ⚠️ AuthDto hook error: " + e.getMessage());
+                              }
+                          }
+                      });
+                      dtoHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ AuthAccessTokenDto hook OK via Activity CL");
+                      sendLog(act, "✅ AuthDto hook OK - login karo token capture hoga");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ❌ AuthAccessTokenDto: " + e.getMessage());
+                      // Fallback: try AuthenticationRepositoryImpl
+                      tryHookAuthRepository(cl, act);
+                  }
+              }
+
+              private void tryHookAuthRepository(ClassLoader cl, android.app.Activity act) {
+                  try {
+                      // Hook AuthenticationRepositoryImpl - saves token after login
+                      Class<?> repoClass = cl.loadClass("net.saned.login.repository.AuthenticationRepositoryImpl");
+                      XposedBridge.hookAllMethods(repoClass, "login", new XC_MethodHook() {
+                          @Override protected void afterHookedMethod(MethodHookParam param) {
+                              XposedBridge.log("[AutoDriver] 🔍 AuthRepo.login called");
+                          }
+                      });
+                      // Hook all methods to find token
+                      for (java.lang.reflect.Method m : repoClass.getDeclaredMethods()) {
+                          String mName = m.getName();
+                          if (mName.contains("token") || mName.contains("Token") ||
+                              mName.contains("save") || mName.contains("store")) {
+                              XposedBridge.log("[AutoDriver] 📋 AuthRepo method: " + mName);
+                          }
+                      }
+                      XposedBridge.log("[AutoDriver] ✅ AuthRepo methods logged");
+                      sendLog(act, "✅ AuthRepo hook OK");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ❌ AuthRepo: " + e.getMessage());
+                      sendLog(act, "❌ Both DTO and AuthRepo hooks failed");
+                  }
+              }
+
+              private void hookRequestProperties(XC_LoadPackage.LoadPackageParam lp) {
+                  XC_MethodHook hook = new XC_MethodHook() {
+                      @Override protected void beforeHookedMethod(MethodHookParam param) {
+                          try {
+                              String key   = (String) param.args[0];
+                              String value = (String) param.args[1];
+                              if (!"Authorization".equals(key)) return;
+                              if (value == null || value.length() < 10) return;
+                              String urlStr = "";
+                              try { urlStr = XposedHelpers.callMethod(param.thisObject, "getURL").toString(); }
+                              catch (Throwable ignored) {}
+                              if (!urlStr.isEmpty() && !urlStr.contains("saned.io") && !urlStr.contains("jahez")) return;
+                              boolean changed = !value.equals(capturedToken);
+                              capturedToken = value;
+                              tokenCount++;
+                              if (changed) XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                                  + " [" + param.method.getName() + "] "
+                                  + value.substring(0, Math.min(40, value.length())));
+                          } catch (Throwable ignored) {}
+                      }
+                  };
+                  try {
+                      Class<?> urlConn = lp.classLoader.loadClass("java.net.URLConnection");
+                      XposedBridge.hookAllMethods(urlConn, "setRequestProperty", hook);
+                      XposedBridge.hookAllMethods(urlConn, "addRequestProperty", hook);
+                      XposedBridge.log("[AutoDriver] ✅ URLConnection property hooks OK");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ❌ URLConnection: " + e.getMessage());
                   }
               }
 
@@ -502,7 +461,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v17 started");
+                  saveLog("✅ AutoService v18 started");
               }
 
               void startLocationUpdates() {
@@ -757,7 +716,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v17 — connect() + reflection hook" android:textSize="12sp"
+                android:text="v18 — AuthAccessTokenDto Hook" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -804,7 +763,7 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo\n3. LSPosed mein connect() logs dikhenge\n4. Toggle ON → Auto accept!"
+                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo\n3. Log mein AuthDto hook OK dikhega\n4. Saned mein logout → login karo\n5. Token capture hoga → Toggle ON!"
                 android:textColor="#444" android:textSize="12sp" android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
           </ScrollView>
@@ -867,7 +826,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v17
+          name: AutoDriver-v18
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
