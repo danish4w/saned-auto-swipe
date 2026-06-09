@@ -1,4 +1,4 @@
-name: Build AutoDriver v21 with Pine Fallback
+name: Build AutoDriver v21 with Dual Xposed+Pine
 
 on: [workflow_dispatch]
 
@@ -48,6 +48,7 @@ jobs:
               google()
               mavenCentral()
               maven { url 'https://api.xposed.info/' }
+              maven { url 'https://jitpack.io' }
             }
           }
           rootProject.name = "AutoDriver"
@@ -91,7 +92,8 @@ jobs:
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.google.android.material:material:1.12.0'
             compileOnly 'de.robv.android.xposed:api:82'
-            implementation 'top.canyie.pine:core:0.2.9'
+            // Pine Xposed compatibility layer (includes core dependency)
+            implementation 'top.canyie.pine:xposed:0.2.0'
           }
           EOF
 
@@ -145,7 +147,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v21 - Pine Fallback + Location 1min"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v21 - Dual Xposed+Pine Fallback"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -166,7 +168,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Write SanedHook.java (Dual Fallback)
+      - name: Write SanedHook.java (Dual Xposed+Pine)
         run: |
           cat > app/src/main/java/com/auto/driver/SanedHook.java << 'HEOF'
           package com.auto.driver;
@@ -208,17 +210,26 @@ jobs:
               private volatile android.app.Activity currentOrderActivity = null;
               private long lastBcast = 0;
               private boolean swipeReceiverRegistered = false;
-              private boolean pineOkHttpHooked = false;
+              private boolean pineInitialized = false;
+              private boolean pineFallbackActive = false;
+              private static boolean xposedOkHttpSuccess = false;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
                   XposedBridge.log("[AutoDriver] v21 dual (Xposed+Pine) loading into " + lp.packageName);
 
+                  // Primary hooks - Xposed
                   hookActivityOnResume(lp);
                   hookURLConnection();
                   hookAuthDto(lp);
-                  tryXposedOkHttpHook(lp);
+                  boolean xposedOkHttpOK = hookOkHttpXposed(lp);
+                  
+                  if (!xposedOkHttpOK) {
+                      XposedBridge.log("[AutoDriver] Xposed OkHttp hook failed - Pine fallback will be activated");
+                  } else {
+                      xposedOkHttpSuccess = true;
+                  }
               }
 
               private void hookActivityOnResume(XC_LoadPackage.LoadPackageParam lp) {
@@ -231,7 +242,8 @@ jobs:
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
                                   String actName = act.getClass().getName();
 
-                                  if (!pineOkHttpHooked && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
+                                  // Initialize Pine if Xposed failed and we have a valid activity
+                                  if (!xposedOkHttpSuccess && !pineInitialized && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
                                       initPineAndHookOkHttp(act);
                                   }
 
@@ -261,9 +273,11 @@ jobs:
                                       double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
                                       double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
 
+                                      String mode = pineFallbackActive ? "🌲 Pine Mode" : "🔧 Xposed Mode";
                                       String tkStatus = capturedToken.isEmpty() ? "❌ NO TOKEN (swipe)" : "✅ #" + tokenCount;
+
                                       sendLog(act, "📦 id=" + requestId + " drop=" + String.format("%.2f", dropDist) + "km"
-                                          + " ₿" + price + "+" + bonus + " | " + tkStatus);
+                                          + " ₿" + price + "+" + bonus + " | " + tkStatus + " | " + mode);
 
                                       Intent bc = new Intent("JAHEZ_ORDER_DATA");
                                       bc.setPackage(OUR_PKG);
@@ -296,17 +310,19 @@ jobs:
                               if ("JAHEZ_DO_SWIPE".equals(intent.getAction())) {
                                   int delay = intent.getIntExtra("scan_delay", 500);
                                   new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                                      if (currentOrderActivity != null && !currentOrderActivity.isFinishing())
+                                      if (currentOrderActivity != null && !currentOrderActivity.isFinishing()) {
                                           doSwipe(currentOrderActivity);
+                                      }
                                   }, delay);
                               }
                           }
                       };
                       IntentFilter filter = new IntentFilter("JAHEZ_DO_SWIPE");
-                      if (android.os.Build.VERSION.SDK_INT >= 34)
+                      if (android.os.Build.VERSION.SDK_INT >= 34) {
                           act.registerReceiver(swipeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-                      else
+                      } else {
                           act.registerReceiver(swipeReceiver, filter);
+                      }
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ❌ registerSwipeReceiver: " + e.getMessage());
                   }
@@ -345,14 +361,16 @@ jobs:
                   if (root == null) return null;
                   if (root instanceof TextView) {
                       String txt = ((TextView) root).getText().toString().toUpperCase().trim();
-                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE","CONFIRM","قبول","موافق","اقبل"})
+                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE","CONFIRM","قبول","موافق","اقبل"}) {
                           if (txt.contains(kw)) return root;
+                      }
                   }
                   CharSequence cd = root.getContentDescription();
                   if (cd != null) {
                       String cdStr = cd.toString().toUpperCase();
-                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE"})
+                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE"}) {
                           if (cdStr.contains(kw)) return root;
+                      }
                   }
                   if (root instanceof ViewGroup) {
                       ViewGroup vg = (ViewGroup) root;
@@ -453,7 +471,7 @@ jobs:
                   }
               }
 
-              private void tryXposedOkHttpHook(XC_LoadPackage.LoadPackageParam lp) {
+              private boolean hookOkHttpXposed(XC_LoadPackage.LoadPackageParam lp) {
                   try {
                       Class<?> chainClass = lp.classLoader.loadClass("okhttp3.internal.http.RealInterceptorChain");
                       Method proceed = chainClass.getDeclaredMethod("proceed", Class.forName("okhttp3.Request"));
@@ -464,8 +482,10 @@ jobs:
                           }
                       });
                       XposedBridge.log("[AutoDriver] ✅ Xposed OkHttp hook OK");
+                      return true;
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] Xposed OkHttp hook failed: " + e.getMessage() + " → will use Pine fallback");
+                      XposedBridge.log("[AutoDriver] Xposed OkHttp hook failed: " + e.getMessage());
+                      return false;
                   }
               }
 
@@ -474,22 +494,25 @@ jobs:
                       XposedBridge.log("[AutoDriver] Initializing Pine fallback...");
                       Context ctx = act.getApplicationContext();
                       PineConfig.debug = true;
-                      Pine.init(ctx);
+                      Pine.ensureInitialized();
+                      
                       ClassLoader cl = act.getClassLoader();
                       Class<?> chainClass = cl.loadClass("okhttp3.internal.http.RealInterceptorChain");
                       Method proceed = chainClass.getDeclaredMethod("proceed", Class.forName("okhttp3.Request"));
+                      
                       Pine.hook(proceed, new MethodHook() {
                           @Override
                           public void beforeCall(Pine.CallFrame callFrame) {
                               extractTokenFromRequest(callFrame.args[0], "Pine-OkHttp");
                           }
                       });
-                      pineOkHttpHooked = true;
-                      XposedBridge.log("[AutoDriver] ✅ Pine OkHttp hook successful");
-                      sendLog(act, "✅ Pine fallback active – token capture via Pine");
+                      pineInitialized = true;
+                      pineFallbackActive = true;
+                      XposedBridge.log("[AutoDriver] ✅ Pine OkHttp hook successful (fallback active)");
+                      sendLog(act, "🌲 Pine fallback active – token capture via Pine");
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ❌ Pine fallback failed: " + e.getMessage());
-                      sendLog(act, "❌ Pine fallback failed");
+                      sendLog(act, "❌ Pine fallback failed: " + e.getMessage());
                   }
               }
 
@@ -652,9 +675,11 @@ jobs:
               }
 
               void reg(BroadcastReceiver r, IntentFilter f, boolean exported) {
-                  if (Build.VERSION.SDK_INT >= 33)
+                  if (Build.VERSION.SDK_INT >= 33) {
                       registerReceiver(r, f, exported ? Context.RECEIVER_EXPORTED : Context.RECEIVER_NOT_EXPORTED);
-                  else registerReceiver(r, f);
+                  } else {
+                      registerReceiver(r, f);
+                  }
               }
 
               @Override public int onStartCommand(Intent i, int flags, int id) { return START_STICKY; }
@@ -746,17 +771,19 @@ jobs:
               void showNotification() {
                   boolean on = prefs != null && prefs.getBoolean("enabled", false);
                   NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                  if (Build.VERSION.SDK_INT >= 26)
+                  if (Build.VERSION.SDK_INT >= 26) {
                       nm.createNotificationChannel(new NotificationChannel("auto_svc", "Auto Driver", NotificationManager.IMPORTANCE_LOW));
+                  }
                   Intent ti = new Intent("JAHEZ_TOGGLE").setPackage(getPackageName());
                   PendingIntent tp = PendingIntent.getBroadcast(this, 0, ti, PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
                   Notification.Builder b = new Notification.Builder(this, "auto_svc")
                       .setContentTitle("Auto Driver").setContentText(on ? "Auto Accept: ON" : "Auto Accept: OFF")
                       .setSmallIcon(android.R.drawable.ic_media_play).setOngoing(true);
-                  if (Build.VERSION.SDK_INT >= 23)
+                  if (Build.VERSION.SDK_INT >= 23) {
                       b.addAction(new Notification.Action.Builder(
                           on ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
                           on ? "✅ ON — tap OFF" : "⏸ OFF — tap ON", tp).build());
+                  }
                   startForeground(1, b.build());
               }
 
@@ -898,7 +925,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v21 — Pine Fallback + Location 1min" android:textSize="12sp"
+                android:text="v21 — Dual Xposed+Pine Fallback" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -1011,7 +1038,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v21-Final
+          name: AutoDriver-v21-Dual
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
