@@ -1,4 +1,4 @@
-name: Build AutoDriver with Pine
+name: Build AutoDriver v21 with Pine Fallback
 
 on: [workflow_dispatch]
 
@@ -74,8 +74,8 @@ jobs:
               applicationId 'com.auto.driver'
               minSdk 26
               targetSdk 34
-              versionCode 20
-              versionName '20.0'
+              versionCode 21
+              versionName '21.0'
             }
             buildTypes {
               release {
@@ -145,7 +145,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v20 - Pine + Swipe Fix"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v21 - Pine Fallback + Location 1min"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -166,7 +166,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Write SanedHook.java (FIXED)
+      - name: Write SanedHook.java (Dual Fallback)
         run: |
           cat > app/src/main/java/com/auto/driver/SanedHook.java << 'HEOF'
           package com.auto.driver;
@@ -191,6 +191,11 @@ jobs:
           import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
           import java.net.URLConnection;
+          import java.lang.reflect.Method;
+
+          import top.canyie.pine.Pine;
+          import top.canyie.pine.PineConfig;
+          import top.canyie.pine.callback.MethodHook;
 
           public class SanedHook implements IXposedHookLoadPackage {
 
@@ -203,15 +208,17 @@ jobs:
               private volatile android.app.Activity currentOrderActivity = null;
               private long lastBcast = 0;
               private boolean swipeReceiverRegistered = false;
+              private boolean pineOkHttpHooked = false;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v20 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v21 dual (Xposed+Pine) loading into " + lp.packageName);
 
                   hookActivityOnResume(lp);
                   hookURLConnection();
                   hookAuthDto(lp);
+                  tryXposedOkHttpHook(lp);
               }
 
               private void hookActivityOnResume(XC_LoadPackage.LoadPackageParam lp) {
@@ -224,14 +231,16 @@ jobs:
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
                                   String actName = act.getClass().getName();
 
+                                  if (!pineOkHttpHooked && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
+                                      initPineAndHookOkHttp(act);
+                                  }
+
                                   if (!swipeReceiverRegistered && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
                                       registerSwipeReceiver(act);
                                       swipeReceiverRegistered = true;
-                                      XposedBridge.log("[AutoDriver] ✅ Swipe receiver registered");
                                   }
 
                                   if (!ORDER_ACTIVITY.equals(actName)) return;
-
                                   currentOrderActivity = act;
 
                                   long now = System.currentTimeMillis();
@@ -252,33 +261,27 @@ jobs:
                                       double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
                                       double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
 
-                                      String tkStatus = capturedToken.isEmpty()
-                                          ? "❌ NO TOKEN (swipe fallback)"
-                                          : "✅ #" + tokenCount;
-
-                                      sendLog(act, "📦 id=" + requestId
-                                          + " drop=" + String.format("%.2f", dropDist) + "km"
+                                      String tkStatus = capturedToken.isEmpty() ? "❌ NO TOKEN (swipe)" : "✅ #" + tokenCount;
+                                      sendLog(act, "📦 id=" + requestId + " drop=" + String.format("%.2f", dropDist) + "km"
                                           + " ₿" + price + "+" + bonus + " | " + tkStatus);
 
                                       Intent bc = new Intent("JAHEZ_ORDER_DATA");
                                       bc.setPackage(OUR_PKG);
-                                      bc.putExtra("request_id",  requestId);
-                                      bc.putExtra("pickup_lat",  pickupLat);
-                                      bc.putExtra("pickup_lon",  pickupLon);
-                                      bc.putExtra("drop_dist",   dropDist);
-                                      bc.putExtra("price",       price);
-                                      bc.putExtra("bonus",       bonus);
-                                      bc.putExtra("auth_token",  capturedToken);
-                                      bc.putExtra("has_token",   !capturedToken.isEmpty());
-                                      bc.putExtra("is_order",    true);
+                                      bc.putExtra("request_id", requestId);
+                                      bc.putExtra("pickup_lat", pickupLat);
+                                      bc.putExtra("pickup_lon", pickupLon);
+                                      bc.putExtra("drop_dist", dropDist);
+                                      bc.putExtra("price", price);
+                                      bc.putExtra("bonus", bonus);
+                                      bc.putExtra("auth_token", capturedToken);
+                                      bc.putExtra("has_token", !capturedToken.isEmpty());
+                                      bc.putExtra("is_order", true);
                                       act.sendBroadcast(bc);
-
                                   } catch (Throwable e) {
                                       sendLog(act, "❌ order: " + e.getMessage());
                                   }
                               }
-                          }
-                      );
+                          });
                       XposedBridge.log("[AutoDriver] ✅ onResume hook OK");
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ❌ onResume hook: " + e.getMessage());
@@ -292,21 +295,18 @@ jobs:
                           public void onReceive(Context ctx, Intent intent) {
                               if ("JAHEZ_DO_SWIPE".equals(intent.getAction())) {
                                   int delay = intent.getIntExtra("scan_delay", 500);
-                                  XposedBridge.log("[AutoDriver] Received swipe broadcast, delay: " + delay);
                                   new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                                      if (currentOrderActivity != null && !currentOrderActivity.isFinishing()) {
+                                      if (currentOrderActivity != null && !currentOrderActivity.isFinishing())
                                           doSwipe(currentOrderActivity);
-                                      }
                                   }, delay);
                               }
                           }
                       };
                       IntentFilter filter = new IntentFilter("JAHEZ_DO_SWIPE");
-                      if (android.os.Build.VERSION.SDK_INT >= 34) {
+                      if (android.os.Build.VERSION.SDK_INT >= 34)
                           act.registerReceiver(swipeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-                      } else {
+                      else
                           act.registerReceiver(swipeReceiver, filter);
-                      }
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ❌ registerSwipeReceiver: " + e.getMessage());
                   }
@@ -317,25 +317,22 @@ jobs:
                       try {
                           View root = act.getWindow().getDecorView();
                           View target = findAcceptView(root);
-
                           float startX, endX, y;
                           if (target != null && target.isShown() && target.getWidth() > 0) {
                               int[] loc = new int[2];
                               target.getLocationOnScreen(loc);
                               startX = loc[0] + 40;
-                              endX   = loc[0] + target.getWidth() - 40;
-                              y      = loc[1] + target.getHeight() / 2f;
-                              sendLog(act, "🖱️ Swipe on: " + target.getClass().getSimpleName()
-                                  + " w=" + target.getWidth());
+                              endX = loc[0] + target.getWidth() - 40;
+                              y = loc[1] + target.getHeight() / 2f;
+                              sendLog(act, "🖱️ Swipe on: " + target.getClass().getSimpleName());
                           } else {
                               DisplayMetrics dm = new DisplayMetrics();
                               act.getWindowManager().getDefaultDisplay().getMetrics(dm);
                               startX = dm.widthPixels * 0.1f;
-                              endX   = dm.widthPixels * 0.9f;
-                              y      = dm.heightPixels * 0.85f;
+                              endX = dm.widthPixels * 0.9f;
+                              y = dm.heightPixels * 0.85f;
                               sendLog(act, "🖱️ Swipe fallback coords");
                           }
-
                           performSwipe(root, startX, endX, y);
                           sendLog(act, "✅ Swipe done");
                       } catch (Throwable e) {
@@ -348,25 +345,15 @@ jobs:
                   if (root == null) return null;
                   if (root instanceof TextView) {
                       String txt = ((TextView) root).getText().toString().toUpperCase().trim();
-                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE","CONFIRM","قبول","موافق","اقبل","ACCEPT ORDER"}) {
+                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE","CONFIRM","قبول","موافق","اقبل"})
                           if (txt.contains(kw)) return root;
-                      }
                   }
                   CharSequence cd = root.getContentDescription();
                   if (cd != null) {
                       String cdStr = cd.toString().toUpperCase();
-                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE"}) {
+                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE"})
                           if (cdStr.contains(kw)) return root;
-                      }
                   }
-                  try {
-                      if (root.getId() != -1) {
-                          String viewId = root.getResources().getResourceEntryName(root.getId()).toUpperCase();
-                          for (String kw : new String[]{"ACCEPT","SWIPE","BTN_ACCEPT"}) {
-                              if (viewId.contains(kw)) return root;
-                          }
-                      }
-                  } catch (Throwable ignored) {}
                   if (root instanceof ViewGroup) {
                       ViewGroup vg = (ViewGroup) root;
                       for (int i = 0; i < vg.getChildCount(); i++) {
@@ -382,7 +369,6 @@ jobs:
                   MotionEvent downEvent = MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, startX, y, 0);
                   root.dispatchTouchEvent(downEvent);
                   downEvent.recycle();
-
                   int steps = 20;
                   for (int i = 1; i <= steps; i++) {
                       float x = startX + (endX - startX) * i / steps;
@@ -392,7 +378,6 @@ jobs:
                       moveEvent.recycle();
                       try { Thread.sleep(5); } catch (InterruptedException ignored) {}
                   }
-
                   long upTime = down + (steps * 8) + 20;
                   MotionEvent upEvent = MotionEvent.obtain(down, upTime, MotionEvent.ACTION_UP, endX, y, 0);
                   root.dispatchTouchEvent(upEvent);
@@ -415,7 +400,7 @@ jobs:
                               if (!value.equals(capturedToken)) {
                                   capturedToken = value;
                                   tokenCount++;
-                                  XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + " [URLConn] " + value.substring(0, Math.min(40, value.length())));
+                                  XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + " [URLConn]");
                               }
                           } catch (Throwable ignored) {}
                       }
@@ -447,21 +432,12 @@ jobs:
               private void captureTokenFromDto(Object dto) {
                   try {
                       String token = null;
-                      for (String fieldName : new String[]{"accessToken", "access_token", "token"}) {
-                          try {
-                              token = (String) XposedHelpers.getObjectField(dto, fieldName);
-                              if (token != null && !token.isEmpty()) break;
-                          } catch (Throwable ignored) {}
+                      for (String fn : new String[]{"accessToken", "access_token", "token"}) {
+                          try { token = (String) XposedHelpers.getObjectField(dto, fn); if (token != null && !token.isEmpty()) break; } catch (Throwable ignored) {}
                       }
                       if (token == null || token.isEmpty()) {
-                          for (String methodName : new String[]{"getAccessToken", "getToken", "component1"}) {
-                              try {
-                                  Object result = XposedHelpers.callMethod(dto, methodName);
-                                  if (result instanceof String) {
-                                      token = (String) result;
-                                      if (!token.isEmpty()) break;
-                                  }
-                              } catch (Throwable ignored) {}
+                          for (String mn : new String[]{"getAccessToken", "getToken", "component1"}) {
+                              try { Object r = XposedHelpers.callMethod(dto, mn); if (r instanceof String) { token = (String) r; if (!token.isEmpty()) break; } } catch (Throwable ignored) {}
                           }
                       }
                       if (token != null && token.length() > 10) {
@@ -469,7 +445,7 @@ jobs:
                           if (!bearer.equals(capturedToken)) {
                               capturedToken = bearer;
                               tokenCount++;
-                              XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + " [AuthDto] " + token.substring(0, Math.min(30, token.length())));
+                              XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + " [AuthDto]");
                           }
                       }
                   } catch (Throwable e) {
@@ -477,11 +453,67 @@ jobs:
                   }
               }
 
+              private void tryXposedOkHttpHook(XC_LoadPackage.LoadPackageParam lp) {
+                  try {
+                      Class<?> chainClass = lp.classLoader.loadClass("okhttp3.internal.http.RealInterceptorChain");
+                      Method proceed = chainClass.getDeclaredMethod("proceed", Class.forName("okhttp3.Request"));
+                      XposedBridge.hookMethod(proceed, new XC_MethodHook() {
+                          @Override
+                          protected void beforeHookedMethod(MethodHookParam param) {
+                              extractTokenFromRequest(param.args[0], "Xposed-OkHttp");
+                          }
+                      });
+                      XposedBridge.log("[AutoDriver] ✅ Xposed OkHttp hook OK");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] Xposed OkHttp hook failed: " + e.getMessage() + " → will use Pine fallback");
+                  }
+              }
+
+              private void initPineAndHookOkHttp(android.app.Activity act) {
+                  try {
+                      XposedBridge.log("[AutoDriver] Initializing Pine fallback...");
+                      Context ctx = act.getApplicationContext();
+                      PineConfig.debug = true;
+                      Pine.init(ctx);
+                      ClassLoader cl = act.getClassLoader();
+                      Class<?> chainClass = cl.loadClass("okhttp3.internal.http.RealInterceptorChain");
+                      Method proceed = chainClass.getDeclaredMethod("proceed", Class.forName("okhttp3.Request"));
+                      Pine.hook(proceed, new MethodHook() {
+                          @Override
+                          public void beforeCall(Pine.CallFrame callFrame) {
+                              extractTokenFromRequest(callFrame.args[0], "Pine-OkHttp");
+                          }
+                      });
+                      pineOkHttpHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ Pine OkHttp hook successful");
+                      sendLog(act, "✅ Pine fallback active – token capture via Pine");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ❌ Pine fallback failed: " + e.getMessage());
+                      sendLog(act, "❌ Pine fallback failed");
+                  }
+              }
+
+              private void extractTokenFromRequest(Object request, String source) {
+                  if (request == null) return;
+                  try {
+                      Object headers = XposedHelpers.callMethod(request, "headers");
+                      String auth = (String) XposedHelpers.callMethod(headers, "get", "Authorization");
+                      if (auth == null || auth.length() < 10) return;
+                      if (!auth.equals(capturedToken)) {
+                          capturedToken = auth;
+                          tokenCount++;
+                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + " [" + source + "]");
+                      }
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] extractToken error: " + e.getMessage());
+                  }
+              }
+
               private String extractRequestId(Bundle b) {
                   try {
                       Object v = b.get("EXTRA_DISPATCH_REQUEST_ID");
                       if (v instanceof String && !((String) v).isEmpty()) return (String) v;
-                      if (v instanceof Long)    return String.valueOf(v);
+                      if (v instanceof Long) return String.valueOf(v);
                       if (v instanceof Integer) return String.valueOf(v);
                       String s = b.getString("EXTRA_DISPATCH_REQUEST_ID");
                       if (s != null && !s.isEmpty()) return s;
@@ -503,46 +535,34 @@ jobs:
               private double getDouble(Bundle b, String key) {
                   try {
                       Object v = b.get(key);
-                      if (v instanceof Double)  return (Double) v;
-                      if (v instanceof Float)   return (Float) v;
-                      if (v instanceof String)  return Double.parseDouble((String) v);
+                      if (v instanceof Double) return (Double) v;
+                      if (v instanceof Float) return (Float) v;
+                      if (v instanceof String) return Double.parseDouble((String) v);
                       if (v instanceof Integer) return (Integer) v;
-                      if (v instanceof Long)    return (Long) v;
+                      if (v instanceof Long) return (Long) v;
                   } catch (Throwable ignored) {}
                   return -1;
               }
           }
           HEOF
 
-      - name: Write AutoService.java (FIXED)
+      - name: Write AutoService.java (Location 1min)
         run: |
           cat > app/src/main/java/com/auto/driver/AutoService.java << 'SEOF'
           package com.auto.driver;
 
-          import android.app.Notification;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.app.PendingIntent;
-          import android.app.Service;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.content.SharedPreferences;
-          import android.location.Location;
-          import android.location.LocationListener;
-          import android.location.LocationManager;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.IBinder;
-          import android.os.Looper;
-          import java.io.InputStream;
-          import java.net.HttpURLConnection;
-          import java.net.URL;
-          import java.text.SimpleDateFormat;
-          import java.util.Date;
-          import java.util.Locale;
+          import android.app.Notification; import android.app.NotificationChannel;
+          import android.app.NotificationManager; import android.app.PendingIntent;
+          import android.app.Service; import android.content.BroadcastReceiver;
+          import android.content.Context; import android.content.Intent;
+          import android.content.IntentFilter; import android.content.SharedPreferences;
+          import android.location.Location; import android.location.LocationListener;
+          import android.location.LocationManager; import android.os.Build;
+          import android.os.Bundle; import android.os.Handler;
+          import android.os.IBinder; import android.os.Looper;
+          import java.io.InputStream; import java.net.HttpURLConnection;
+          import java.net.URL; import java.text.SimpleDateFormat;
+          import java.util.Date; import java.util.Locale;
 
           public class AutoService extends Service {
               static final String ACCEPT_URL = "https://gateway.saned.io/api/v1/dispatch/accept-dispatch/";
@@ -552,6 +572,9 @@ jobs:
               SharedPreferences prefs;
               long lastEvent = 0;
               private volatile Location lastLocation = null;
+              private LocationManager locationManager;
+              private LocationListener locationListener;
+              private boolean locationActive = false;
 
               private final BroadcastReceiver hookLogReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
@@ -595,27 +618,37 @@ jobs:
                   reg(toggleReceiver, tf, false);
                   reg(orderReceiver,   new IntentFilter("JAHEZ_ORDER_DATA"), true);
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
-                  startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v20 started");
+                  startLocationUpdates();
+                  saveLog("✅ AutoService v21 started (location 1min)");
               }
 
               void startLocationUpdates() {
-                  try {
-                      LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
-                      LocationListener ll = new LocationListener() {
-                          @Override public void onLocationChanged(Location loc) { lastLocation = loc; }
-                          @Override public void onStatusChanged(String p, int s, Bundle e) {}
-                          @Override public void onProviderEnabled(String p) {}
-                          @Override public void onProviderDisabled(String p) {}
-                      };
-                      try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30000, 10, ll); } catch (SecurityException ignored) {}
-                      try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000, 10, ll); } catch (SecurityException ignored) {}
-                      for (String p : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
-                          try { Location l = lm.getLastKnownLocation(p); if (l!=null && lastLocation==null) { lastLocation=l; break; } } catch (SecurityException ignored) {}
+                  if (locationActive) return;
+                  locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+                  locationListener = new LocationListener() {
+                      @Override public void onLocationChanged(Location loc) {
+                          if (loc != null) {
+                              lastLocation = loc;
+                              saveLog("📍 Loc: " + loc.getLatitude() + "," + loc.getLongitude() + " acc:" + loc.getAccuracy());
+                          }
                       }
-                      saveLog("📍 Location " + (lastLocation != null ? "✅" : "⚠️"));
-                  } catch (Exception e) { saveLog("❌ Location: " + e.getMessage()); }
+                      @Override public void onStatusChanged(String p, int s, Bundle e) {}
+                      @Override public void onProviderEnabled(String p) {}
+                      @Override public void onProviderDisabled(String p) {}
+                  };
+                  try {
+                      locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 60000, 10, locationListener);
+                      locationActive = true;
+                      saveLog("✅ GPS updates requested (60s)");
+                      Location last = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                      if (last != null) { lastLocation = last; saveLog("📍 initial GPS: " + last.getLatitude() + "," + last.getLongitude()); }
+                      else saveLog("⚠️ waiting for GPS fix...");
+                  } catch (SecurityException e) {
+                      saveLog("❌ Location permission missing");
+                  } catch (Exception e) {
+                      saveLog("❌ Location error: " + e.getMessage());
+                  }
               }
 
               void reg(BroadcastReceiver r, IntentFilter f, boolean exported) {
@@ -639,14 +672,12 @@ jobs:
                   float maxPickup = prefs.getFloat("max_pickup", 2.0f);
                   float maxDrop   = prefs.getFloat("max_drop", 5.0f);
                   float dropKm    = dropDist > 0 ? (float) dropDist : -1f;
-                  String locInfo  = lastLocation != null ? ((System.currentTimeMillis()-lastLocation.getTime())/1000)+"s" : "N/A";
-
+                  String locInfo = lastLocation != null ? ((System.currentTimeMillis()-lastLocation.getTime())/1000)+"s" : "N/A";
                   saveLog(String.format("📏 Pickup=%s/%skm Drop=%s/%skm loc:%s",
                       fmt1(pickupKm), fmt1(maxPickup), fmt1(dropKm), fmt1(maxDrop), locInfo));
 
                   boolean pickupOk = pickupKm < 0 || pickupKm <= maxPickup;
                   boolean dropOk   = dropKm < 0 || dropKm <= maxDrop;
-
                   if (!pickupOk || !dropOk) {
                       StringBuilder r = new StringBuilder();
                       if (!pickupOk) r.append("Pickup ").append(fmt1(pickupKm)).append(">").append(fmt1(maxPickup)).append("km");
@@ -656,7 +687,6 @@ jobs:
                   }
 
                   int delay = prefs.getInt("scan_delay", 500);
-
                   if (hasToken && authToken != null && authToken.length() > 20) {
                       saveLog("✅ Filter pass! API in " + delay + "ms");
                       final String fa = authToken;
@@ -692,7 +722,7 @@ jobs:
                           } else {
                               String body = readStream(conn.getErrorStream(), 400);
                               String msg = "❌ HTTP " + code + " — " + body;
-                              if (code == 401) msg += " → Token expire, login karo";
+                              if (code == 401) msg += " → Token expire";
                               if (code == 409) msg += " → Already accepted";
                               if (code == 404) msg += " → Order expire";
                               toast(msg); saveLog(msg);
@@ -705,7 +735,7 @@ jobs:
 
               float calcPickupDist(double lat, double lon) {
                   if (lat <= 0 || lon <= 0) return -1;
-                  if (lastLocation == null) { saveLog("⚠️ GPS N/A, pickup skip"); return -1; }
+                  if (lastLocation == null) { saveLog("⚠️ No location yet"); return -1; }
                   try {
                       float[] res = new float[1];
                       Location.distanceBetween(lastLocation.getLatitude(), lastLocation.getLongitude(), lat, lon, res);
@@ -754,6 +784,9 @@ jobs:
 
               @Override public void onDestroy() {
                   super.onDestroy();
+                  if (locationManager != null && locationListener != null) {
+                      try { locationManager.removeUpdates(locationListener); } catch (SecurityException ignored) {}
+                  }
                   try { unregisterReceiver(toggleReceiver); } catch (Exception ignored) {}
                   try { unregisterReceiver(orderReceiver);  } catch (Exception ignored) {}
                   try { unregisterReceiver(hookLogReceiver); } catch (Exception ignored) {}
@@ -765,12 +798,9 @@ jobs:
         run: |
           cat > app/src/main/java/com/auto/driver/BootReceiver.java << 'BEOF'
           package com.auto.driver;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
+          import android.content.BroadcastReceiver; import android.content.Context; import android.content.Intent;
           public class BootReceiver extends BroadcastReceiver {
-            @Override
-            public void onReceive(Context ctx, Intent intent) {
+            @Override public void onReceive(Context ctx, Intent intent) {
               if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
               Intent svc = new Intent(ctx, AutoService.class);
               if (android.os.Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc);
@@ -783,23 +813,15 @@ jobs:
         run: |
           cat > app/src/main/java/com/auto/driver/LogActivity.java << 'LEOF'
           package com.auto.driver;
-          import android.app.Activity;
-          import android.content.SharedPreferences;
-          import android.os.Bundle;
-          import android.widget.*;
+          import android.app.Activity; import android.content.SharedPreferences; import android.os.Bundle; import android.widget.*;
           public class LogActivity extends Activity {
-            @Override
-            protected void onCreate(Bundle saved) {
-              super.onCreate(saved);
-              setContentView(R.layout.activity_log);
+            @Override protected void onCreate(Bundle saved) {
+              super.onCreate(saved); setContentView(R.layout.activity_log);
               SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
               TextView tvLog = findViewById(R.id.tv_log);
               String logs = prefs.getString("logs", "");
               tvLog.setText(logs.isEmpty() ? "No logs yet." : logs);
-              ((Button)findViewById(R.id.btn_clear)).setOnClickListener(v -> {
-                  prefs.edit().remove("logs").apply();
-                  tvLog.setText("Cleared.");
-              });
+              ((Button)findViewById(R.id.btn_clear)).setOnClickListener(v -> { prefs.edit().remove("logs").apply(); tvLog.setText("Cleared."); });
               ((Button)findViewById(R.id.btn_back)).setOnClickListener(v -> finish());
             }
           }
@@ -809,77 +831,51 @@ jobs:
         run: |
           cat > app/src/main/java/com/auto/driver/MainActivity.java << 'MAEOF'
           package com.auto.driver;
-          import android.app.Activity;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.content.IntentFilter;
-          import android.content.SharedPreferences;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.view.inputmethod.InputMethodManager;
-          import android.widget.*;
+          import android.app.Activity; import android.content.BroadcastReceiver; import android.content.Context;
+          import android.content.Intent; import android.content.IntentFilter; import android.content.SharedPreferences;
+          import android.os.Build; import android.os.Bundle; import android.view.inputmethod.InputMethodManager; import android.widget.*;
           public class MainActivity extends Activity {
-            SharedPreferences prefs;
-            Switch swEnable;
-            TextView tvStatus;
+            SharedPreferences prefs; Switch swEnable; TextView tvStatus;
             final BroadcastReceiver sr = new BroadcastReceiver() {
-              @Override
-              public void onReceive(Context ctx, Intent intent) {
+              @Override public void onReceive(Context ctx, Intent intent) {
                 if (swEnable != null) swEnable.setChecked("JAHEZ_AUTO_ON".equals(intent.getAction()));
                 refreshStatus();
               }
             };
-            @Override
-            protected void onCreate(Bundle saved) {
-              super.onCreate(saved);
-              setContentView(R.layout.activity_main);
+            @Override protected void onCreate(Bundle saved) {
+              super.onCreate(saved); setContentView(R.layout.activity_main);
               prefs = getSharedPreferences("cfg", MODE_PRIVATE);
-              EditText etPickup = findViewById(R.id.et_pickup);
-              EditText etDrop = findViewById(R.id.et_drop);
-              SeekBar sbDelay = findViewById(R.id.sb_delay);
-              TextView tvDelay = findViewById(R.id.tv_delay);
-              swEnable = findViewById(R.id.sw_enable);
-              tvStatus = findViewById(R.id.tv_status);
+              EditText etPickup = findViewById(R.id.et_pickup); EditText etDrop = findViewById(R.id.et_drop);
+              SeekBar sbDelay = findViewById(R.id.sb_delay); TextView tvDelay = findViewById(R.id.tv_delay);
+              swEnable = findViewById(R.id.sw_enable); tvStatus = findViewById(R.id.tv_status);
               etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
               etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
-              int sd = prefs.getInt("scan_delay", 500);
-              sbDelay.setProgress(sd - 50);
-              tvDelay.setText(sd + "ms");
+              int sd = prefs.getInt("scan_delay", 500); sbDelay.setProgress(sd-50); tvDelay.setText(sd+"ms");
               sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                public void onProgressChanged(SeekBar sb, int p, boolean u) { tvDelay.setText((p + 50) + "ms"); }
+                public void onProgressChanged(SeekBar sb, int p, boolean u) { tvDelay.setText((p+50)+"ms"); }
                 public void onStartTrackingTouch(SeekBar sb) {}
-                public void onStopTrackingTouch(SeekBar sb) { prefs.edit().putInt("scan_delay", sb.getProgress() + 50).apply(); }
+                public void onStopTrackingTouch(SeekBar sb) { prefs.edit().putInt("scan_delay", sb.getProgress()+50).apply(); }
               });
               swEnable.setChecked(prefs.getBoolean("enabled", false));
               if (Build.VERSION.SDK_INT >= 33) requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
               requestPermissions(new String[]{"android.permission.ACCESS_FINE_LOCATION","android.permission.ACCESS_COARSE_LOCATION"}, 1);
-              IntentFilter f = new IntentFilter("JAHEZ_AUTO_OFF");
-              f.addAction("JAHEZ_AUTO_ON");
+              IntentFilter f = new IntentFilter("JAHEZ_AUTO_OFF"); f.addAction("JAHEZ_AUTO_ON");
               if (Build.VERSION.SDK_INT >= 33) registerReceiver(sr, f, Context.RECEIVER_NOT_EXPORTED);
               else registerReceiver(sr, f);
-              swEnable.setOnCheckedChangeListener((btn, checked) -> {
-                  prefs.edit().putBoolean("enabled", checked).apply();
-                  sendBroadcast(new Intent("JAHEZ_STATE_CHANGED"));
-                  refreshStatus();
-              });
+              swEnable.setOnCheckedChangeListener((btn, checked) -> { prefs.edit().putBoolean("enabled", checked).apply(); sendBroadcast(new Intent("JAHEZ_STATE_CHANGED")); refreshStatus(); });
               ((Button)findViewById(R.id.btn_save)).setOnClickListener(v -> {
-                  float pk = parseF(etPickup.getText().toString(), 2f);
-                  float dk = parseF(etDrop.getText().toString(), 5f);
-                  prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
-                  Toast.makeText(this, "Saved ✅ Pickup≤"+pk+"km Drop≤"+dk+"km", Toast.LENGTH_LONG).show();
-                  InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                  if (imm != null) imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
+                float pk = parseF(etPickup.getText().toString(), 2f); float dk = parseF(etDrop.getText().toString(), 5f);
+                prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
+                Toast.makeText(this, "Saved ✅ Pickup≤"+pk+"km Drop≤"+dk+"km", Toast.LENGTH_LONG).show();
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
               });
               ((Button)findViewById(R.id.btn_logs)).setOnClickListener(v -> startActivity(new Intent(this, LogActivity.class)));
               Intent svc = new Intent(this, AutoService.class);
-              if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
-              else startService(svc);
+              if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc); else startService(svc);
             }
-            @Override
-            protected void onResume() { super.onResume(); refreshStatus(); }
-            @Override
-            protected void onDestroy() { super.onDestroy(); try { unregisterReceiver(sr); } catch (Exception ignored) {} }
+            @Override protected void onResume() { super.onResume(); refreshStatus(); }
+            @Override protected void onDestroy() { super.onDestroy(); try { unregisterReceiver(sr); } catch (Exception ignored) {} }
             void refreshStatus() {
               if (tvStatus == null) return;
               boolean en = prefs.getBoolean("enabled", false);
@@ -902,7 +898,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v20 — Pine + Swipe Fallback" android:textSize="12sp"
+                android:text="v21 — Pine Fallback + Location 1min" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -949,7 +945,7 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Mode:\n✅ Token mile → Direct API accept\n🖱️ Token na mile → Auto swipe\n\nSetup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo → login karo (token capture)\n3. Distance → Save → Toggle ON"
+                android:text="Mode:\n✅ Token mile → Direct API accept\n🖱️ Token na mile → Auto swipe\n\nLocation updates every 1 minute\n\nSetup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned login karo (token capture)\n3. Distance → Save → Toggle ON"
                 android:textColor="#444" android:textSize="12sp" android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
           </ScrollView>
@@ -982,9 +978,7 @@ jobs:
 
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-            <string name="app_name">Auto Driver</string>
-          </resources>
+          <resources><string name="app_name">Auto Driver</string></resources>
           EOF
 
           cat > app/src/main/res/values/themes.xml << 'EOF'
@@ -1017,7 +1011,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v20-Fixed
+          name: AutoDriver-v21-Final
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
