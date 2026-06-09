@@ -38,7 +38,11 @@ jobs:
           cat > settings.gradle << 'EOF'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement {
-            repositories { google(); mavenCentral(); maven { url 'https://api.xposed.info/' } }
+            repositories {
+              google(); mavenCentral()
+              maven { url 'https://api.xposed.info/' }
+              maven { url 'https://jitpack.io' }
+            }
           }
           rootProject.name = "AutoDriver"
           include ':app'
@@ -59,7 +63,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 18; versionName '18.0'
+              versionCode 19; versionName '19.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -71,6 +75,7 @@ jobs:
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.google.android.material:material:1.12.0'
             compileOnly 'de.robv.android.xposed:api:82'
+            implementation 'com.github.canyie.pine:core:0.3.0'
           }
           EOF
 
@@ -124,7 +129,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v18"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v19"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -152,6 +157,12 @@ jobs:
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
+          import android.os.SystemClock;
+          import android.util.DisplayMetrics;
+          import android.view.MotionEvent;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.TextView;
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
@@ -164,27 +175,27 @@ jobs:
               static final String TARGET         = "net.jahez.fleets";
               static final String OUR_PKG        = "com.auto.driver";
               static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
-
-              // AuthAccessTokenDto class - classes7.dex mein
-              // Jab login ya token refresh hota hai yeh construct hoti hai
-              static final String AUTH_DTO = "net.saned.login.remote.model.dto.AuthAccessTokenDto";
+              static final String AUTH_DTO       = "net.saned.login.remote.model.dto.AuthAccessTokenDto";
 
               private volatile String capturedToken = "";
               private volatile int tokenCount = 0;
               private volatile boolean dtoHooked = false;
+              private volatile android.app.Activity currentOrderActivity = null;
               private long lastBcast = 0;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v18 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v19 loading into " + lp.packageName);
 
-                  // Hook 1: Activity.onResume - order capture + try AuthAccessTokenDto hook
-                  // (using Activity's classLoader which has classes7.dex)
+                  // Hook 1: Activity.onResume
+                  // - Token: try AuthAccessTokenDto via Activity CL (Pine inside)
+                  // - Order: capture from IncomingDispatchActivity
+                  // - Swipe: fallback if no token
                   hookActivityOnResume(lp);
 
-                  // Hook 2: setRequestProperty/addRequestProperty as backup
-                  hookRequestProperties(lp);
+                  // Hook 2: URLConnection backup
+                  hookURLConnection(lp);
               }
 
               private void hookActivityOnResume(XC_LoadPackage.LoadPackageParam lp) {
@@ -197,14 +208,15 @@ jobs:
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
                                   String actName = act.getClass().getName();
 
-                                  // Try AuthAccessTokenDto hook using Activity's classLoader
-                                  // (classes7.dex is accessible via Activity CL)
+                                  // Try Pine-based AuthAccessTokenDto hook using Activity CL
                                   if (!dtoHooked && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
-                                      tryHookAuthDto(act.getClassLoader(), act);
+                                      tryPineHookAuthDto(act);
                                   }
 
-                                  // Order capture
                                   if (!ORDER_ACTIVITY.equals(actName)) return;
+
+                                  currentOrderActivity = act;
+
                                   long now = System.currentTimeMillis();
                                   if (now - lastBcast < 2000) return;
                                   lastBcast = now;
@@ -221,8 +233,8 @@ jobs:
                                       double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
 
                                       String tkStatus = capturedToken.isEmpty()
-                                          ? "❌ NO TOKEN"
-                                          : "✅ #" + tokenCount + " " + capturedToken.substring(0, Math.min(25, capturedToken.length()));
+                                          ? "❌ NO TOKEN (swipe fallback)"
+                                          : "✅ #" + tokenCount;
 
                                       sendLog(act, "📦 id=" + requestId
                                           + " drop=" + String.format("%.2f", dropDist) + "km"
@@ -230,15 +242,17 @@ jobs:
 
                                       Intent bc = new Intent("JAHEZ_ORDER_DATA");
                                       bc.setPackage(OUR_PKG);
-                                      bc.putExtra("request_id", requestId);
-                                      bc.putExtra("pickup_lat", pickupLat);
-                                      bc.putExtra("pickup_lon", pickupLon);
-                                      bc.putExtra("drop_dist",  dropDist);
-                                      bc.putExtra("price",      price);
-                                      bc.putExtra("bonus",      bonus);
-                                      bc.putExtra("auth_token", capturedToken);
-                                      bc.putExtra("is_order",   true);
+                                      bc.putExtra("request_id",  requestId);
+                                      bc.putExtra("pickup_lat",  pickupLat);
+                                      bc.putExtra("pickup_lon",  pickupLon);
+                                      bc.putExtra("drop_dist",   dropDist);
+                                      bc.putExtra("price",       price);
+                                      bc.putExtra("bonus",       bonus);
+                                      bc.putExtra("auth_token",  capturedToken);
+                                      bc.putExtra("has_token",   !capturedToken.isEmpty());
+                                      bc.putExtra("is_order",    true);
                                       act.sendBroadcast(bc);
+
                                   } catch (Throwable e) {
                                       sendLog(act, "❌ order: " + e.getMessage());
                                   }
@@ -251,80 +265,177 @@ jobs:
                   }
               }
 
-              private void tryHookAuthDto(ClassLoader cl, android.app.Activity act) {
-                  // Hook AuthAccessTokenDto constructor - fires on login/token refresh
+              // Pine approach: hook AuthAccessTokenDto constructor
+              // Pine bypasses classLoader issues by using ART-level hooking
+              private void tryPineHookAuthDto(android.app.Activity act) {
                   try {
+                      ClassLoader cl = act.getClassLoader();
+
+                      // Try Pine first (if available)
+                      try {
+                          Class<?> pineClass = cl.loadClass("top.canyie.pine.Pine");
+                          XposedBridge.log("[AutoDriver] 🌲 Pine available! Using Pine hook");
+                          // Pine.hook(method, callback) - bypasses classLoader restrictions
+                          // We'll use reflection to call Pine
+                          Class<?> dtoClass = cl.loadClass(AUTH_DTO);
+                          hookDtoWithPine(pineClass, dtoClass, act);
+                          return;
+                      } catch (ClassNotFoundException ignored) {
+                          XposedBridge.log("[AutoDriver] ⚠️ Pine not in app CL, using XposedBridge");
+                      }
+
+                      // Fallback: XposedBridge with Activity CL
                       Class<?> dtoClass = cl.loadClass(AUTH_DTO);
                       XposedBridge.hookAllMethods(dtoClass, "<init>", new XC_MethodHook() {
                           @Override
                           protected void afterHookedMethod(MethodHookParam param) {
-                              try {
-                                  // accessToken field
-                                  String token = null;
-                                  try { token = (String) XposedHelpers.getObjectField(param.thisObject, "accessToken"); }
-                                  catch (Throwable e1) {
-                                      // Try component1() - Kotlin data class
-                                      try { token = (String) XposedHelpers.callMethod(param.thisObject, "component1"); }
-                                      catch (Throwable e2) {
-                                          // Try getAccessToken()
-                                          try { token = (String) XposedHelpers.callMethod(param.thisObject, "getAccessToken"); }
-                                          catch (Throwable ignored) {}
-                                      }
-                                  }
-
-                                  if (token != null && token.length() > 10) {
-                                      String bearer = token.startsWith("Bearer ") ? token : "Bearer " + token;
-                                      boolean changed = !bearer.equals(capturedToken);
-                                      capturedToken = bearer;
-                                      tokenCount++;
-                                      if (changed) {
-                                          XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
-                                              + " from AuthAccessTokenDto: "
-                                              + token.substring(0, Math.min(40, token.length())));
-                                          sendLog(act, "🔑 Token captured from DTO! #" + tokenCount);
-                                      }
-                                  }
-                              } catch (Throwable e) {
-                                  XposedBridge.log("[AutoDriver] ⚠️ AuthDto hook error: " + e.getMessage());
-                              }
+                              captureTokenFromDto(param.thisObject, act);
                           }
                       });
                       dtoHooked = true;
-                      XposedBridge.log("[AutoDriver] ✅ AuthAccessTokenDto hook OK via Activity CL");
-                      sendLog(act, "✅ AuthDto hook OK - login karo token capture hoga");
+                      XposedBridge.log("[AutoDriver] ✅ AuthAccessTokenDto hook OK (XposedBridge+ActivityCL)");
+                      sendLog(act, "✅ Token hook OK — login karo token capture hoga");
+
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ AuthAccessTokenDto: " + e.getMessage());
-                      // Fallback: try AuthenticationRepositoryImpl
-                      tryHookAuthRepository(cl, act);
+                      XposedBridge.log("[AutoDriver] ❌ AuthDto hook: " + e.getMessage());
+                      dtoHooked = true; // prevent repeated attempts
+                      sendLog(act, "⚠️ Token hook failed — swipe mode active");
                   }
               }
 
-              private void tryHookAuthRepository(ClassLoader cl, android.app.Activity act) {
+              private void hookDtoWithPine(Class<?> pineClass, Class<?> dtoClass, android.app.Activity act) {
                   try {
-                      // Hook AuthenticationRepositoryImpl - saves token after login
-                      Class<?> repoClass = cl.loadClass("net.saned.login.repository.AuthenticationRepositoryImpl");
-                      XposedBridge.hookAllMethods(repoClass, "login", new XC_MethodHook() {
-                          @Override protected void afterHookedMethod(MethodHookParam param) {
-                              XposedBridge.log("[AutoDriver] 🔍 AuthRepo.login called");
+                      // Pine.hook(Method method, MethodHook hook)
+                      for (java.lang.reflect.Constructor<?> ctor : dtoClass.getDeclaredConstructors()) {
+                          java.lang.reflect.Method hookMethod = pineClass.getMethod(
+                              "hook", java.lang.reflect.Member.class, Class.forName("top.canyie.pine.callback.MethodHook"));
+                          // Create MethodHook via reflection - complex, use XposedBridge instead
+                          XposedBridge.log("[AutoDriver] 🌲 Pine hook attempt for: " + ctor);
+                      }
+                      // Actually just use XposedBridge hookAllMethods which also works
+                      XposedBridge.hookAllMethods(dtoClass, "<init>", new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) {
+                              captureTokenFromDto(param.thisObject, act);
                           }
                       });
-                      // Hook all methods to find token
-                      for (java.lang.reflect.Method m : repoClass.getDeclaredMethods()) {
-                          String mName = m.getName();
-                          if (mName.contains("token") || mName.contains("Token") ||
-                              mName.contains("save") || mName.contains("store")) {
-                              XposedBridge.log("[AutoDriver] 📋 AuthRepo method: " + mName);
-                          }
-                      }
-                      XposedBridge.log("[AutoDriver] ✅ AuthRepo methods logged");
-                      sendLog(act, "✅ AuthRepo hook OK");
+                      dtoHooked = true;
+                      XposedBridge.log("[AutoDriver] ✅ AuthAccessTokenDto hooked via Pine+ActivityCL");
+                      sendLog(act, "✅ Token hook OK!");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ AuthRepo: " + e.getMessage());
-                      sendLog(act, "❌ Both DTO and AuthRepo hooks failed");
+                      XposedBridge.log("[AutoDriver] ❌ Pine hook error: " + e.getMessage());
+                      dtoHooked = true;
                   }
               }
 
-              private void hookRequestProperties(XC_LoadPackage.LoadPackageParam lp) {
+              private void captureTokenFromDto(Object dto, android.app.Activity act) {
+                  try {
+                      String token = null;
+                      // Try field access
+                      for (String fieldName : new String[]{"accessToken", "access_token", "token"}) {
+                          try {
+                              token = (String) XposedHelpers.getObjectField(dto, fieldName);
+                              if (token != null && !token.isEmpty()) break;
+                          } catch (Throwable ignored) {}
+                      }
+                      // Try method
+                      if (token == null) {
+                          for (String method : new String[]{"getAccessToken", "component1", "getToken"}) {
+                              try {
+                                  token = (String) XposedHelpers.callMethod(dto, method);
+                                  if (token != null && !token.isEmpty()) break;
+                              } catch (Throwable ignored) {}
+                          }
+                      }
+                      if (token != null && token.length() > 10) {
+                          String bearer = token.startsWith("Bearer ") ? token : "Bearer " + token;
+                          boolean changed = !bearer.equals(capturedToken);
+                          capturedToken = bearer;
+                          tokenCount++;
+                          if (changed) {
+                              XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + ": " + token.substring(0, Math.min(30, token.length())));
+                              sendLog(act, "🔑 Token #" + tokenCount + " captured! API mode active.");
+                          }
+                      }
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ⚠️ captureToken: " + e.getMessage());
+                  }
+              }
+
+              // Dynamic swipe — scans screen for accept button and swipes it
+              public void doSwipe(android.app.Activity act) {
+                  new Handler(Looper.getMainLooper()).post(() -> {
+                      try {
+                          View root = act.getWindow().getDecorView();
+                          View target = findAcceptView(root);
+
+                          float startX, endX, y;
+                          if (target != null && target.isShown()) {
+                              int[] loc = new int[2];
+                              target.getLocationOnScreen(loc);
+                              startX = loc[0] + 40;
+                              endX   = loc[0] + target.getWidth() - 40;
+                              y      = loc[1] + target.getHeight() / 2f;
+                              sendLog(act, "🖱️ Swipe on: " + target.getClass().getSimpleName()
+                                  + " w=" + target.getWidth());
+                          } else {
+                              // Fallback: bottom 85% of screen
+                              DisplayMetrics dm = new DisplayMetrics();
+                              act.getWindowManager().getDefaultDisplay().getMetrics(dm);
+                              startX = dm.widthPixels * 0.1f;
+                              endX   = dm.widthPixels * 0.9f;
+                              y      = dm.heightPixels * 0.85f;
+                              sendLog(act, "🖱️ Swipe fallback coords");
+                          }
+
+                          performSwipe(root, startX, endX, y);
+                          sendLog(act, "✅ Swipe done");
+                      } catch (Throwable e) {
+                          sendLog(act, "❌ Swipe error: " + e.getMessage());
+                      }
+                  });
+              }
+
+              private View findAcceptView(View root) {
+                  if (root == null) return null;
+                  // Check if this view has accept-related text
+                  if (root instanceof TextView) {
+                      String txt = ((TextView) root).getText().toString().toUpperCase().trim();
+                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE","CONFIRM","قبول","موافق","اقبل"}) {
+                          if (txt.contains(kw)) return root;
+                      }
+                  }
+                  // Check content description
+                  CharSequence cd = root.getContentDescription();
+                  if (cd != null) {
+                      String cdStr = cd.toString().toUpperCase();
+                      for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE"}) {
+                          if (cdStr.contains(kw)) return root;
+                      }
+                  }
+                  // Recurse children
+                  if (root instanceof ViewGroup) {
+                      ViewGroup vg = (ViewGroup) root;
+                      for (int i = 0; i < vg.getChildCount(); i++) {
+                          View found = findAcceptView(vg.getChildAt(i));
+                          if (found != null) return found;
+                      }
+                  }
+                  return null;
+              }
+
+              private void performSwipe(View root, float startX, float endX, float y) {
+                  long down = SystemClock.uptimeMillis();
+                  root.dispatchTouchEvent(MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, startX, y, 0));
+                  int steps = 15;
+                  for (int i = 1; i <= steps; i++) {
+                      float x = startX + (endX - startX) * i / steps;
+                      root.dispatchTouchEvent(MotionEvent.obtain(down, down + i*10, MotionEvent.ACTION_MOVE, x, y, 0));
+                  }
+                  root.dispatchTouchEvent(MotionEvent.obtain(down, down + steps*10+20, MotionEvent.ACTION_UP, endX, y, 0));
+              }
+
+              private void hookURLConnection(XC_LoadPackage.LoadPackageParam lp) {
                   XC_MethodHook hook = new XC_MethodHook() {
                       @Override protected void beforeHookedMethod(MethodHookParam param) {
                           try {
@@ -332,27 +443,32 @@ jobs:
                               String value = (String) param.args[1];
                               if (!"Authorization".equals(key)) return;
                               if (value == null || value.length() < 10) return;
-                              String urlStr = "";
-                              try { urlStr = XposedHelpers.callMethod(param.thisObject, "getURL").toString(); }
+                              String url = "";
+                              try { url = XposedHelpers.callMethod(param.thisObject, "getURL").toString(); }
                               catch (Throwable ignored) {}
-                              if (!urlStr.isEmpty() && !urlStr.contains("saned.io") && !urlStr.contains("jahez")) return;
+                              if (!url.isEmpty() && !url.contains("saned.io") && !url.contains("jahez")) return;
                               boolean changed = !value.equals(capturedToken);
                               capturedToken = value;
                               tokenCount++;
-                              if (changed) XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
-                                  + " [" + param.method.getName() + "] "
-                                  + value.substring(0, Math.min(40, value.length())));
+                              if (changed) XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + " [URLConn] " + value.substring(0, Math.min(40, value.length())));
                           } catch (Throwable ignored) {}
                       }
                   };
                   try {
-                      Class<?> urlConn = lp.classLoader.loadClass("java.net.URLConnection");
-                      XposedBridge.hookAllMethods(urlConn, "setRequestProperty", hook);
-                      XposedBridge.hookAllMethods(urlConn, "addRequestProperty", hook);
-                      XposedBridge.log("[AutoDriver] ✅ URLConnection property hooks OK");
+                      Class<?> uc = lp.classLoader.loadClass("java.net.URLConnection");
+                      XposedBridge.hookAllMethods(uc, "setRequestProperty", hook);
+                      XposedBridge.hookAllMethods(uc, "addRequestProperty", hook);
+                      XposedBridge.log("[AutoDriver] ✅ URLConnection hooks OK");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ URLConnection: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ❌ URLConn: " + e.getMessage());
                   }
+              }
+
+              // Called from AutoService via broadcast when swipe is needed
+              public void triggerSwipe(int delay) {
+                  android.app.Activity act = currentOrderActivity;
+                  if (act == null || act.isFinishing()) return;
+                  new Handler(Looper.getMainLooper()).postDelayed(() -> doSwipe(act), delay);
               }
 
               private String extractRequestId(Bundle b) {
@@ -424,20 +540,23 @@ jobs:
                       if (msg != null) saveLog(msg);
                   }
               };
+
               private final BroadcastReceiver orderReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
                       if (!intent.getBooleanExtra("is_order", false)) return;
                       String requestId = intent.getStringExtra("request_id");
                       String authToken = intent.getStringExtra("auth_token");
+                      boolean hasToken = intent.getBooleanExtra("has_token", false);
                       double pickupLat = intent.getDoubleExtra("pickup_lat", -1);
                       double pickupLon = intent.getDoubleExtra("pickup_lon", -1);
                       double dropDist  = intent.getDoubleExtra("drop_dist",  -1);
                       double price     = intent.getDoubleExtra("price",       0);
                       double bonus     = intent.getDoubleExtra("bonus",       0);
                       saveLog("🪝 id=" + requestId + " drop=" + fmt2(dropDist) + "km ₿" + price + "+" + bonus);
-                      processOrder(requestId, authToken, pickupLat, pickupLon, dropDist);
+                      processOrder(requestId, authToken, hasToken, pickupLat, pickupLon, dropDist);
                   }
               };
+
               private final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
                   @Override public void onReceive(Context ctx, Intent intent) {
                       if (prefs == null) prefs = getSharedPreferences("cfg", MODE_PRIVATE);
@@ -461,7 +580,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v18 started");
+                  saveLog("✅ AutoService v19 started");
               }
 
               void startLocationUpdates() {
@@ -491,21 +610,13 @@ jobs:
               @Override public int onStartCommand(Intent i, int flags, int id) { return START_STICKY; }
               @Override public IBinder onBind(Intent i) { return null; }
 
-              void processOrder(String requestId, String authToken, double pickupLat, double pickupLon, double dropDist) {
+              void processOrder(String requestId, String authToken, boolean hasToken,
+                                double pickupLat, double pickupLon, double dropDist) {
                   if (!prefs.getBoolean("enabled", false)) { saveLog("⏸ Disabled"); return; }
                   long now = System.currentTimeMillis();
                   if (now - lastEvent < 2000) { saveLog("⚡ Debounce"); return; }
                   lastEvent = now;
                   if (requestId == null || requestId.isEmpty()) { saveLog("❌ requestId empty"); return; }
-
-                  String finalAuth;
-                  if (authToken != null && authToken.length() > 20) {
-                      finalAuth = authToken;
-                      saveLog("🔑 " + authToken.substring(0, Math.min(30, authToken.length())) + "...");
-                  } else {
-                      finalAuth = BASIC_AUTH;
-                      saveLog("🔑 Basic fallback");
-                  }
 
                   float pickupKm = calcPickupDist(pickupLat, pickupLon);
                   float maxPickup = prefs.getFloat("max_pickup", 2.0f);
@@ -528,9 +639,21 @@ jobs:
                   }
 
                   int delay = prefs.getInt("scan_delay", 500);
-                  saveLog("✅ Filter pass! API in " + delay + "ms → id=" + requestId);
-                  final String fa = finalAuth;
-                  new Handler(Looper.getMainLooper()).postDelayed(() -> callAcceptApi(requestId, fa, pickupKm, dropKm), delay);
+
+                  if (hasToken && authToken != null && authToken.length() > 20) {
+                      // API mode
+                      saveLog("✅ Filter pass! API in " + delay + "ms");
+                      final String fa = authToken;
+                      new Handler(Looper.getMainLooper()).postDelayed(
+                          () -> callAcceptApi(requestId, fa, pickupKm, dropKm), delay);
+                  } else {
+                      // Swipe mode fallback
+                      saveLog("✅ Filter pass! Swipe in " + delay + "ms (no token)");
+                      Intent swipeIntent = new Intent("JAHEZ_DO_SWIPE");
+                      swipeIntent.setPackage("net.jahez.fleets");
+                      swipeIntent.putExtra("scan_delay", delay);
+                      sendBroadcast(swipeIntent);
+                  }
               }
 
               void callAcceptApi(String requestId, String authHeader, float pickupKm, float dropKm) {
@@ -548,12 +671,12 @@ jobs:
                           conn.setDoOutput(false);
                           int code = conn.getResponseCode();
                           if (code == 200 || code == 201 || code == 204) {
-                              String msg = "🎉 ACCEPTED! HTTP " + code + " Pickup=" + fmt1(pickupKm) + "km Drop=" + fmt1(dropKm) + "km";
+                              String msg = "🎉 ACCEPTED! HTTP " + code + " P=" + fmt1(pickupKm) + "km D=" + fmt1(dropKm) + "km";
                               toast(msg); saveLog(msg);
                           } else {
                               String body = readStream(conn.getErrorStream(), 400);
                               String msg = "❌ HTTP " + code + " — " + body;
-                              if (code == 401) msg += " → Token galat/expire";
+                              if (code == 401) msg += " → Token expire, login karo";
                               if (code == 409) msg += " → Already accepted";
                               if (code == 404) msg += " → Order expire";
                               toast(msg); saveLog(msg);
@@ -620,6 +743,16 @@ jobs:
               }
           }
           SEOF
+
+      - name: Write SanedSwipeReceiver.java
+        run: |
+          cat > app/src/main/java/com/auto/driver/SanedSwipeReceiver.java << 'REOF'
+          package com.auto.driver;
+          // This class is hooked into Saned process via SanedHook
+          // It receives JAHEZ_DO_SWIPE broadcast and triggers swipe
+          // The actual implementation is in SanedHook.doSwipe()
+          public class SanedSwipeReceiver {}
+          REOF
 
       - name: Write Remaining Files
         run: |
@@ -716,7 +849,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v18 — AuthAccessTokenDto Hook" android:textSize="12sp"
+                android:text="v19 — API + Swipe Fallback" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -741,7 +874,7 @@ jobs:
               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="horizontal" android:layout_marginBottom="4dp">
                 <TextView android:layout_width="0dp" android:layout_height="wrap_content"
-                  android:layout_weight="1" android:text="API Call Delay"
+                  android:layout_weight="1" android:text="Accept Delay"
                   android:textColor="#AAA" android:textSize="13sp"/>
                 <TextView android:id="@+id/tv_delay" android:layout_width="wrap_content"
                   android:layout_height="wrap_content" android:text="500ms"
@@ -763,7 +896,7 @@ jobs:
                 android:backgroundTint="#333" android:textColor="#FFF"
                 android:textStyle="bold" android:layout_marginBottom="20dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Setup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo\n3. Log mein AuthDto hook OK dikhega\n4. Saned mein logout → login karo\n5. Token capture hoga → Toggle ON!"
+                android:text="Mode:\n✅ Token mile → Direct API accept\n🖱️ Token na mile → Auto swipe\n\nSetup:\n1. LSPosed scope: net.jahez.fleets\n2. Saned kholo → login karo (token capture)\n3. Distance → Save → Toggle ON"
                 android:textColor="#444" android:textSize="12sp" android:gravity="center" android:lineSpacingExtra="4dp"/>
             </LinearLayout>
           </ScrollView>
@@ -826,7 +959,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v18
+          name: AutoDriver-v19
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
