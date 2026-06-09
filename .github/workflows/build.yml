@@ -1,4 +1,4 @@
-name: Build AutoDriver v22 Dual Xposed+Pine
+name: Build AutoDriver v22 Dual Xposed+Pine (Complete)
 
 on: [workflow_dispatch]
 
@@ -91,7 +91,6 @@ jobs:
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.google.android.material:material:1.12.0'
             compileOnly 'de.robv.android.xposed:api:82'
-            // Pine core (includes Xposed compatibility)
             implementation 'top.canyie.pine:core:0.2.9'
           }
           EOF
@@ -167,7 +166,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Write SanedHook.java (Dual Fixed)
+      - name: Write SanedHook.java (Complete Fixed)
         run: |
           cat > app/src/main/java/com/auto/driver/SanedHook.java << 'HEOF'
           package com.auto.driver;
@@ -194,7 +193,6 @@ jobs:
           import java.net.URLConnection;
           import java.lang.reflect.Method;
 
-          // Pine imports - fixed package names
           import top.canyie.pine.Pine;
           import top.canyie.pine.PineConfig;
           import top.canyie.pine.callback.MethodHook;
@@ -490,9 +488,9 @@ jobs:
               private void initPineAndHookOkHttp(android.app.Activity act) {
                   try {
                       XposedBridge.log("[AutoDriver] Initializing Pine fallback...");
-                      Context ctx = act.getApplicationContext();
                       PineConfig.debug = true;
-                      Pine.init(ctx);
+                      // FIXED: Pine.init requires Application, not Context
+                      Pine.init(act.getApplication());
                       
                       ClassLoader cl = act.getClassLoader();
                       Class<?> chainClass = cl.loadClass("okhttp3.internal.http.RealInterceptorChain");
@@ -567,7 +565,7 @@ jobs:
           }
           HEOF
 
-      - name: Write AutoService.java (Location 1min)
+      - name: Write AutoService.java (Complete)
         run: |
           cat > app/src/main/java/com/auto/driver/AutoService.java << 'SEOF'
           package com.auto.driver;
@@ -1036,7 +1034,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v22-Dual
+          name: AutoDriver-v22-Dual-Final
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
