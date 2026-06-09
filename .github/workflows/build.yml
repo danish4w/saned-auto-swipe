@@ -1,4 +1,4 @@
-name: Build AutoDriver v22 Dual Xposed+Pine (Complete)
+name: Build AutoDriver v23 Dual Xposed+Pine (Correct)
 
 on: [workflow_dispatch]
 
@@ -74,8 +74,8 @@ jobs:
               applicationId 'com.auto.driver'
               minSdk 26
               targetSdk 34
-              versionCode 22
-              versionName '22.0'
+              versionCode 23
+              versionName '23.0'
             }
             buildTypes {
               release {
@@ -91,7 +91,8 @@ jobs:
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.google.android.material:material:1.12.0'
             compileOnly 'de.robv.android.xposed:api:82'
-            implementation 'top.canyie.pine:core:0.2.9'
+            // Pine xposed compatibility - isse Xposed-style hooks kaam karenge bina extra init ke
+            implementation 'top.canyie.pine:xposed:0.2.0'
           }
           EOF
 
@@ -145,7 +146,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v22 - Dual Xposed+Pine Fallback"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v23 - Dual Xposed+Pine (Correct)"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -166,7 +167,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Write SanedHook.java (Complete Fixed)
+      - name: Write SanedHook.java (Pure Xposed Style - Works with Pine)
         run: |
           cat > app/src/main/java/com/auto/driver/SanedHook.java << 'HEOF'
           package com.auto.driver;
@@ -193,9 +194,8 @@ jobs:
           import java.net.URLConnection;
           import java.lang.reflect.Method;
 
-          import top.canyie.pine.Pine;
+          // Pine config for debugging (optional, no init needed)
           import top.canyie.pine.PineConfig;
-          import top.canyie.pine.callback.MethodHook;
 
           public class SanedHook implements IXposedHookLoadPackage {
 
@@ -208,25 +208,22 @@ jobs:
               private volatile android.app.Activity currentOrderActivity = null;
               private long lastBcast = 0;
               private boolean swipeReceiverRegistered = false;
-              private boolean pineInitialized = false;
-              private boolean pineFallbackActive = false;
-              private static boolean xposedOkHttpSuccess = false;
 
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v22 dual (Xposed+Pine) loading into " + lp.packageName);
+                  
+                  // Enable Pine debug logs (optional)
+                  PineConfig.debug = true;
+                  PineConfig.debuggable = true;
+                  
+                  XposedBridge.log("[AutoDriver] v23 dual (Xposed+Pine) loading into " + lp.packageName);
 
+                  // All hooks are Xposed-style - Pine's xposed compatibility layer handles them
                   hookActivityOnResume(lp);
                   hookURLConnection();
                   hookAuthDto(lp);
-                  boolean xposedOkHttpOK = hookOkHttpXposed(lp);
-                  
-                  if (!xposedOkHttpOK) {
-                      XposedBridge.log("[AutoDriver] Xposed OkHttp hook failed - Pine fallback will be activated");
-                  } else {
-                      xposedOkHttpSuccess = true;
-                  }
+                  hookOkHttp(lp);
               }
 
               private void hookActivityOnResume(XC_LoadPackage.LoadPackageParam lp) {
@@ -238,10 +235,6 @@ jobs:
                               protected void afterHookedMethod(MethodHookParam param) {
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
                                   String actName = act.getClass().getName();
-
-                                  if (!xposedOkHttpSuccess && !pineInitialized && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
-                                      initPineAndHookOkHttp(act);
-                                  }
 
                                   if (!swipeReceiverRegistered && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
                                       registerSwipeReceiver(act);
@@ -269,11 +262,10 @@ jobs:
                                       double price     = getDouble(extras, "EXTRA_DELIVERY_PRICE");
                                       double bonus     = getDouble(extras, "EXTRA_BONUS_AMOUNT");
 
-                                      String mode = pineFallbackActive ? "🌲 Pine Mode" : "🔧 Xposed Mode";
                                       String tkStatus = capturedToken.isEmpty() ? "❌ NO TOKEN (swipe)" : "✅ #" + tokenCount;
 
                                       sendLog(act, "📦 id=" + requestId + " drop=" + String.format("%.2f", dropDist) + "km"
-                                          + " ₿" + price + "+" + bonus + " | " + tkStatus + " | " + mode);
+                                          + " ₿" + price + "+" + bonus + " | " + tkStatus);
 
                                       Intent bc = new Intent("JAHEZ_ORDER_DATA");
                                       bc.setPackage(OUR_PKG);
@@ -467,48 +459,19 @@ jobs:
                   }
               }
 
-              private boolean hookOkHttpXposed(XC_LoadPackage.LoadPackageParam lp) {
+              private void hookOkHttp(XC_LoadPackage.LoadPackageParam lp) {
                   try {
                       Class<?> chainClass = lp.classLoader.loadClass("okhttp3.internal.http.RealInterceptorChain");
                       Method proceed = chainClass.getDeclaredMethod("proceed", Class.forName("okhttp3.Request"));
                       XposedBridge.hookMethod(proceed, new XC_MethodHook() {
                           @Override
                           protected void beforeHookedMethod(MethodHookParam param) {
-                              extractTokenFromRequest(param.args[0], "Xposed-OkHttp");
+                              extractTokenFromRequest(param.args[0], "OkHttp");
                           }
                       });
-                      XposedBridge.log("[AutoDriver] ✅ Xposed OkHttp hook OK");
-                      return true;
+                      XposedBridge.log("[AutoDriver] ✅ OkHttp hook OK");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] Xposed OkHttp hook failed: " + e.getMessage());
-                      return false;
-                  }
-              }
-
-              private void initPineAndHookOkHttp(android.app.Activity act) {
-                  try {
-                      XposedBridge.log("[AutoDriver] Initializing Pine fallback...");
-                      PineConfig.debug = true;
-                      // FIXED: Pine.init requires Application, not Context
-                      Pine.init(act.getApplication());
-                      
-                      ClassLoader cl = act.getClassLoader();
-                      Class<?> chainClass = cl.loadClass("okhttp3.internal.http.RealInterceptorChain");
-                      Method proceed = chainClass.getDeclaredMethod("proceed", Class.forName("okhttp3.Request"));
-                      
-                      Pine.hook(proceed, new MethodHook() {
-                          @Override
-                          public void beforeCall(Pine.CallFrame callFrame) {
-                              extractTokenFromRequest(callFrame.args[0], "Pine-OkHttp");
-                          }
-                      });
-                      pineInitialized = true;
-                      pineFallbackActive = true;
-                      XposedBridge.log("[AutoDriver] ✅ Pine OkHttp hook successful (fallback active)");
-                      sendLog(act, "🌲 Pine fallback active – token capture via Pine");
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ Pine fallback failed: " + e.getMessage());
-                      sendLog(act, "❌ Pine fallback failed: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ⚠️ OkHttp hook failed: " + e.getMessage());
                   }
               }
 
@@ -565,7 +528,7 @@ jobs:
           }
           HEOF
 
-      - name: Write AutoService.java (Complete)
+      - name: Write AutoService.java
         run: |
           cat > app/src/main/java/com/auto/driver/AutoService.java << 'SEOF'
           package com.auto.driver;
@@ -639,7 +602,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   showNotification();
                   startLocationUpdates();
-                  saveLog("✅ AutoService v22 started (location 1min)");
+                  saveLog("✅ AutoService v23 started (location 1min)");
               }
 
               void startLocationUpdates() {
@@ -921,7 +884,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v22 — Dual Xposed+Pine Fallback" android:textSize="12sp"
+                android:text="v23 — Dual Xposed+Pine (Correct)" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -1034,7 +997,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v22-Dual-Final
+          name: AutoDriver-v23-Dual-Fixed
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
