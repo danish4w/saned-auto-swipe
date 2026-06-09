@@ -1,4 +1,4 @@
-name: Build AutoDriver v21 with Dual Xposed+Pine
+name: Build AutoDriver v22 Dual Xposed+Pine
 
 on: [workflow_dispatch]
 
@@ -48,7 +48,6 @@ jobs:
               google()
               mavenCentral()
               maven { url 'https://api.xposed.info/' }
-              maven { url 'https://jitpack.io' }
             }
           }
           rootProject.name = "AutoDriver"
@@ -75,8 +74,8 @@ jobs:
               applicationId 'com.auto.driver'
               minSdk 26
               targetSdk 34
-              versionCode 21
-              versionName '21.0'
+              versionCode 22
+              versionName '22.0'
             }
             buildTypes {
               release {
@@ -92,8 +91,8 @@ jobs:
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.google.android.material:material:1.12.0'
             compileOnly 'de.robv.android.xposed:api:82'
-            // Pine Xposed compatibility layer (includes core dependency)
-            implementation 'top.canyie.pine:xposed:0.2.0'
+            // Pine core (includes Xposed compatibility)
+            implementation 'top.canyie.pine:core:0.2.9'
           }
           EOF
 
@@ -147,7 +146,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v21 - Dual Xposed+Pine Fallback"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v22 - Dual Xposed+Pine Fallback"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -168,7 +167,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Write SanedHook.java (Dual Xposed+Pine)
+      - name: Write SanedHook.java (Dual Fixed)
         run: |
           cat > app/src/main/java/com/auto/driver/SanedHook.java << 'HEOF'
           package com.auto.driver;
@@ -195,6 +194,7 @@ jobs:
           import java.net.URLConnection;
           import java.lang.reflect.Method;
 
+          // Pine imports - fixed package names
           import top.canyie.pine.Pine;
           import top.canyie.pine.PineConfig;
           import top.canyie.pine.callback.MethodHook;
@@ -217,9 +217,8 @@ jobs:
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v21 dual (Xposed+Pine) loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v22 dual (Xposed+Pine) loading into " + lp.packageName);
 
-                  // Primary hooks - Xposed
                   hookActivityOnResume(lp);
                   hookURLConnection();
                   hookAuthDto(lp);
@@ -242,7 +241,6 @@ jobs:
                                   android.app.Activity act = (android.app.Activity) param.thisObject;
                                   String actName = act.getClass().getName();
 
-                                  // Initialize Pine if Xposed failed and we have a valid activity
                                   if (!xposedOkHttpSuccess && !pineInitialized && (actName.startsWith("net.jahez") || actName.startsWith("net.saned"))) {
                                       initPineAndHookOkHttp(act);
                                   }
@@ -494,7 +492,7 @@ jobs:
                       XposedBridge.log("[AutoDriver] Initializing Pine fallback...");
                       Context ctx = act.getApplicationContext();
                       PineConfig.debug = true;
-                      Pine.ensureInitialized();
+                      Pine.init(ctx);
                       
                       ClassLoader cl = act.getClassLoader();
                       Class<?> chainClass = cl.loadClass("okhttp3.internal.http.RealInterceptorChain");
@@ -643,7 +641,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   showNotification();
                   startLocationUpdates();
-                  saveLog("✅ AutoService v21 started (location 1min)");
+                  saveLog("✅ AutoService v22 started (location 1min)");
               }
 
               void startLocationUpdates() {
@@ -925,7 +923,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v21 — Dual Xposed+Pine Fallback" android:textSize="12sp"
+                android:text="v22 — Dual Xposed+Pine Fallback" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -1038,7 +1036,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v21-Dual
+          name: AutoDriver-v22-Dual
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
