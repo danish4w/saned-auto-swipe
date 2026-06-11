@@ -63,7 +63,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 20; versionName '20.0'
+              versionCode 21; versionName '21.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -129,7 +129,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v20"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v21"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -178,7 +178,10 @@ jobs:
               static final String TARGET         = "net.jahez.fleets";
               static final String OUR_PKG        = "com.auto.driver";
               static final String ORDER_ACTIVITY = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity";
-              static final String AUTH_DTO       = "net.saned.login.remote.model.dto.AuthAccessTokenDto";
+              static final String AUTH_DTO        = "net.saned.login.remote.model.dto.AuthAccessTokenDto";
+              static final String AUTH_CLASS      = "net.saned.login.remote.model.dto.Auth";
+              static final String LOGIN_DATA       = "net.saned.login.remote.model.dto.CompleteLoginData";
+              static final String AUTH_REPO        = "net.saned.login.repository.AuthenticationRepositoryImpl";
 
               private volatile String capturedToken = "";
               private volatile int tokenCount = 0;
@@ -298,117 +301,192 @@ jobs:
                   }
               }
 
-              // Dual: Pine + XposedBridge for AuthAccessTokenDto
-              private void hookTokenDto(android.app.Activity act) {
-                  tokenHooked = true; // prevent repeated attempts
-                  ClassLoader cl = act.getClassLoader();
+              // Hook ALL login-related classes to ensure token capture
+              // net.saned.login.remote.model.dto.*
 
-                  // Strategy 1: XposedBridge with Activity ClassLoader
-                  boolean xposedOk = false;
+
+              private void hookTokenDto(android.app.Activity act) {
+                  tokenHooked = true;
+                  ClassLoader cl = act.getClassLoader();
+                  int hooked = 0;
+
+                  // Hook 1: AuthAccessTokenDto - has accessToken field
+                  hooked += hookClass(cl, AUTH_DTO, act, "accessToken", "AuthAccessTokenDto");
+
+                  // Hook 2: Auth - has refreshToken field  
+                  hooked += hookClass(cl, AUTH_CLASS, act, "refreshToken", "Auth");
+
+                  // Hook 3: CompleteLoginData - top level login response data
+                  hooked += hookClass(cl, LOGIN_DATA, act, null, "CompleteLoginData");
+
+                  // Hook 4: AuthenticationRepositoryImpl - saves token after login
                   try {
-                      Class<?> dtoClass = cl.loadClass(AUTH_DTO);
-                      XposedBridge.hookAllMethods(dtoClass, "<init>", new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam param) {
-                              captureTokenFromDto(param.thisObject, act);
+                      Class<?> repoClass = cl.loadClass(AUTH_REPO);
+                      XposedBridge.hookAllMethods(repoClass, "saveToken", new XC_MethodHook() {
+                          @Override protected void afterHookedMethod(MethodHookParam p) {
+                              XposedBridge.log("[AutoDriver] 🔍 AuthRepo.saveToken called");
+                              if (p.args != null) for (Object a : p.args) {
+                                  if (a instanceof String && ((String)a).length() > 10) {
+                                      captureRawToken((String)a, act, "AuthRepo.saveToken");
+                                  }
+                              }
                           }
                       });
-                      xposedOk = true;
-                      XposedBridge.log("[AutoDriver] ✅ XposedBridge AuthDto hook OK");
-                      sendLog(act, "✅ XposedBridge token hook OK");
+                      // Hook ALL methods to find token flow
+                      for (java.lang.reflect.Method m : repoClass.getDeclaredMethods()) {
+                          String n = m.getName();
+                          if (n.toLowerCase().contains("token") || n.toLowerCase().contains("auth")
+                              || n.toLowerCase().contains("login") || n.toLowerCase().contains("save")) {
+                              XposedBridge.log("[AutoDriver] 📋 AuthRepo method: " + n);
+                          }
+                      }
+                      hooked++;
+                      XposedBridge.log("[AutoDriver] ✅ AuthRepo hooks OK");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ XposedBridge AuthDto: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ⚠️ AuthRepo: " + e.getMessage());
                   }
 
-                  // Strategy 2: Pine (runs even if XposedBridge fails due to lsplant)
+                  // Pine backup
                   try {
                       Class<?> pineClass = cl.loadClass("top.canyie.pine.Pine");
-                      Class<?> dtoClass  = cl.loadClass(AUTH_DTO);
-                      Class<?> hookClass = cl.loadClass("top.canyie.pine.callback.MethodHook");
-
-                      // Pine.hook(Constructor, MethodHook)
-                      for (java.lang.reflect.Constructor<?> ctor : dtoClass.getDeclaredConstructors()) {
-                          // Create anonymous Pine MethodHook via dynamic proxy or reflection
-                          // Pine.hookMethod(method, callback)
-                          java.lang.reflect.Method hookMethod = pineClass.getDeclaredMethod(
-                              "hook", java.lang.reflect.Member.class, hookClass);
-
-                          // Create MethodHook subclass - we need to pass Pine callback
-                          // Since Pine callback is abstract, use XposedBridge as bridge
-                          // This at minimum tests if Pine class loads
-                          XposedBridge.log("[AutoDriver] 🌲 Pine ctor found: " + ctor.toGenericString());
-                      }
-                      XposedBridge.log("[AutoDriver] ✅ Pine available, using as backup ART hook");
-                      sendLog(act, "✅ Pine loaded — dual hook active");
-
-                      // Pine hookAllMethods via reflection
-                      java.lang.reflect.Method pineHookAll = pineClass.getMethod(
-                          "hookAllMethods", Class.class, String.class, hookClass);
-                      XposedBridge.log("[AutoDriver] 🌲 Pine.hookAllMethods available");
-
+                      XposedBridge.log("[AutoDriver] 🌲 Pine available as backup");
+                      sendLog(act, "✅ Pine+Xposed dual active, " + hooked + " classes hooked");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ Pine: " + e.getMessage());
-                  }
-
-                  if (!xposedOk) {
-                      sendLog(act, "⚠️ Token hook failed — swipe mode only");
+                      sendLog(act, "✅ Xposed " + hooked + " classes hooked — login karo token milega");
                   }
               }
 
-              private void captureTokenFromDto(Object dto, android.app.Activity act) {
+              private int hookClass(ClassLoader cl, String className, android.app.Activity act,
+                                    String primaryField, String label) {
+                  try {
+                      Class<?> cls = cl.loadClass(className);
+                      XposedBridge.hookAllMethods(cls, "<init>", new XC_MethodHook() {
+                          @Override
+                          protected void afterHookedMethod(MethodHookParam param) {
+                              captureTokenFromDto(param.thisObject, act, primaryField, label);
+                          }
+                      });
+                      XposedBridge.log("[AutoDriver] ✅ Hook OK: " + label);
+                      return 1;
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ⚠️ " + label + ": " + e.getMessage());
+                      return 0;
+                  }
+              }
+
+              private void captureRawToken(String token, android.app.Activity act, String source) {
+                  if (token == null || token.length() < 10) return;
+                  String bearer = token.startsWith("Bearer ") ? token : "Bearer " + token;
+                  boolean changed = !bearer.equals(capturedToken);
+                  capturedToken = bearer;
+                  tokenCount++;
+                  if (changed) {
+                      XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + " [" + source + "]: "
+                          + token.substring(0, Math.min(30, token.length())));
+                      sendLog(act, "🔑 Token #" + tokenCount + " from " + source + "!");
+                  }
+              }
+
+              private void captureTokenFromDto(Object dto, android.app.Activity act,
+                                                  String primaryField, String label) {
                   try {
                       String token = null;
-                      for (String f : new String[]{"accessToken", "access_token", "token"}) {
-                          try { token = (String) XposedHelpers.getObjectField(dto, f); if (token != null && !token.isEmpty()) break; }
-                          catch (Throwable ignored) {}
+
+                      // Try primary field first
+                      if (primaryField != null) {
+                          try { token = (String) XposedHelpers.getObjectField(dto, primaryField);
+                          } catch (Throwable ignored) {}
                       }
-                      if (token == null) {
-                          for (String m : new String[]{"getAccessToken", "component1", "getToken"}) {
-                              try { token = (String) XposedHelpers.callMethod(dto, m); if (token != null && !token.isEmpty()) break; }
-                              catch (Throwable ignored) {}
+
+                      // Try all common field names
+                      if (token == null || token.isEmpty()) {
+                          for (String f : new String[]{"accessToken", "access_token", "token", "refreshToken", "refresh_token", "authToken"}) {
+                              try {
+                                  Object val = XposedHelpers.getObjectField(dto, f);
+                                  if (val instanceof String && ((String)val).length() > 10) {
+                                      token = (String) val;
+                                      XposedBridge.log("[AutoDriver] 🔍 " + label + " field '" + f + "' = " + token.substring(0, Math.min(20, token.length())));
+                                      break;
+                                  }
+                              } catch (Throwable ignored) {}
                           }
                       }
+
+                      // Try all object fields via reflection
+                      if (token == null || token.isEmpty()) {
+                          for (java.lang.reflect.Field field : dto.getClass().getDeclaredFields()) {
+                              field.setAccessible(true);
+                              try {
+                                  Object val = field.get(dto);
+                                  if (val instanceof String && ((String)val).length() > 20
+                                      && ((String)val).length() < 500) {
+                                      String s = (String) val;
+                                      // Token looks like JWT or long alphanumeric string
+                                      if (s.contains(".") || s.length() > 50) {
+                                          XposedBridge.log("[AutoDriver] 🔍 " + label
+                                              + " field '" + field.getName() + "' candidate: "
+                                              + s.substring(0, Math.min(30, s.length())));
+                                          if (token == null) token = s;
+                                      }
+                                  }
+                              } catch (Throwable ignored) {}
+                          }
+                      }
+
+                      // Try getter methods
+                      if (token == null || token.isEmpty()) {
+                          for (String m : new String[]{"getAccessToken","getToken","getRefreshToken","component1","getAuthToken"}) {
+                              try {
+                                  Object val = XposedHelpers.callMethod(dto, m);
+                                  if (val instanceof String && ((String)val).length() > 10) {
+                                      token = (String) val;
+                                      break;
+                                  }
+                              } catch (Throwable ignored) {}
+                          }
+                      }
+
                       if (token != null && token.length() > 10) {
-                          String bearer = token.startsWith("Bearer ") ? token : "Bearer " + token;
-                          boolean changed = !bearer.equals(capturedToken);
-                          capturedToken = bearer;
-                          tokenCount++;
-                          if (changed) {
-                              XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount + ": " + token.substring(0, Math.min(30, token.length())));
-                              sendLog(act, "🔑 Token #" + tokenCount + " captured! Switching to API mode.");
-                          }
+                          captureRawToken(token, act, label);
+                      } else {
+                          XposedBridge.log("[AutoDriver] ⚠️ " + label + " constructed but no token found");
                       }
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ captureToken: " + e.getMessage());
+                      XposedBridge.log("[AutoDriver] ⚠️ captureTokenFromDto[" + label + "]: " + e.getMessage());
                   }
               }
 
-              // Dynamic swipe — scans all views for accept button
+              // Dynamic swipe — Accept button bottom of screen
               private void doSwipe(android.app.Activity act) {
                   try {
                       View root = act.getWindow().getDecorView();
+                      DisplayMetrics dm = new DisplayMetrics();
+                      act.getWindowManager().getDefaultDisplay().getMetrics(dm);
+                      int W = dm.widthPixels;
+                      int H = dm.heightPixels;
 
-                      // Step 1: scan entire view tree
+                      // Step 1: scan view tree for Accept button
                       View target = findAcceptView(root);
-                      sendLog(act, "🔍 Accept view: " + (target != null ? target.getClass().getSimpleName() + " w=" + target.getWidth() : "NOT FOUND"));
 
                       float startX, endX, y;
-                      if (target != null && target.isShown() && target.getWidth() > 50) {
+                      if (target != null && target.isShown() && target.getWidth() > 100) {
                           int[] loc = new int[2];
                           target.getLocationOnScreen(loc);
-                          startX = loc[0] + 30;
-                          endX   = loc[0] + target.getWidth() - 30;
+                          // Swipe from left edge + margin to right edge - margin
+                          startX = loc[0] + 40;
+                          endX   = loc[0] + target.getWidth() - 40;
                           y      = loc[1] + target.getHeight() / 2f;
-                          sendLog(act, "🖱️ Swipe on view: (" + (int)startX + "→" + (int)endX + ", y=" + (int)y + ")");
+                          sendLog(act, "🖱️ Accept view found: " + target.getClass().getSimpleName()
+                              + " (" + (int)startX + "→" + (int)endX + " y=" + (int)y + ")");
                       } else {
-                          // Fallback: screen bottom area — most accept buttons are here
-                          DisplayMetrics dm = new DisplayMetrics();
-                          act.getWindowManager().getDefaultDisplay().getMetrics(dm);
-                          // Try 75%, 80%, 85% of screen height
-                          startX = dm.widthPixels * 0.15f;
-                          endX   = dm.widthPixels * 0.85f;
-                          y      = dm.heightPixels * 0.80f;
-                          sendLog(act, "🖱️ Swipe fallback 80%: (" + (int)startX + "→" + (int)endX + ", y=" + (int)y + ")");
+                          // Accept button is at screen bottom ~85-92% height, full width
+                          // Based on screenshot: green Accept button at very bottom
+                          startX = W * 0.10f;   // 10% from left
+                          endX   = W * 0.88f;   // 88% from left
+                          y      = H * 0.885f;  // 88.5% from top (bottom area)
+                          sendLog(act, "🖱️ Fallback swipe (Accept btn): ("
+                              + (int)startX + "→" + (int)endX + " y=" + (int)y
+                              + ") screen=" + W + "x" + H);
                       }
 
                       performSwipe(root, startX, endX, y);
@@ -419,29 +497,39 @@ jobs:
                   }
               }
 
-              // Comprehensive view search — checks text, tag, class name, content desc
+              // Find Accept button — scan full view tree
               private View findAcceptView(View root) {
-                  if (root == null || root.getVisibility() != View.VISIBLE) return null;
+                  if (root == null) return null;
+                  // Invisible views bhi check karo (button might be partially visible)
+                  if (root.getVisibility() == View.GONE) return null;
 
-                  // Check text content
+                  // Check TextView text
                   if (root instanceof TextView) {
-                      String txt = ((TextView) root).getText().toString();
-                      if (isAcceptText(txt)) return root;
+                      String txt = ((TextView) root).getText().toString().trim();
+                      if (isAcceptText(txt)) {
+                          android.util.Log.d("AutoDriver", "Found accept TextView: '" + txt + "'");
+                          return root;
+                      }
                   }
 
                   // Check content description
                   CharSequence cd = root.getContentDescription();
                   if (cd != null && isAcceptText(cd.toString())) return root;
 
-                  // Check class name (custom slide components)
-                  String cls = root.getClass().getSimpleName().toLowerCase();
-                  if (cls.contains("slide") || cls.contains("swipe") || cls.contains("drag")) return root;
+                  // Check view class name
+                  String cls = root.getClass().getName().toLowerCase();
+                  String simpleCls = root.getClass().getSimpleName().toLowerCase();
+                  if (simpleCls.contains("slide") || simpleCls.contains("swipe")
+                      || simpleCls.contains("accept") || simpleCls.contains("drag")) {
+                      android.util.Log.d("AutoDriver", "Found accept by class: " + simpleCls);
+                      return root;
+                  }
 
                   // Check tag
                   Object tag = root.getTag();
                   if (tag instanceof String && isAcceptText((String) tag)) return root;
 
-                  // Recurse children
+                  // Recurse into children
                   if (root instanceof ViewGroup) {
                       ViewGroup vg = (ViewGroup) root;
                       for (int i = 0; i < vg.getChildCount(); i++) {
@@ -453,14 +541,14 @@ jobs:
               }
 
               private boolean isAcceptText(String s) {
-                  if (s == null) return false;
+                  if (s == null || s.isEmpty()) return false;
                   String u = s.toUpperCase().trim();
-                  // English
+                  // English — "Accept" is the button text in screenshot
                   for (String kw : new String[]{"ACCEPT","SWIPE","SLIDE","CONFIRM","APPROVE"}) {
                       if (u.contains(kw)) return true;
                   }
-                  // Arabic keywords
-                  for (String kw : new String[]{"قبول","موافق","تأكيد","اقبل","قبل"}) {
+                  // Arabic
+                  for (String kw : new String[]{"قبول","موافق","تأكيد","اقبل","قبل","اقبال"}) {
                       if (s.contains(kw)) return true;
                   }
                   return false;
@@ -619,7 +707,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
-                  saveLog("✅ AutoService v20 started");
+                  saveLog("✅ AutoService v21 started");
               }
 
               void startLocationUpdates() {
@@ -879,7 +967,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v20 — Pine+Xposed Dual + Smart Swipe" android:textSize="12sp"
+                android:text="v21 — Multi-Class Token Hook" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -989,7 +1077,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v20
+          name: AutoDriver-v21
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
