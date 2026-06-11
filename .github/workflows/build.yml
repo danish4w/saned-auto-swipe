@@ -63,7 +63,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 21; versionName '21.0'
+              versionCode 25; versionName '25.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -129,7 +129,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v21"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v25"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -346,13 +346,26 @@ jobs:
                       XposedBridge.log("[AutoDriver] ⚠️ AuthRepo: " + e.getMessage());
                   }
 
-                  // Pine backup
+                  // Pine: use OUR module classLoader (not Saned's)
+                  // Pine is in our APK so it's in our classLoader
                   try {
-                      Class<?> pineClass = cl.loadClass("top.canyie.pine.Pine");
-                      XposedBridge.log("[AutoDriver] 🌲 Pine available as backup");
-                      sendLog(act, "✅ Pine+Xposed dual active, " + hooked + " classes hooked");
+                      // SanedHook.class.getClassLoader() = our module's CL
+                      ClassLoader ourCL = SanedHook.class.getClassLoader();
+                      Class<?> pineClass = ourCL.loadClass("top.canyie.pine.Pine");
+                      XposedBridge.log("[AutoDriver] 🌲 Pine found in module CL!");
+
+                      // Now hook AuthAccessTokenDto using Pine + our CL
+                      // Pine can hook any class regardless of which CL it's in
+                      Class<?> dtoClass = cl.loadClass(AUTH_DTO);
+                      hookWithPine(pineClass, dtoClass, act, "accessToken", "Pine.AuthDto");
+
+                      Class<?> authClass = cl.loadClass(AUTH_CLASS);
+                      hookWithPine(pineClass, authClass, act, "refreshToken", "Pine.Auth");
+
+                      sendLog(act, "✅ Pine+Xposed dual: " + hooked + " Xposed + Pine hooks active");
                   } catch (Throwable e) {
-                      sendLog(act, "✅ Xposed " + hooked + " classes hooked — login karo token milega");
+                      XposedBridge.log("[AutoDriver] ⚠️ Pine dual: " + e.getMessage());
+                      sendLog(act, "✅ Xposed only: " + hooked + " hooks — login karo token milega");
                   }
               }
 
@@ -371,6 +384,58 @@ jobs:
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ⚠️ " + label + ": " + e.getMessage());
                       return 0;
+                  }
+              }
+
+              // Pine hook - works even when lsplant fails
+              private void hookWithPine(Class<?> pineClass, Class<?> targetClass,
+                                        android.app.Activity act, String field, String label) {
+                  try {
+                      // top.canyie.pine.Pine.hookAllMethods(class, methodName, callback)
+                      // For constructor: methodName = null or use hookAllConstructors
+
+                      // Try hookAllConstructors
+                      try {
+                          java.lang.reflect.Method hookAllCtors = pineClass.getMethod(
+                              "hookAllConstructors", Class.class,
+                              Class.forName("top.canyie.pine.callback.MethodHook",
+                                  true, SanedHook.class.getClassLoader()));
+                          XposedBridge.log("[AutoDriver] 🌲 Pine.hookAllConstructors available");
+                      } catch (Throwable e1) {
+                          XposedBridge.log("[AutoDriver] ⚠️ Pine hookAllConstructors: " + e1.getMessage());
+                      }
+
+                      // Pine.hook(Constructor, PineMethodHook) - manual per constructor
+                      for (java.lang.reflect.Constructor<?> ctor : targetClass.getDeclaredConstructors()) {
+                          try {
+                              // Create Pine MethodHook using our classloader
+                              ClassLoader ourCL = SanedHook.class.getClassLoader();
+                              Class<?> mhClass = ourCL.loadClass("top.canyie.pine.callback.MethodHook");
+
+                              // Anonymous inner class via reflection proxy
+                              Object pineHook = java.lang.reflect.Proxy.newProxyInstance(
+                                  ourCL,
+                                  new Class[]{mhClass},
+                                  (proxy, method, args) -> {
+                                      String mName = method.getName();
+                                      if ("afterCall".equals(mName) || "afterHookedMethod".equals(mName)) {
+                                          Object thisObj = args != null && args.length > 0 ? args[0] : null;
+                                          if (thisObj != null) captureTokenFromDto(thisObj, act, field, label);
+                                      }
+                                      return null;
+                                  });
+
+                              java.lang.reflect.Method hookMethod = pineClass.getMethod(
+                                  "hook", java.lang.reflect.Member.class, mhClass);
+                              hookMethod.invoke(null, ctor, pineHook);
+                              XposedBridge.log("[AutoDriver] 🌲 Pine hook OK: " + label + " ctor=" + ctor);
+                              sendLog(act, "🌲 Pine hook OK: " + label);
+                          } catch (Throwable e) {
+                              XposedBridge.log("[AutoDriver] ⚠️ Pine ctor hook: " + e.getMessage());
+                          }
+                      }
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ❌ hookWithPine[" + label + "]: " + e.getMessage());
                   }
               }
 
@@ -472,29 +537,88 @@ jobs:
                       if (target != null && target.isShown() && target.getWidth() > 100) {
                           int[] loc = new int[2];
                           target.getLocationOnScreen(loc);
-                          // Swipe from left edge + margin to right edge - margin
                           startX = loc[0] + 40;
                           endX   = loc[0] + target.getWidth() - 40;
                           y      = loc[1] + target.getHeight() / 2f;
                           sendLog(act, "🖱️ Accept view found: " + target.getClass().getSimpleName()
                               + " (" + (int)startX + "→" + (int)endX + " y=" + (int)y + ")");
                       } else {
-                          // Accept button is at screen bottom ~85-92% height, full width
-                          // Based on screenshot: green Accept button at very bottom
-                          startX = W * 0.10f;   // 10% from left
-                          endX   = W * 0.88f;   // 88% from left
-                          y      = H * 0.885f;  // 88.5% from top (bottom area)
-                          sendLog(act, "🖱️ Fallback swipe (Accept btn): ("
+                          // Redmi 12 Pro - 1080x2152
+                          // Accept button: bottom green button, y~91.5%, full width
+                          // Swipe: left edge to right edge
+                          startX = 0;            // screen left edge bilkul start
+                          endX   = W;            // screen right edge bilkul end
+                          y      = H * 0.915f;   // 91.5% height = Accept btn center
+                          sendLog(act, "🖱️ Accept btn swipe: ("
                               + (int)startX + "→" + (int)endX + " y=" + (int)y
                               + ") screen=" + W + "x" + H);
                       }
 
-                      performSwipe(root, startX, endX, y);
-                      sendLog(act, "✅ Swipe done");
+                      // Method 1: Root su command (most reliable on rooted MIUI)
+                      boolean suOk = doSwipeSu((int)startX, (int)endX, (int)y, act);
+
+                      // Method 2: MotionEvent inject (fallback if su fails)
+                      if (!suOk) {
+                          performSwipe(root, startX, endX, y);
+                          sendLog(act, "✅ MotionEvent swipe done");
+                      }
 
                   } catch (Throwable e) {
-                      sendLog(act, "❌ Swipe: " + e.getMessage());
+                      sendLog(act, "❌ Swipe error: " + e.getMessage());
                   }
+              }
+
+              // Root su swipe — guaranteed on rooted device
+              private boolean doSwipeSu(int x1, int x2, int y, android.app.Activity act) {
+                  try {
+                      // Full swipe: left to right on Accept button
+                      String cmd = "input swipe " + x1 + " " + y + " " + x2 + " " + y + " 500";
+                      sendLog(act, "🔧 Su cmd: " + cmd);
+
+                      // Try su -c
+                      Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+
+                      // Read stderr for errors
+                      java.io.InputStream err = p.getErrorStream();
+                      byte[] errBytes = new byte[200];
+                      int errLen = err.read(errBytes);
+                      String errMsg = errLen > 0 ? new String(errBytes, 0, errLen).trim() : "";
+
+                      int exit = p.waitFor();
+                      if (exit == 0) {
+                          sendLog(act, "✅ Su swipe OK!");
+                          return true;
+                      } else {
+                          sendLog(act, "❌ Su exit=" + exit
+                              + (errMsg.isEmpty() ? "" : " err=" + errMsg));
+                          // Try with full path
+                          return doSwipeSuFullPath(x1, x2, y, act, cmd);
+                      }
+                  } catch (Throwable e) {
+                      sendLog(act, "❌ Su swipe: " + e.getMessage());
+                      return doSwipeSuFullPath(x1, x2, y, act,
+                          "input swipe " + x1 + " " + y + " " + x2 + " " + y + " 400");
+                  }
+              }
+
+              private boolean doSwipeSuFullPath(int x1, int x2, int y,
+                                                android.app.Activity act, String inputCmd) {
+                  // Try /system/bin/input directly with su
+                  for (String su : new String[]{"/system/bin/su", "/system/xbin/su", "su"}) {
+                      try {
+                          Process p2 = Runtime.getRuntime().exec(
+                              new String[]{su, "-c", "/system/bin/input swipe "
+                                  + x1 + " " + y + " " + x2 + " " + y + " 400"});
+                          int exit2 = p2.waitFor();
+                          if (exit2 == 0) {
+                              sendLog(act, "✅ Su swipe OK via " + su);
+                              return true;
+                          }
+                          sendLog(act, "⚠️ " + su + " exit=" + exit2);
+                      } catch (Throwable ignored) {}
+                  }
+                  sendLog(act, "❌ All su paths failed → MotionEvent fallback");
+                  return false;
               }
 
               // Find Accept button — scan full view tree
@@ -967,7 +1091,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v21 — Multi-Class Token Hook" android:textSize="12sp"
+                android:text="v25 — Full Screen Swipe" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -1077,7 +1201,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v21
+          name: AutoDriver-v25
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
