@@ -63,7 +63,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 23; versionName '23.0'
+              versionCode 24; versionName '24.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -129,7 +129,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v23"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v24"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -771,7 +771,33 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
+                  grantSuPermission();
                   saveLog("✅ AutoService v21 started");
+              }
+
+              // Su permission pehle se le lo — app start hote hi
+              void grantSuPermission() {
+                  new Thread(() -> {
+                      try {
+                          // "echo ok" se su grant hoga silently
+                          ProcessBuilder pb = new ProcessBuilder("su", "-c", "echo granted");
+                          pb.redirectErrorStream(true);
+                          Process p = pb.start();
+                          byte[] buf = new byte[64];
+                          int n = p.getInputStream().read(buf);
+                          String out = n > 0 ? new String(buf, 0, n).trim() : "";
+                          boolean done = p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+                          int exit = done ? p.exitValue() : -1;
+                          if (exit == 0 && out.contains("granted")) {
+                              saveLog("✅ Su permission granted!");
+                          } else {
+                              saveLog("⚠️ Su grant exit=" + exit + " out=" + out
+                                  + " — Magisk mein Auto Driver ko su allow karo");
+                          }
+                      } catch (Throwable e) {
+                          saveLog("❌ Su grant: " + e.getMessage());
+                      }
+                  }, "su-grant").start();
               }
 
               void startLocationUpdates() {
@@ -1141,7 +1167,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v23
+          name: AutoDriver-v24
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
