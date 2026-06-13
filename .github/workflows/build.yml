@@ -63,7 +63,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 29; versionName '29.0'
+              versionCode 30; versionName '30.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -129,7 +129,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v29"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v30"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -390,22 +390,94 @@ jobs:
                       "net.saned.login.remote.model.dto.Auth",
                       "net.saned.login.remote.model.dto.CompleteLoginData"
                   };
-                  int count = 0;
+                  int pineCount = 0, xposedCount = 0;
+
+                  // Load Pine from OUR classLoader (not Saned's)
+                  // Pine bypasses lsplant - works on MIUI even when lsplant fails
+                  ClassLoader ourCL = SanedHook.class.getClassLoader();
+                  Class<?> pineClass = null;
+                  try {
+                      pineClass = ourCL.loadClass("top.canyie.pine.Pine");
+                      XposedBridge.log("[AutoDriver] 🌲 Pine ready for token hooks");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ⚠️ Pine load: " + e.getMessage());
+                  }
+
                   for (String className : tokenClasses) {
                       try {
-                          Class<?> cls = cl.loadClass(className);
-                          XposedBridge.hookAllMethods(cls, "<init>", new XC_MethodHook() {
-                              @Override protected void afterHookedMethod(MethodHookParam p) {
-                                  scanObjectForToken(p.thisObject, act, cls.getSimpleName());
-                              }
-                          });
-                          count++;
-                          XposedBridge.log("[AutoDriver] ✅ Token class hook: " + cls.getSimpleName());
+                          Class<?> target = cl.loadClass(className);
+
+                          if (pineClass != null) {
+                              // Pine hook - bypasses lsplant!
+                              hookWithPine(pineClass, target, act);
+                              pineCount++;
+                              XposedBridge.log("[AutoDriver] 🌲 Pine hook: " + target.getSimpleName());
+                          } else {
+                              // Fallback: XposedBridge
+                              XposedBridge.hookAllMethods(target, "<init>", new XC_MethodHook() {
+                                  @Override protected void afterHookedMethod(MethodHookParam p) {
+                                      scanObjectForToken(p.thisObject, act, target.getSimpleName());
+                                  }
+                              });
+                              xposedCount++;
+                              XposedBridge.log("[AutoDriver] ✅ Xposed hook: " + target.getSimpleName());
+                          }
                       } catch (Throwable e) {
-                          XposedBridge.log("[AutoDriver] ⚠️ " + className + ": " + e.getMessage());
+                          XposedBridge.log("[AutoDriver] ⚠️ " + className.substring(className.lastIndexOf('.')+1) + ": " + e.getMessage());
                       }
                   }
-                  if (count > 0) sendLog(act, "✅ " + count + " token classes hooked");
+                  sendLog(act, "✅ Token hooks: Pine=" + pineCount + " Xposed=" + xposedCount
+                      + " — login karo token capture hoga!");
+              }
+
+              private void hookWithPine(Class<?> pineClass, Class<?> target, android.app.Activity act) {
+                  try {
+                      // Pine.hookAllConstructors(Class, MethodHook)
+                      // MethodHook is top.canyie.pine.callback.MethodHook
+                      ClassLoader ourCL = SanedHook.class.getClassLoader();
+                      Class<?> hookCbClass = ourCL.loadClass("top.canyie.pine.callback.MethodHook");
+
+                      // Create anonymous MethodHook using dynamic proxy
+                      Object hookCallback = java.lang.reflect.Proxy.newProxyInstance(
+                          ourCL,
+                          new Class[]{},  // MethodHook is abstract class, not interface
+                          (proxy, method, args) -> null
+                      );
+                      // Since MethodHook is abstract class (not interface), use subclass approach
+                      // Use Pine.hookAllConstructors via reflection with our pre-made wrapper
+                      hookWithPineReflection(pineClass, target, act);
+
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ⚠️ Pine hookWithPine: " + e.getMessage());
+                      // Fallback to XposedBridge
+                      try {
+                          XposedBridge.hookAllMethods(target, "<init>", new XC_MethodHook() {
+                              @Override protected void afterHookedMethod(MethodHookParam p) {
+                                  scanObjectForToken(p.thisObject, act, target.getSimpleName());
+                              }
+                          });
+                      } catch (Throwable ignored) {}
+                  }
+              }
+
+              private void hookWithPineReflection(Class<?> pineClass, Class<?> target,
+                                                   android.app.Activity act) throws Throwable {
+                  // Pine.hookAllConstructors(targetClass, callback)
+                  // callback must be a MethodHook subclass
+                  // Since we have Pine as compile dependency, use it directly
+                  for (java.lang.reflect.Constructor<?> ctor : target.getDeclaredConstructors()) {
+                      top.canyie.pine.Pine.hook(ctor, new top.canyie.pine.callback.MethodHook() {
+                          @Override
+                          public void afterCall(top.canyie.pine.callback.MethodHook.CallFrame frame)
+                              throws Throwable {
+                              Object obj = frame.thisObject;
+                              if (obj != null) {
+                                  scanObjectForToken(obj, act, target.getSimpleName());
+                              }
+                          }
+                      });
+                  }
+                  XposedBridge.log("[AutoDriver] 🌲 Pine constructor hooked: " + target.getSimpleName());
               }
 
               private void scanObjectForToken(Object obj, android.app.Activity act, String label) {
@@ -712,7 +784,7 @@ jobs:
                   showNotification();
                   // Su grant + SharedPrefs token read
                   initSuAndToken();
-                  saveLog("✅ AutoService v29 started");
+                  saveLog("✅ AutoService v30 started");
               }
 
               void initSuAndToken() {
@@ -1240,7 +1312,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v29
+          name: AutoDriver-v30
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
