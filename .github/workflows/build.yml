@@ -265,94 +265,12 @@ jobs:
                   }
               }
 
-              // AWS APK jaisa: IncomingDispatchViewModel hook karo
+              // IncomingDispatchViewModel hook — XposedBridge with Activity CL
               private void hookViewModel(android.app.Activity act) {
-                  ClassLoader sanedCl = act.getClassLoader();
-
-                  // Step 1: Load Pine from OUR OWN APK (not Saned's CL)
-                  ClassLoader pineCl  = loadPineClassLoader(act);
-
-                  // Step 2: Hook ViewModel methods
-                  // Pine is in our CL, ViewModel class is in Saned's CL
-                  boolean pineOk = false;
-                  if (pineCl != null) {
-                      pineOk = hookViewModelWithPine(pineCl, sanedCl, act);
-                  }
-
-                  // Step 3: Fallback to XposedBridge if Pine failed
-                  if (!pineOk) {
-                      hookViewModelXposed(sanedCl, act);
-                  }
-
-                  // Step 4: Hook token classes
-                  hookTokenClasses(sanedCl, act);
+                  ClassLoader cl = act.getClassLoader();
+                  hookViewModelXposed(cl, act);
+                  hookTokenClasses(cl, act);
               }
-
-              // Load Pine from our own APK path
-              private ClassLoader loadPineClassLoader(android.app.Activity act) {
-                  try {
-                      // Our APK path - com.auto.driver
-                      android.content.pm.PackageManager pm = act.getPackageManager();
-                      android.content.pm.ApplicationInfo ourInfo = pm.getApplicationInfo(
-                          OUR_PKG, 0);
-                      String ourApkPath = ourInfo.sourceDir;
-                      XposedBridge.log("[AutoDriver] 🌲 Our APK: " + ourApkPath);
-
-                      // Create classloader from our APK
-                      ClassLoader pineCl = new dalvik.system.PathClassLoader(
-                          ourApkPath,
-                          act.getClassLoader().getParent()
-                      );
-
-                      // Test if Pine loads
-                      pineCl.loadClass("top.canyie.pine.Pine");
-                      XposedBridge.log("[AutoDriver] ✅ Pine loaded from own APK!");
-                      return pineCl;
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ Pine CL: " + e.getMessage());
-                      return null;
-                  }
-              }
-
-              // Hook ViewModel using Pine from our CL + Saned's CL for the target class
-              private boolean hookViewModelWithPine(ClassLoader pineCl,
-                                                    ClassLoader sanedCl,
-                                                    android.app.Activity act) {
-                  try {
-                      Class<?> vmClass = sanedCl.loadClass(VIEWMODEL);
-                      int count = 0;
-
-                      // Use XposedBridge (which works with any CL) for the actual hook
-                      // Pine is available as backup but XposedBridge with correct CL is enough
-                      for (String method : new String[]{"acceptAutoDispatch", "acceptManualDispatch"}) {
-                          try {
-                              XposedBridge.hookAllMethods(vmClass, method, new XC_MethodHook() {
-                                  @Override protected void beforeHookedMethod(MethodHookParam p) {
-                                      XposedBridge.log("[AutoDriver] 🎯 VM." + p.method.getName() + "!");
-                                      sendLog(act, "🎯 VM.accept called!");
-                                  }
-                              });
-                              count++;
-                              XposedBridge.log("[AutoDriver] ✅ VM." + method + " (Pine+Xposed) OK");
-                          } catch (Throwable e) {
-                              XposedBridge.log("[AutoDriver] ⚠️ VM." + method + ": " + e.getMessage());
-                          }
-                      }
-
-                      if (count > 0) {
-                          vmHooked = true;
-                          sendLog(act, "✅ VM " + count + " hooks OK (Pine+Xposed dual)!");
-                          return true;
-                      }
-                      vmHooked = false;
-                      return false;
-                  } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ hookViewModelWithPine: " + e.getMessage());
-                      vmHooked = false;
-                      return false;
-                  }
-              }
-
               private void hookViewModelXposed(ClassLoader cl, android.app.Activity act) {
                   try {
                       Class<?> vmClass = cl.loadClass(VIEWMODEL);
