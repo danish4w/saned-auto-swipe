@@ -47,17 +47,14 @@ jobs:
           rootProject.name = "AutoDriver"
           include ':app'
           EOF
-          
           cat > build.gradle << 'EOF'
           plugins { id 'com.android.application' version '8.5.2' apply false }
           EOF
-          
           cat > gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=false
           org.gradle.jvmargs=-Xmx2048m
           EOF
-          
           cat > app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           android {
@@ -66,7 +63,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 30; versionName '30.0'
+              versionCode 27; versionName '27.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -74,26 +71,83 @@ jobs:
               targetCompatibility JavaVersion.VERSION_17
             }
           }
-          
-          // Add dependency for pine
           dependencies {
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'com.google.android.material:material:1.12.0'
             compileOnly 'de.robv.android.xposed:api:82'
-            implementation 'top.canyie.pine:core:0.2.9'  # Make sure this matches your usage
+            implementation 'top.canyie.pine:core:0.2.9'
           }
           EOF
 
       - name: Write Icons and Config
         run: |
-          # (unchanged, omitted for brevity, keep your existing resource files)
-          # ...
-          
+          cat > app/src/main/res/drawable/ic_launcher_background.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+            <path android:fillColor="#1B5E20" android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
+          </vector>
+          EOF
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+            <path android:fillColor="#FFFFFF" android:pathData="M25,54 L35,44 L47,60 L73,30 L83,40 L47,82 Z"/>
+          </vector>
+          EOF
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@drawable/ic_launcher_background"/>
+            <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+          </adaptive-icon>
+          EOF
+          cp app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          cat > app/src/main/res/xml/network_security_config.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+            <base-config cleartextTrafficPermitted="false">
+              <trust-anchors><certificates src="system"/></trust-anchors>
+            </base-config>
+          </network-security-config>
+          EOF
+          echo "com.auto.driver.SanedHook" > app/src/main/assets/xposed_init
+
       - name: Write Manifest
         run: |
-          # (unchanged, omitted for brevity, keep your existing manifest)
-          # ...
-          
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+            <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+            <application android:label="Auto Driver" android:icon="@mipmap/ic_launcher"
+              android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
+              android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
+              <meta-data android:name="xposedmodule" android:value="true"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v30"/>
+              <meta-data android:name="xposedminversion" android:value="82"/>
+              <activity android:name=".MainActivity" android:exported="true"
+                android:windowSoftInputMode="stateHidden|adjustPan">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+              </activity>
+              <activity android:name=".LogActivity" android:exported="false"/>
+              <service android:name=".AutoService" android:exported="false"
+                android:foregroundServiceType="dataSync"/>
+              <receiver android:name=".BootReceiver" android:exported="true">
+                <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter>
+              </receiver>
+            </application>
+          </manifest>
+          EOF
+
       - name: Write SanedHook.java
         run: |
           cat > app/src/main/java/com/auto/driver/SanedHook.java << 'HEOF'
@@ -104,11 +158,6 @@ jobs:
           import android.content.Intent;
           import android.content.IntentFilter;
           import android.os.Bundle;
-
-          // Import the pine callback class
-          import top.canyie.pine.callback.MethodHook;
-          // Import CallFrame explicitly
-          import top.canyie.pine.callback.MethodHook.CallFrame;
 
           import de.robv.android.xposed.IXposedHookLoadPackage;
           import de.robv.android.xposed.XC_MethodHook;
@@ -157,11 +206,13 @@ jobs:
                                   registerSwipeReceiver(act);
 
                                   // Hook ViewModel — retry on every Saned activity
+                                  // IncomingDispatchActivity pe classes7 definitely loaded hoti hai
                                   if (!vmHooked) {
                                       if (actName.startsWith("net.jahez") || actName.startsWith("net.saned")) {
                                           hookViewModel(act);
                                       }
                                   }
+                                  // Extra retry on order screen specifically
                                   if (ORDER_ACTIVITY.equals(actName) && !vmHooked) {
                                       hookViewModel(act);
                                   }
@@ -214,19 +265,19 @@ jobs:
                   }
               }
 
+              // IncomingDispatchViewModel hook — XposedBridge with Activity CL
               private void hookViewModel(android.app.Activity act) {
                   ClassLoader cl = act.getClassLoader();
                   hookViewModelXposed(cl, act);
                   hookTokenClasses(cl, act);
               }
-
               private void hookViewModelXposed(ClassLoader cl, android.app.Activity act) {
                   try {
                       Class<?> vmClass = cl.loadClass(VIEWMODEL);
                       int hooked = 0;
                       for (String method : new String[]{"acceptAutoDispatch", "acceptManualDispatch"}) {
                           try {
-                              XposedHelpers.findAndHookMethod(vmClass, method, new XC_MethodHook() {
+                              XposedBridge.hookAllMethods(vmClass, method, new XC_MethodHook() {
                                   @Override protected void beforeHookedMethod(MethodHookParam p) {
                                       XposedBridge.log("[AutoDriver] 🎯 VM." + p.method.getName() + " called!");
                                       sendLog(act, "🎯 accept triggered!");
@@ -239,15 +290,15 @@ jobs:
                           }
                       }
                       if (hooked > 0) {
-                          vmHooked = true;
+                          vmHooked = true; // only set when at least one hook succeeded
                           sendLog(act, "✅ VM " + hooked + " hooks OK!");
                       } else {
-                          vmHooked = false;
+                          vmHooked = false; // allow retry
                           sendLog(act, "⚠️ VM hook failed, will retry");
                       }
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ❌ VM: " + e.getMessage());
-                      vmHooked = false;
+                      vmHooked = false; // allow retry
                   }
               }
 
@@ -259,6 +310,8 @@ jobs:
                   };
                   int pineCount = 0, xposedCount = 0;
 
+                  // Load Pine from OUR classLoader (not Saned's)
+                  // Pine bypasses lsplant - works on MIUI even when lsplant fails
                   ClassLoader ourCL = SanedHook.class.getClassLoader();
                   Class<?> pineClass = null;
                   try {
@@ -273,10 +326,12 @@ jobs:
                           Class<?> target = cl.loadClass(className);
 
                           if (pineClass != null) {
+                              // Pine hook - bypasses lsplant!
                               hookWithPine(pineClass, target, act);
                               pineCount++;
                               XposedBridge.log("[AutoDriver] 🌲 Pine hook: " + target.getSimpleName());
                           } else {
+                              // Fallback: XposedBridge
                               XposedBridge.hookAllMethods(target, "<init>", new XC_MethodHook() {
                                   @Override protected void afterHookedMethod(MethodHookParam p) {
                                       scanObjectForToken(p.thisObject, act, target.getSimpleName());
@@ -295,38 +350,54 @@ jobs:
 
               private void hookWithPine(Class<?> pineClass, Class<?> target, android.app.Activity act) {
                   try {
+                      // Pine.hookAllConstructors(Class, MethodHook)
+                      // MethodHook is top.canyie.pine.callback.MethodHook
                       ClassLoader ourCL = SanedHook.class.getClassLoader();
                       Class<?> hookCbClass = ourCL.loadClass("top.canyie.pine.callback.MethodHook");
 
+                      // Create anonymous MethodHook using dynamic proxy
                       Object hookCallback = java.lang.reflect.Proxy.newProxyInstance(
                           ourCL,
-                          new Class[]{},
+                          new Class[]{},  // MethodHook is abstract class, not interface
                           (proxy, method, args) -> null
                       );
-                      // Use reflection to hook constructors
-                      for (java.lang.reflect.Constructor<?> ctor : target.getDeclaredConstructors()) {
-                          top.canyie.pine.Pine.hook(ctor, new top.canyie.pine.callback.MethodHook() {
-                              @Override
-                              public void afterCall(CallFrame frame) throws Throwable {
-                                  Object obj = frame.thisObject;
-                                  if (obj != null) {
-                                      scanObjectForToken(obj, act, target.getSimpleName());
-                                  }
-                              }
-                          });
-                      }
-                      XposedBridge.log("[AutoDriver] 🌲 Pine constructor hooked: " + target.getSimpleName());
+                      // Since MethodHook is abstract class (not interface), use subclass approach
+                      // Use Pine.hookAllConstructors via reflection with our pre-made wrapper
+                      hookWithPineReflection(pineClass, target, act);
+
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ⚠️ Pine hookWithPine: " + e.getMessage());
-                      // Fallback to Xposed
+                      // Fallback to XposedBridge
                       try {
-                          XposedHelpers.findAndHookConstructor(target, new XC_MethodHook() {
+                          XposedBridge.hookAllMethods(target, "<init>", new XC_MethodHook() {
                               @Override protected void afterHookedMethod(MethodHookParam p) {
                                   scanObjectForToken(p.thisObject, act, target.getSimpleName());
                               }
                           });
                       } catch (Throwable ignored) {}
                   }
+              }
+
+              private void hookWithPineReflection(Class<?> pineClass, Class<?> target,
+                                                   android.app.Activity act) throws Throwable {
+                  // Pine.hookAllConstructors(targetClass, callback)
+                  // callback must be a MethodHook subclass
+                  // Since we have Pine as compile dependency, use it directly
+                  // Pine.hook with correct CallFrame class
+                  // top.canyie.pine.CallFrame (not nested in MethodHook)
+                  for (java.lang.reflect.Constructor<?> ctor : target.getDeclaredConstructors()) {
+                      top.canyie.pine.Pine.hook(ctor, new top.canyie.pine.callback.MethodHook() {
+                          @Override
+                          public void afterCall(top.canyie.pine.CallFrame frame)
+                              throws Throwable {
+                              Object obj = frame.thisObject;
+                              if (obj != null) {
+                                  scanObjectForToken(obj, act, target.getSimpleName());
+                              }
+                          }
+                      });
+                  }
+                  XposedBridge.log("[AutoDriver] 🌲 Pine constructor hooked: " + target.getSimpleName());
               }
 
               private void scanObjectForToken(Object obj, android.app.Activity act, String label) {
@@ -359,6 +430,7 @@ jobs:
                   }
               }
 
+              // Swipe receiver inside Saned process (AWS APK jaisa)
               private void registerSwipeReceiver(android.app.Activity act) {
                   if (swipeReceiverRegistered) return;
                   try {
@@ -389,6 +461,7 @@ jobs:
 
               private volatile android.app.Activity currentAct = null;
 
+              // Accept karne ke 3 methods - jo pehle kaam kare
               private void doSwipe(android.app.Activity act) {
                   currentAct = act;
                   try {
@@ -403,7 +476,7 @@ jobs:
                       sendLog(act, "🖱️ Accept attempt: screen=" + W + "x" + H
                           + " swipe=" + x1 + "→" + x2 + " y=" + y);
 
-                      // Method 1: performClick on Accept button
+                      // Method 1: performClick on Accept button (most reliable)
                       android.view.View root = act.getWindow().getDecorView();
                       android.view.View btn = findAcceptView(root);
                       if (btn != null) {
@@ -414,7 +487,7 @@ jobs:
                           return;
                       }
 
-                      // Method 2: su input touchscreen swipe
+                      // Method 2: su input touchscreen swipe (MIUI compatible)
                       String[] cmds = {
                           "input touchscreen swipe " + x1+" "+y+" "+x2+" "+y+" 250",
                           "input swipe " + x1+" "+y+" "+x2+" "+y+" 250",
@@ -427,13 +500,14 @@ jobs:
                               Process p = pb.start();
                               byte[] buf = new byte[128];
                               int n = p.getInputStream().read(buf);
-                              boolean done = p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
-                              int exit = done ? p.exitValue() : -1;
+                              boolean ok = p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+                              int exit = ok ? p.exitValue() : -1;
                               String out = n > 0 ? new String(buf, 0, n).trim() : "";
-                              sendLog(act, (exit==0?"✅":"⚠️") + " su [" + cmd.substring(0,30) + "]");
+                              sendLog(act, (exit==0?"✅":"⚠️") + " su [" + cmd.substring(0,Math.min(30,cmd.length()))
+                                  + "] exit=" + exit + (out.isEmpty()?"":" "+out));
                               if (exit == 0) return;
                           } catch (Throwable e) {
-                              sendLog(act, "⚠️ cmd err: " + e.getMessage());
+                              sendLog(act, "⚠️ su cmd: " + e.getMessage());
                           }
                       }
 
@@ -460,6 +534,7 @@ jobs:
                   }
               }
 
+              // Find Accept button in view tree
               private android.view.View findAcceptView(android.view.View root) {
                   if (root == null || root.getVisibility() == android.view.View.GONE) return null;
                   if (root instanceof android.widget.TextView) {
@@ -490,11 +565,29 @@ jobs:
                   return false;
               }
 
-              private void hookURLConnection(XC_MethodHook hook) {
+              private void hookURLConnection(XC_LoadPackage.LoadPackageParam lp) {
+                  XC_MethodHook hook = new XC_MethodHook() {
+                      @Override protected void beforeHookedMethod(MethodHookParam param) {
+                          try {
+                              String key   = (String) param.args[0];
+                              String value = (String) param.args[1];
+                              if (!"Authorization".equals(key) || value == null || value.length() < 10) return;
+                              String url = "";
+                              try { url = XposedHelpers.callMethod(param.thisObject, "getURL").toString(); }
+                              catch (Throwable ignored) {}
+                              if (!url.isEmpty() && !url.contains("saned.io") && !url.contains("jahez")) return;
+                              boolean changed = !value.equals(capturedToken);
+                              capturedToken = value;
+                              tokenCount++;
+                              if (changed) XposedBridge.log("[AutoDriver] 🔑 Token #" + tokenCount
+                                  + " [URLConn] " + value.substring(0, Math.min(40, value.length())));
+                          } catch (Throwable ignored) {}
+                      }
+                  };
                   try {
-                      Class<?> uc = Class.forName("java.net.URLConnection");
-                      XposedHelpers.findAndHookMethod(uc, "setRequestProperty", String.class, String.class, hook);
-                      XposedHelpers.findAndHookMethod(uc, "addRequestProperty", String.class, String.class, hook);
+                      Class<?> uc = lp.classLoader.loadClass("java.net.URLConnection");
+                      XposedBridge.hookAllMethods(uc, "setRequestProperty", hook);
+                      XposedBridge.hookAllMethods(uc, "addRequestProperty", hook);
                       XposedBridge.log("[AutoDriver] ✅ URLConnection hooks OK");
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ❌ URLConn: " + e.getMessage());
@@ -545,7 +638,16 @@ jobs:
 
           import android.app.Notification; import android.app.NotificationChannel;
           import android.app.NotificationManager; import android.app.PendingIntent;
-          import android.app.Service; import android.content.BroadcastReceiver; import android.content.Context; import android.content.Intent; import android.content.IntentFilter; import android.content.SharedPreferences; import android.location.Location; import android.location.LocationListener; import android.location.LocationManager; import android.os.Build; import android.os.Bundle; import android.os.Handler; import android.os.IBinder; import android.os.Looper; import java.io.InputStream; import java.net.HttpURLConnection; import java.net.URL; import java.text.SimpleDateFormat; import java.util.Date; import java.util.Locale;
+          import android.app.Service; import android.content.BroadcastReceiver;
+          import android.content.Context; import android.content.Intent;
+          import android.content.IntentFilter; import android.content.SharedPreferences;
+          import android.location.Location; import android.location.LocationListener;
+          import android.location.LocationManager; import android.os.Build;
+          import android.os.Bundle; import android.os.Handler;
+          import android.os.IBinder; import android.os.Looper;
+          import java.io.InputStream; import java.net.HttpURLConnection;
+          import java.net.URL; import java.text.SimpleDateFormat;
+          import java.util.Date; import java.util.Locale;
 
           public class AutoService extends Service {
               static final String ACCEPT_URL = "https://gateway.saned.io/api/v1/dispatch/accept-dispatch/";
@@ -600,6 +702,7 @@ jobs:
                   reg(hookLogReceiver, new IntentFilter("JAHEZ_HOOK_LOG"),   true);
                   startLocationUpdates();
                   showNotification();
+                  // Su grant + SharedPrefs token read
                   initSuAndToken();
                   saveLog("✅ AutoService v30 started");
               }
@@ -607,6 +710,7 @@ jobs:
               void initSuAndToken() {
                   new Thread(() -> {
                       try {
+                          // Step 1: Grant su
                           Process p = new ProcessBuilder("su", "-c", "echo ok")
                               .redirectErrorStream(true).start();
                           byte[] buf = new byte[32];
@@ -615,6 +719,7 @@ jobs:
                           int exit = done ? p.exitValue() : -1;
                           if (exit == 0) {
                               saveLog("✅ Su granted!");
+                              // Step 2: Read token from SharedPrefs
                               readSanedToken();
                           } else {
                               saveLog("⚠️ Su exit=" + exit + " — Magisk mein Allow karo");
@@ -627,6 +732,8 @@ jobs:
 
               void readSanedToken() {
                   try {
+                      // Saned stores token in DataStore (proto format) not plain SharedPrefs
+                      // Try multiple locations
                       String[] files = {
                           "/data/data/net.jahez.fleets/shared_prefs/net.jahez.fleets.SharedPreferences.xml",
                           "/data/data/net.jahez.fleets/shared_prefs/net.jahez.fleets.Settings.xml",
@@ -653,6 +760,26 @@ jobs:
                                   + " (" + n + "b): no token");
                           }
                       }
+                      // List all SharedPrefs AND datastore files
+                      for (String dir : new String[]{
+                          "ls /data/data/net.jahez.fleets/shared_prefs/",
+                          "ls /data/data/net.jahez.fleets/files/",
+                          "ls /data/data/net.jahez.fleets/files/datastore/ 2>/dev/null",
+                          "find /data/data/net.jahez.fleets/ -name '*.xml' -o -name '*.pb' 2>/dev/null | head -20"
+                      }) {
+                          try {
+                              Process ls = new ProcessBuilder("su", "-c", dir)
+                                  .redirectErrorStream(true).start();
+                              byte[] lsBuf = new byte[1024];
+                              int lsN = ls.getInputStream().read(lsBuf);
+                              ls.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+                              if (lsN > 0) {
+                                  String out = new String(lsBuf, 0, lsN).trim();
+                                  if (!out.isEmpty() && !out.contains("No such"))
+                                      saveLog("📁 " + out.replace("\n", " | ").substring(0, Math.min(150, out.length())));
+                              }
+                          } catch (Throwable ignored) {}
+                      }
                   } catch (Throwable e) {
                       saveLog("❌ readToken: " + e.getMessage());
                   }
@@ -670,6 +797,7 @@ jobs:
                       String val = xml.substring(start, end).trim();
                       if (val.length() > 20) { saveLog("🔍 Key: " + key); return val; }
                   }
+                  // JWT auto-detect
                   int jwtIdx = xml.indexOf("eyJ");
                   if (jwtIdx != -1) {
                       int end = xml.indexOf("<", jwtIdx);
@@ -689,7 +817,7 @@ jobs:
                           @Override public void onProviderEnabled(String p) {}
                           @Override public void onProviderDisabled(String p) {}
                       };
-                      try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 30000, 10, ll); } catch (SecurityException ignored) {}
+                      try { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,     30000, 10, ll); } catch (SecurityException ignored) {}
                       try { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 30000, 10, ll); } catch (SecurityException ignored) {}
                       for (String p : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
                           try { Location l = lm.getLastKnownLocation(p); if (l!=null&&lastLocation==null){lastLocation=l;break;} } catch (SecurityException ignored) {}
@@ -737,6 +865,7 @@ jobs:
 
                   int delay = prefs.getInt("scan_delay", 300);
 
+                  // Token priority: hook > SharedPrefs > swipe
                   String bestToken = null;
                   if (hasToken && authToken != null && authToken.length() > 20) {
                       bestToken = authToken;
@@ -753,6 +882,8 @@ jobs:
                       new Handler(Looper.getMainLooper()).postDelayed(
                           () -> callAcceptApi(requestId, fa, pickupKm, dropKm), delay);
                   } else {
+                      // AutoService directly runs su swipe — no broadcast needed
+                      // su -c "input swipe" works at system level regardless of which app is shown
                       saveLog("✅ Filter pass! Su-Swipe in " + delay + "ms → id=" + requestId);
                       final int d = delay;
                       new Handler(Looper.getMainLooper()).postDelayed(
@@ -760,9 +891,13 @@ jobs:
                   }
               }
 
+              // AutoService directly swipes using su — no cross-app broadcast needed
               void doSuSwipe(int delayMs) {
                   new Thread(() -> {
                       try {
+                          // Screen dimensions - based on screenshot: 1080x2152
+                          // Accept button center: ~88.5% height, >> at left (10%), end at right (90%)
+                          // Try to get actual screen size
                           android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
                           int W = dm.widthPixels;
                           int H = dm.heightPixels;
@@ -770,7 +905,10 @@ jobs:
                           int x2 = (int)(W * 0.90f);
                           int y  = (int)(H * 0.885f);
 
-                          saveLog("🖱️ Su swipe: " + x1 + "→" + x2 + " y=" + y);
+                          saveLog("🖱️ Su swipe: " + x1 + "→" + x2 + " y=" + y
+                              + " screen=" + W + "x" + H);
+
+                          // Try multiple input commands
                           String[] cmds = {
                               "input touchscreen swipe " + x1+" "+y+" "+x2+" "+y+" 250",
                               "input swipe " + x1+" "+y+" "+x2+" "+y+" 250"
@@ -893,9 +1031,188 @@ jobs:
 
       - name: Write Remaining Files
         run: |
-          # (unchanged, omitted for brevity, keep your existing BootReceiver.java, LogActivity.java, MainActivity.java, layouts, strings, themes, etc.)
-          # ...
-          
+          cat > app/src/main/java/com/auto/driver/BootReceiver.java << 'EOF'
+          package com.auto.driver;
+          import android.content.BroadcastReceiver; import android.content.Context; import android.content.Intent;
+          public class BootReceiver extends BroadcastReceiver {
+            @Override public void onReceive(Context ctx, Intent intent) {
+              if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
+              Intent svc = new Intent(ctx, AutoService.class);
+              if (android.os.Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc); else ctx.startService(svc);
+            }
+          }
+          EOF
+          cat > app/src/main/java/com/auto/driver/LogActivity.java << 'EOF'
+          package com.auto.driver;
+          import android.app.Activity; import android.content.SharedPreferences; import android.os.Bundle; import android.widget.*;
+          public class LogActivity extends Activity {
+            @Override protected void onCreate(Bundle saved) {
+              super.onCreate(saved); setContentView(R.layout.activity_log);
+              SharedPreferences prefs = getSharedPreferences("cfg", MODE_PRIVATE);
+              TextView tvLog = findViewById(R.id.tv_log);
+              String logs = prefs.getString("logs", "");
+              tvLog.setText(logs.isEmpty() ? "No logs yet." : logs);
+              ((Button)findViewById(R.id.btn_clear)).setOnClickListener(v -> { prefs.edit().remove("logs").apply(); tvLog.setText("Cleared."); });
+              ((Button)findViewById(R.id.btn_back)).setOnClickListener(v -> finish());
+            }
+          }
+          EOF
+          cat > app/src/main/java/com/auto/driver/MainActivity.java << 'EOF'
+          package com.auto.driver;
+          import android.app.Activity; import android.content.BroadcastReceiver; import android.content.Context;
+          import android.content.Intent; import android.content.IntentFilter; import android.content.SharedPreferences;
+          import android.os.Build; import android.os.Bundle; import android.view.inputmethod.InputMethodManager; import android.widget.*;
+          public class MainActivity extends Activity {
+            SharedPreferences prefs; Switch swEnable; TextView tvStatus;
+            final BroadcastReceiver sr = new BroadcastReceiver() {
+              @Override public void onReceive(Context ctx, Intent intent) {
+                if (swEnable != null) swEnable.setChecked("JAHEZ_AUTO_ON".equals(intent.getAction())); refreshStatus();
+              }
+            };
+            @Override protected void onCreate(Bundle saved) {
+              super.onCreate(saved); setContentView(R.layout.activity_main);
+              prefs = getSharedPreferences("cfg", MODE_PRIVATE);
+              EditText etPickup = findViewById(R.id.et_pickup); EditText etDrop = findViewById(R.id.et_drop);
+              SeekBar sbDelay = findViewById(R.id.sb_delay); TextView tvDelay = findViewById(R.id.tv_delay);
+              swEnable = findViewById(R.id.sw_enable); tvStatus = findViewById(R.id.tv_status);
+              etPickup.setText(String.valueOf(prefs.getFloat("max_pickup", 2.0f)));
+              etDrop.setText(String.valueOf(prefs.getFloat("max_drop", 5.0f)));
+              int sd = prefs.getInt("scan_delay", 300); sbDelay.setProgress(sd-50); tvDelay.setText(sd+"ms");
+              sbDelay.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                public void onProgressChanged(SeekBar sb, int p, boolean u) { tvDelay.setText((p+50)+"ms"); }
+                public void onStartTrackingTouch(SeekBar sb) {}
+                public void onStopTrackingTouch(SeekBar sb) { prefs.edit().putInt("scan_delay", sb.getProgress()+50).apply(); }
+              });
+              swEnable.setChecked(prefs.getBoolean("enabled", false));
+              if (Build.VERSION.SDK_INT >= 33) requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 0);
+              requestPermissions(new String[]{"android.permission.ACCESS_FINE_LOCATION","android.permission.ACCESS_COARSE_LOCATION"}, 1);
+              IntentFilter f = new IntentFilter("JAHEZ_AUTO_OFF"); f.addAction("JAHEZ_AUTO_ON");
+              if (Build.VERSION.SDK_INT >= 33) registerReceiver(sr, f, Context.RECEIVER_NOT_EXPORTED); else registerReceiver(sr, f);
+              swEnable.setOnCheckedChangeListener((btn, checked) -> { prefs.edit().putBoolean("enabled", checked).apply(); sendBroadcast(new Intent("JAHEZ_STATE_CHANGED")); refreshStatus(); });
+              ((Button)findViewById(R.id.btn_save)).setOnClickListener(v -> {
+                float pk = parseF(etPickup.getText().toString(), 2f); float dk = parseF(etDrop.getText().toString(), 5f);
+                prefs.edit().putFloat("max_pickup", pk).putFloat("max_drop", dk).apply();
+                Toast.makeText(this, "Saved ✅ Pickup≤"+pk+"km Drop≤"+dk+"km", Toast.LENGTH_LONG).show();
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
+              });
+              ((Button)findViewById(R.id.btn_logs)).setOnClickListener(v -> startActivity(new Intent(this, LogActivity.class)));
+              Intent svc = new Intent(this, AutoService.class);
+              if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc); else startService(svc);
+            }
+            @Override protected void onResume()  { super.onResume();  refreshStatus(); }
+            @Override protected void onDestroy() { super.onDestroy(); try { unregisterReceiver(sr); } catch (Exception ignored) {} }
+            void refreshStatus() {
+              if (tvStatus == null) return;
+              boolean en = prefs.getBoolean("enabled", false);
+              tvStatus.setText(en ? "AUTO ACCEPT: ON" : "AUTO ACCEPT: OFF");
+              tvStatus.setTextColor(en ? 0xFF4CAF50 : 0xFFFF5555);
+            }
+            float parseF(String s, float def) { try { return Float.parseFloat(s.trim()); } catch (Exception e) { return def; } }
+          }
+          EOF
+
+      - name: Write Layouts and Resources
+        run: |
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent" android:layout_height="match_parent" android:background="#0A0A0A">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:orientation="vertical" android:padding="20dp">
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
+                android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="v29 — Pine from Own APK" android:textSize="12sp"
+                android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
+              <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
+                android:textSize="24sp" android:textColor="#FF5555" android:textStyle="bold"
+                android:gravity="center" android:layout_marginBottom="24dp"/>
+              <View android:layout_width="match_parent" android:layout_height="1dp"
+                android:background="#222" android:layout_marginBottom="20dp"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Max Pickup (km)" android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
+              <EditText android:id="@+id/et_pickup" android:layout_width="match_parent"
+                android:layout_height="56dp" android:inputType="numberDecimal"
+                android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
+                android:padding="12dp" android:layout_marginBottom="16dp"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Max Drop (km)" android:textColor="#AAA" android:textSize="13sp" android:layout_marginBottom="4dp"/>
+              <EditText android:id="@+id/et_drop" android:layout_width="match_parent"
+                android:layout_height="56dp" android:inputType="numberDecimal"
+                android:textColor="#FFF" android:textSize="22sp" android:background="#1A1A1A"
+                android:padding="12dp" android:layout_marginBottom="20dp"/>
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginBottom="4dp">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                  android:layout_weight="1" android:text="Accept Delay"
+                  android:textColor="#AAA" android:textSize="13sp"/>
+                <TextView android:id="@+id/tv_delay" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:text="300ms"
+                  android:textColor="#4CAF50" android:textSize="14sp" android:textStyle="bold"/>
+              </LinearLayout>
+              <SeekBar android:id="@+id/sb_delay" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:max="1450" android:progress="250"
+                android:progressTint="#4CAF50" android:thumbTint="#4CAF50" android:layout_marginBottom="20dp"/>
+              <Button android:id="@+id/btn_save" android:layout_width="match_parent"
+                android:layout_height="54dp" android:text="Save Settings"
+                android:backgroundTint="#2196F3" android:textColor="#FFF"
+                android:textStyle="bold" android:layout_marginBottom="16dp"/>
+              <Switch android:id="@+id/sw_enable" android:layout_width="match_parent"
+                android:layout_height="58dp" android:text="  Enable Auto Accept"
+                android:textColor="#FFF" android:textSize="16sp" android:background="#1A1A1A"
+                android:padding="16dp" android:layout_marginBottom="12dp"/>
+              <Button android:id="@+id/btn_logs" android:layout_width="match_parent"
+                android:layout_height="54dp" android:text="View Logs"
+                android:backgroundTint="#333" android:textColor="#FFF"
+                android:textStyle="bold" android:layout_marginBottom="20dp"/>
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Setup:\n1. LSPosed: net.jahez.fleets scope\n2. Auto Driver kholo → Magisk Allow karo\n3. Log mein Token dikhega\n4. Toggle ON → Auto accept!"
+                android:textColor="#444" android:textSize="12sp" android:gravity="center" android:lineSpacingExtra="4dp"/>
+            </LinearLayout>
+          </ScrollView>
+          EOF
+          cat > app/src/main/res/layout/activity_log.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent" android:layout_height="match_parent"
+            android:orientation="vertical" android:background="#0A0A0A" android:padding="16dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:text="Activity Log" android:textSize="22sp" android:textColor="#4CAF50"
+              android:textStyle="bold" android:layout_marginBottom="12dp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+              android:orientation="horizontal" android:layout_marginBottom="12dp">
+              <Button android:id="@+id/btn_back" android:layout_width="0dp" android:layout_height="46dp"
+                android:layout_weight="1" android:text="Back" android:backgroundTint="#333"
+                android:textColor="#FFF" android:layout_marginEnd="8dp"/>
+              <Button android:id="@+id/btn_clear" android:layout_width="0dp" android:layout_height="46dp"
+                android:layout_weight="1" android:text="Clear" android:backgroundTint="#B71C1C" android:textColor="#FFF"/>
+            </LinearLayout>
+            <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
+              <TextView android:id="@+id/tv_log" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="Loading..."
+                android:textColor="#CCC" android:textSize="12sp" android:fontFamily="monospace"
+                android:lineSpacingExtra="6dp" android:padding="8dp" android:background="#111"/>
+            </ScrollView>
+          </LinearLayout>
+          EOF
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources><string name="app_name">Auto Driver</string></resources>
+          EOF
+          cat > app/src/main/res/values/themes.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+              <item name="colorPrimary">#4CAF50</item>
+              <item name="colorPrimaryDark">#388E3C</item>
+              <item name="colorAccent">#FF9800</item>
+            </style>
+          </resources>
+          EOF
+
       - name: Build APK
         run: ./gradlew assembleRelease --no-daemon 2>&1
 
@@ -915,7 +1232,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v30
+          name: AutoDriver-v27
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
