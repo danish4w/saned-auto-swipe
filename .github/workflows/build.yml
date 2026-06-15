@@ -349,29 +349,28 @@ jobs:
               }
 
               private void hookWithPine(Class<?> pineClass, Class<?> target, android.app.Activity act) {
+                  // Pine is in our APK classpath
+                  // XposedBridge automatically uses Pine as hook engine when Pine is present
+                  // So XposedBridge.hookAllMethods = Pine hook under the hood
                   try {
-                      // Pine.hookAllConstructors(Class, MethodHook)
-                      // MethodHook is top.canyie.pine.callback.MethodHook
-                      ClassLoader ourCL = SanedHook.class.getClassLoader();
-                      Class<?> hookCbClass = ourCL.loadClass("top.canyie.pine.callback.MethodHook");
-
-                      // Create anonymous MethodHook using dynamic proxy
-                      Object hookCallback = java.lang.reflect.Proxy.newProxyInstance(
-                          ourCL,
-                          new Class[]{},  // MethodHook is abstract class, not interface
-                          (proxy, method, args) -> null
-                      );
-                      // Since MethodHook is abstract class (not interface), use subclass approach
-                      // Use Pine.hookAllConstructors via reflection with our pre-made wrapper
-                      hookWithPineReflection(pineClass, target, act);
-
+                      // Try Pine.hookAllMethods via reflection (Pine 0.2.9 API)
+                      java.lang.reflect.Method hookAll = pineClass.getMethod(
+                          "hookAll", Class.class, String.class,
+                          Class.forName("de.robv.android.xposed.XC_MethodHook"));
+                      hookAll.invoke(null, target, "<init>", new XC_MethodHook() {
+                          @Override protected void afterHookedMethod(MethodHookParam p) {
+                              scanObjectForToken(p.thisObject, act, "[Pine]" + target.getSimpleName());
+                          }
+                      });
+                      XposedBridge.log("[AutoDriver] 🌲 Pine.hookAll OK: " + target.getSimpleName());
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ⚠️ Pine hookWithPine: " + e.getMessage());
-                      // Fallback to XposedBridge
+                      XposedBridge.log("[AutoDriver] ⚠️ Pine.hookAll: " + e.getMessage()
+                          + " → XposedBridge fallback");
+                      // Fallback: XposedBridge (which may use Pine internally)
                       try {
                           XposedBridge.hookAllMethods(target, "<init>", new XC_MethodHook() {
                               @Override protected void afterHookedMethod(MethodHookParam p) {
-                                  scanObjectForToken(p.thisObject, act, target.getSimpleName());
+                                  scanObjectForToken(p.thisObject, act, "[Xposed]" + target.getSimpleName());
                               }
                           });
                       } catch (Throwable ignored) {}
@@ -380,24 +379,14 @@ jobs:
 
               private void hookWithPineReflection(Class<?> pineClass, Class<?> target,
                                                    android.app.Activity act) throws Throwable {
-                  // Pine.hookAllConstructors(targetClass, callback)
-                  // callback must be a MethodHook subclass
-                  // Since we have Pine as compile dependency, use it directly
-                  // Pine.hook with correct CallFrame class
-                  // top.canyie.pine.CallFrame (not nested in MethodHook)
-                  for (java.lang.reflect.Constructor<?> ctor : target.getDeclaredConstructors()) {
-                      top.canyie.pine.Pine.hook(ctor, new top.canyie.pine.callback.MethodHook() {
-                          @Override
-                          public void afterCall(top.canyie.pine.CallFrame frame)
-                              throws Throwable {
-                              Object obj = frame.thisObject;
-                              if (obj != null) {
-                                  scanObjectForToken(obj, act, target.getSimpleName());
-                              }
-                          }
-                      });
-                  }
-                  XposedBridge.log("[AutoDriver] 🌲 Pine constructor hooked: " + target.getSimpleName());
+                  XposedBridge.hookAllMethods(target, "<init>", new XC_MethodHook() {
+                      @Override
+                      protected void afterHookedMethod(MethodHookParam p) {
+                          if (p.thisObject != null)
+                              scanObjectForToken(p.thisObject, act, target.getSimpleName());
+                      }
+                  });
+                  XposedBridge.log("[AutoDriver] 🌲 Xposed hook: " + target.getSimpleName());
               }
 
               private void scanObjectForToken(Object obj, android.app.Activity act, String label) {
