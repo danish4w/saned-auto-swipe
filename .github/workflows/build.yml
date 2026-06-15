@@ -62,7 +62,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 29; versionName '29.0'
+              versionCode 30; versionName '30.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -128,7 +128,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v29"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v30"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -190,13 +190,66 @@ jobs:
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v28 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v30 loading into " + lp.packageName);
 
-                  // Hook Activity.onResume — lazy ViewModel hook + order capture
+                  // Hook 1: ViewModelStore.put() — captures ViewModel when created
+                  hookViewModelStore(lp);
+
+                  // Hook 2: Activity.onResume — order data capture
                   hookActivityOnResume(lp);
 
-                  // URLConnection backup
+                  // Hook 3: URLConnection backup
                   hookURLConnection(lp);
+              }
+
+              // Hook ViewModelStore.put() — fires when ANY ViewModel is created
+              // This is the most reliable way to capture IncomingDispatchViewModel
+              private void hookViewModelStore(XC_LoadPackage.LoadPackageParam lp) {
+                  try {
+                      // ViewModelStore is in androidx — accessible from lp.classLoader
+                      XposedHelpers.findAndHookMethod(
+                          "androidx.lifecycle.ViewModelStore",
+                          lp.classLoader,
+                          "put",
+                          String.class, Object.class,
+                          new XC_MethodHook() {
+                              @Override
+                              protected void afterHookedMethod(MethodHookParam p) {
+                                  String key = (String) p.args[0];
+                                  Object vm   = p.args[1];
+                                  if (vm == null) return;
+                                  String vmName = vm.getClass().getName();
+                                  XposedBridge.log("[AutoDriver] 📦 ViewModelStore.put: key=" + key
+                                      + " class=" + vmName);
+                                  // Check if it is IncomingDispatchViewModel
+                                  if (vmName.contains("IncomingDispatch")
+                                      || vmName.contains("DispatchViewModel")) {
+                                      XposedBridge.log("[AutoDriver] 🎯 IncomingDispatchViewModel captured!");
+                                      capturedViewModel = vm;
+                                      // Find acceptAutoDispatch method
+                                      for (java.lang.reflect.Method m : vm.getClass().getDeclaredMethods()) {
+                                          if (m.getName().equals("acceptAutoDispatch")
+                                              || m.getName().contains("acceptAuto")) {
+                                              m.setAccessible(true);
+                                              acceptMethod = m;
+                                              XposedBridge.log("[AutoDriver] ✅ Method: " + m.getName());
+                                              break;
+                                          }
+                                      }
+                                      if (acceptMethod == null) {
+                                          XposedBridge.log("[AutoDriver] ⚠️ Listing VM methods:");
+                                          for (java.lang.reflect.Method m : vm.getClass().getDeclaredMethods()) {
+                                              XposedBridge.log("[AutoDriver]   " + m.getName());
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      );
+                      XposedBridge.log("[AutoDriver] ✅ ViewModelStore.put hook OK");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ❌ ViewModelStore: " + e.getMessage());
+                  }
               }
 
               private void hookActivityOnResume(XC_LoadPackage.LoadPackageParam lp) {
@@ -212,15 +265,13 @@ jobs:
                                   // Register swipe receiver in Saned process (once)
                                   registerSwipeReceiver(act);
 
-                                  // Try to hook/find ViewModel
-                                  if (!vmHooked) {
-                                      if (actName.startsWith("net.jahez") || actName.startsWith("net.saned")) {
-                                          hookViewModelConstructor(act);
-                                      }
-                                  }
-                                  // On order screen: always scan fields to find VM
+                                  // On order screen: scan ViewModelStore after delay
+                                  // (ViewModel is created AFTER onResume, so we wait 500ms)
                                   if (ORDER_ACTIVITY.equals(actName) && capturedViewModel == null) {
-                                      extractVmFromActivity(act);
+                                      final android.app.Activity delayAct = act;
+                                      act.getWindow().getDecorView().postDelayed(() -> {
+                                          extractVmFromViewModelStore(delayAct);
+                                      }, 500);
                                   }
 
                                   if (!ORDER_ACTIVITY.equals(actName)) return;
@@ -318,6 +369,42 @@ jobs:
                   XposedBridge.log("[AutoDriver] ⚠️ VM class not found — will scan Activity fields on order screen");
                   sendLog(act, "⚠️ VM class not found — will scan fields on order screen");
                   vmHooked = false; // allow retry on IncomingDispatchActivity
+              }
+
+              // Extract ViewModel from ViewModelStore (delayed, after Compose creates it)
+              private void extractVmFromViewModelStore(android.app.Activity act) {
+                  try {
+                      Object store = XposedHelpers.callMethod(act, "getViewModelStore");
+                      if (store == null) { XposedBridge.log("[AutoDriver] ⚠️ ViewModelStore null"); return; }
+
+                      // Try mMap field
+                      for (String fieldName : new String[]{"mMap", "map", "mViewModels"}) {
+                          try {
+                              java.lang.reflect.Field f = store.getClass().getDeclaredField(fieldName);
+                              f.setAccessible(true);
+                              java.util.Map<?,?> map = (java.util.Map<?,?>) f.get(store);
+                              if (map == null || map.isEmpty()) continue;
+                              XposedBridge.log("[AutoDriver] 🗺️ ViewModelStore keys: " + map.keySet());
+                              for (Object vm : map.values()) {
+                                  if (vm == null) continue;
+                                  String name = vm.getClass().getName();
+                                  if (name.contains("DispatchViewModel") || name.contains("IncomingDispatch")) {
+                                      XposedBridge.log("[AutoDriver] 🎯 VM from store: " + name);
+                                      captureVmInstance(vm, act);
+                                      return;
+                                  }
+                              }
+                              // Log all VMs found
+                              for (Object vm : map.values()) {
+                                  if (vm != null)
+                                      XposedBridge.log("[AutoDriver] 📦 VM in store: " + vm.getClass().getName());
+                              }
+                          } catch (NoSuchFieldException ignored) {}
+                      }
+                      XposedBridge.log("[AutoDriver] ⚠️ Target VM not in ViewModelStore");
+                  } catch (Throwable e) {
+                      XposedBridge.log("[AutoDriver] ❌ extractVmFromStore: " + e.getMessage());
+                  }
               }
 
               // Extract ViewModel from Activity fields (most reliable approach)
@@ -655,7 +742,7 @@ jobs:
                   startLocationUpdates();
                   showNotification();
                   grantSu();
-                  saveLog("✅ AutoService v29 started");
+                  saveLog("✅ AutoService v30 started");
               }
 
               void grantSu() {
@@ -890,7 +977,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v29 — Activity Field VM Scan" android:textSize="12sp"
+                android:text="v30 — ViewModelStore Hook" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -998,7 +1085,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v29
+          name: AutoDriver-v30
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
