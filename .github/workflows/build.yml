@@ -62,7 +62,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 28; versionName '28.0'
+              versionCode 29; versionName '29.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -128,7 +128,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v28"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v29"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -212,10 +212,15 @@ jobs:
                                   // Register swipe receiver in Saned process (once)
                                   registerSwipeReceiver(act);
 
-                                  // Hook ViewModel using Activity CL (classes7.dex accessible here)
-                                  if (!vmHooked && (actName.startsWith("net.jahez")
-                                          || actName.startsWith("net.saned"))) {
-                                      hookViewModelConstructor(act);
+                                  // Try to hook/find ViewModel
+                                  if (!vmHooked) {
+                                      if (actName.startsWith("net.jahez") || actName.startsWith("net.saned")) {
+                                          hookViewModelConstructor(act);
+                                      }
+                                  }
+                                  // On order screen: always scan fields to find VM
+                                  if (ORDER_ACTIVITY.equals(actName) && capturedViewModel == null) {
+                                      extractVmFromActivity(act);
                                   }
 
                                   if (!ORDER_ACTIVITY.equals(actName)) return;
@@ -268,69 +273,120 @@ jobs:
                   }
               }
 
-              // Hook ViewModel constructor to capture its instance
-              // When acceptAutoDispatch() needs to be called, we use this instance
+              // Scan IncomingDispatchActivity fields to find ViewModel
+              // ViewModel is stored as a field in the Activity
               private void hookViewModelConstructor(android.app.Activity act) {
-                  try {
-                      ClassLoader cl = act.getClassLoader();
-                      Class<?> vmClass = cl.loadClass(VIEWMODEL);
+                  vmHooked = true; // prevent repeated attempts
 
-                      // Hook constructor to capture instance
-                      XposedBridge.hookAllMethods(vmClass, "<init>", new XC_MethodHook() {
-                          @Override
-                          protected void afterHookedMethod(MethodHookParam p) {
-                              capturedViewModel = p.thisObject;
-                              XposedBridge.log("[AutoDriver] 🎯 ViewModel instance captured!");
-                              sendLog(act, "🎯 ViewModel captured — accept ready!");
+                  // Strategy 1: Scan Activity fields for ViewModel
+                  if (ORDER_ACTIVITY.equals(act.getClass().getName())) {
+                      extractVmFromActivity(act);
+                      return;
+                  }
 
-                              // Find acceptAutoDispatch method
-                              try {
-                                  for (Method m : vmClass.getDeclaredMethods()) {
-                                      if (m.getName().equals("acceptAutoDispatch")) {
-                                          m.setAccessible(true);
-                                          acceptMethod = m;
-                                          XposedBridge.log("[AutoDriver] ✅ acceptAutoDispatch found: "
-                                              + m.toGenericString());
-                                          sendLog(act, "✅ acceptAutoDispatch method ready!");
-                                      }
-                                  }
-                                  if (acceptMethod == null) {
-                                      // Try hookAllMethods to intercept any call
-                                      XposedBridge.log("[AutoDriver] ⚠️ acceptAutoDispatch not found by name");
-                                      sendLog(act, "⚠️ Listing VM methods...");
-                                      for (Method m : vmClass.getDeclaredMethods()) {
-                                          XposedBridge.log("[AutoDriver] VM method: " + m.getName());
-                                      }
-                                  }
-                              } catch (Throwable e) {
-                                  XposedBridge.log("[AutoDriver] ⚠️ method find: " + e.getMessage());
-                              }
-                          }
-                      });
-
-                      // Also hook acceptAutoDispatch directly to intercept Saned's own calls
+                  // Strategy 2: Try loading ViewModel class with multiple classloaders
+                  ClassLoader[] cls = {
+                      act.getClassLoader(),
+                      act.getApplicationContext().getClassLoader(),
+                      Thread.currentThread().getContextClassLoader(),
+                  };
+                  for (ClassLoader cl : cls) {
+                      if (cl == null) continue;
                       try {
-                          XposedBridge.hookAllMethods(vmClass, "acceptAutoDispatch",
-                              new XC_MethodHook() {
-                                  @Override protected void beforeHookedMethod(MethodHookParam p) {
-                                      capturedViewModel = p.thisObject;
-                                      XposedBridge.log("[AutoDriver] 🎯 acceptAutoDispatch intercepted!");
-                                      sendLog(act, "🎯 Saned accept intercepted!");
-                                  }
-                              });
-                          XposedBridge.log("[AutoDriver] ✅ acceptAutoDispatch hook OK");
+                          Class<?> vmClass = cl.loadClass(VIEWMODEL);
+                          XposedBridge.hookAllMethods(vmClass, "<init>", new XC_MethodHook() {
+                              @Override protected void afterHookedMethod(MethodHookParam p) {
+                                  captureVmInstance(p.thisObject, act);
+                              }
+                          });
+                          try {
+                              XposedBridge.hookAllMethods(vmClass, "acceptAutoDispatch",
+                                  new XC_MethodHook() {
+                                      @Override protected void beforeHookedMethod(MethodHookParam p) {
+                                          capturedViewModel = p.thisObject;
+                                          XposedBridge.log("[AutoDriver] 🎯 acceptAutoDispatch intercepted!");
+                                      }
+                                  });
+                          } catch (Throwable ignored) {}
+                          XposedBridge.log("[AutoDriver] ✅ VM hooked via " + cl.getClass().getSimpleName());
+                          sendLog(act, "✅ VM hook OK via " + cl.getClass().getSimpleName());
+                          return;
                       } catch (Throwable e) {
-                          XposedBridge.log("[AutoDriver] ⚠️ acceptAutoDispatch: " + e.getMessage());
+                          XposedBridge.log("[AutoDriver] ⚠️ CL " + cl.getClass().getSimpleName() + ": " + e.getMessage());
+                      }
+                  }
+                  XposedBridge.log("[AutoDriver] ⚠️ VM class not found — will scan Activity fields on order screen");
+                  sendLog(act, "⚠️ VM class not found — will scan fields on order screen");
+                  vmHooked = false; // allow retry on IncomingDispatchActivity
+              }
+
+              // Extract ViewModel from Activity fields (most reliable approach)
+              private void extractVmFromActivity(android.app.Activity act) {
+                  try {
+                      // Scan all fields in Activity class hierarchy
+                      Class<?> cls = act.getClass();
+                      while (cls != null && !cls.getName().equals("android.app.Activity")) {
+                          for (java.lang.reflect.Field f : cls.getDeclaredFields()) {
+                              f.setAccessible(true);
+                              try {
+                                  Object val = f.get(act);
+                                  if (val == null) continue;
+                                  String valClass = val.getClass().getName();
+                                  // ViewModel class name contains "ViewModel"
+                                  if (valClass.contains("ViewModel") || valClass.contains("DispatchViewModel")) {
+                                      XposedBridge.log("[AutoDriver] 🎯 Found VM field: "
+                                          + f.getName() + " = " + valClass);
+                                      captureVmInstance(val, act);
+                                      return;
+                                  }
+                              } catch (Throwable ignored) {}
+                          }
+                          cls = cls.getSuperclass();
                       }
 
-                      vmHooked = true;
-                      XposedBridge.log("[AutoDriver] ✅ ViewModel hooks registered");
-                      sendLog(act, "✅ VM hooks OK — waiting for ViewModel creation");
+                      // Also check ViewModelStore via lifecycle
+                      try {
+                          Object store = XposedHelpers.callMethod(act, "getViewModelStore");
+                          java.lang.reflect.Field mapField = store.getClass().getDeclaredField("mMap");
+                          mapField.setAccessible(true);
+                          java.util.Map<?,?> map = (java.util.Map<?,?>) mapField.get(store);
+                          for (Object vm : map.values()) {
+                              if (vm != null && vm.getClass().getName().contains("DispatchViewModel")) {
+                                  XposedBridge.log("[AutoDriver] 🎯 VM from ViewModelStore: " + vm.getClass().getName());
+                                  captureVmInstance(vm, act);
+                                  return;
+                              }
+                          }
+                      } catch (Throwable e) {
+                          XposedBridge.log("[AutoDriver] ⚠️ ViewModelStore: " + e.getMessage());
+                      }
 
+                      sendLog(act, "⚠️ VM not found in Activity fields → swipe fallback");
+                      XposedBridge.log("[AutoDriver] ⚠️ VM not found in Activity fields");
                   } catch (Throwable e) {
-                      XposedBridge.log("[AutoDriver] ❌ VM hook: " + e.getMessage());
-                      vmHooked = false; // retry on next activity
+                      XposedBridge.log("[AutoDriver] ❌ extractVm: " + e.getMessage());
                   }
+              }
+
+              private void captureVmInstance(Object vm, android.app.Activity act) {
+                  capturedViewModel = vm;
+                  // Find acceptAutoDispatch method
+                  for (Method m : vm.getClass().getDeclaredMethods()) {
+                      if (m.getName().equals("acceptAutoDispatch")
+                          || m.getName().contains("acceptAuto")) {
+                          m.setAccessible(true);
+                          acceptMethod = m;
+                          XposedBridge.log("[AutoDriver] ✅ acceptAutoDispatch: " + m.getName());
+                          sendLog(act, "🎯 VM captured! acceptAutoDispatch ready → API mode!");
+                          return;
+                      }
+                  }
+                  // Log all methods for debugging
+                  XposedBridge.log("[AutoDriver] ⚠️ acceptAutoDispatch not found, listing methods:");
+                  for (Method m : vm.getClass().getDeclaredMethods()) {
+                      XposedBridge.log("[AutoDriver]   method: " + m.getName());
+                  }
+                  sendLog(act, "🎯 VM captured! (method search in logs)");
               }
 
               // Call ViewModel.acceptAutoDispatch() — Saned makes the API call itself
@@ -599,7 +655,7 @@ jobs:
                   startLocationUpdates();
                   showNotification();
                   grantSu();
-                  saveLog("✅ AutoService v28 started");
+                  saveLog("✅ AutoService v29 started");
               }
 
               void grantSu() {
@@ -834,7 +890,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v28 — ViewModel Direct Accept" android:textSize="12sp"
+                android:text="v29 — Activity Field VM Scan" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -942,7 +998,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v28
+          name: AutoDriver-v29
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
