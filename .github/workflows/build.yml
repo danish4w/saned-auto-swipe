@@ -62,7 +62,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 30; versionName '30.0'
+              versionCode 32; versionName '32.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -128,7 +128,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v30"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v32"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -183,23 +183,77 @@ jobs:
               private volatile Object capturedViewModel = null;
               private volatile Method acceptMethod = null;
               private volatile boolean vmHooked = false;
+              private volatile Object capturedLambda = null;
+              private volatile Class<?> capturedLambdaClass = null;
               private volatile boolean swipeReceiverRegistered = false;
               private long lastBcast = 0;
               private volatile android.app.Activity currentOrderActivity = null;
 
+              // Accept button lambda classes (classes6.dex - accessible!)
+              static final String LAMBDA_A = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity$a";
+              static final String LAMBDA_B = "net.jahez.fleets.dispatch.accept.IncomingDispatchActivity$b";
+
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v30 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v32 loading into " + lp.packageName);
 
-                  // Hook 1: ViewModelStore.put() — captures ViewModel when created
-                  hookViewModelStore(lp);
+                  // Hook 1: IncomingDispatchActivity$a/$b — onClick lambdas (classes6)
+                  hookAcceptLambdas(lp);
 
-                  // Hook 2: Activity.onResume — order data capture
+                  // Hook 2: Activity.onResume — order data + performClick fallback
                   hookActivityOnResume(lp);
 
-                  // Hook 3: URLConnection backup
+                  // Hook 3: URLConnection — token backup
                   hookURLConnection(lp);
+              }
+
+              // Hook Accept button click lambdas
+              // These are in classes6.dex — accessible via lp.classLoader!
+              private void hookAcceptLambdas(XC_LoadPackage.LoadPackageParam lp) {
+                  int hooked = 0;
+                  for (String lambdaClass : new String[]{LAMBDA_A, LAMBDA_B}) {
+                      try {
+                          Class<?> cls = lp.classLoader.loadClass(lambdaClass);
+                          // Hook all methods — invoke() is the click handler
+                          XposedBridge.hookAllMethods(cls, "invoke", new XC_MethodHook() {
+                              @Override
+                              protected void beforeHookedMethod(MethodHookParam p) {
+                                  XposedBridge.log("[AutoDriver] 🎯 Lambda.invoke: "
+                                      + cls.getSimpleName() + " called!");
+                                  // This fires when Accept button is clicked
+                                  // We intercept but let it proceed normally
+                                  // When WE want to accept, we call this
+                              }
+                          });
+                          // Also try onClick
+                          try {
+                              XposedBridge.hookAllMethods(cls, "onClick", new XC_MethodHook() {
+                                  @Override protected void beforeHookedMethod(MethodHookParam p) {
+                                      XposedBridge.log("[AutoDriver] 🎯 Lambda.onClick: " + cls.getSimpleName());
+                                  }
+                              });
+                          } catch (Throwable ignored) {}
+
+                          // Capture lambda instance for later use
+                          XposedBridge.hookAllMethods(cls, "<init>", new XC_MethodHook() {
+                              @Override protected void afterHookedMethod(MethodHookParam p) {
+                                  capturedLambda = p.thisObject;
+                                  capturedLambdaClass = cls;
+                                  XposedBridge.log("[AutoDriver] 📦 Lambda instance: " + cls.getSimpleName());
+                              }
+                          });
+
+                          hooked++;
+                          XposedBridge.log("[AutoDriver] ✅ Lambda hook: " + cls.getSimpleName());
+                      } catch (Throwable e) {
+                          XposedBridge.log("[AutoDriver] ⚠️ " + lambdaClass.substring(lambdaClass.lastIndexOf('.')+1)
+                              + ": " + e.getMessage());
+                      }
+                  }
+                  if (hooked > 0) {
+                      XposedBridge.log("[AutoDriver] ✅ " + hooked + " lambda hooks OK — accept will work!");
+                  }
               }
 
               // Hook ViewModelStore.put() — fires when ANY ViewModel is created
@@ -265,13 +319,9 @@ jobs:
                                   // Register swipe receiver in Saned process (once)
                                   registerSwipeReceiver(act);
 
-                                  // On order screen: scan ViewModelStore after delay
-                                  // (ViewModel is created AFTER onResume, so we wait 500ms)
-                                  if (ORDER_ACTIVITY.equals(actName) && capturedViewModel == null) {
-                                      final android.app.Activity delayAct = act;
-                                      act.getWindow().getDecorView().postDelayed(() -> {
-                                          extractVmFromViewModelStore(delayAct);
-                                      }, 500);
+                                  // On order screen — store activity ref
+                                  if (ORDER_ACTIVITY.equals(actName)) {
+                                      currentOrderActivity = act;
                                   }
 
                                   if (!ORDER_ACTIVITY.equals(actName)) return;
@@ -537,13 +587,13 @@ jobs:
                       BroadcastReceiver r = new BroadcastReceiver() {
                           @Override public void onReceive(Context ctx, Intent intent) {
                               int delay = intent.getIntExtra("scan_delay", 300);
-                              boolean useVm = intent.getBooleanExtra("use_vm", false);
                               android.app.Activity target = currentOrderActivity;
                               if (target == null || target.isFinishing()) return;
                               new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                                  if (useVm && capturedViewModel != null) {
-                                      callViewModelAccept(target);
-                                  } else {
+                                  // Primary: performClick on Accept button
+                                  boolean clicked = tryPerformClick(target);
+                                  if (!clicked) {
+                                      // Fallback: su swipe
                                       doSwipe(target);
                                   }
                               }, delay);
@@ -558,6 +608,101 @@ jobs:
                       XposedBridge.log("[AutoDriver] ✅ Swipe receiver registered in Saned");
                   } catch (Throwable e) {
                       XposedBridge.log("[AutoDriver] ❌ receiver: " + e.getMessage());
+                  }
+              }
+
+              // Primary accept: lambda invoke > performClick > swipe
+              private boolean tryPerformClick(android.app.Activity act) {
+                  // Method 1: Call captured lambda.invoke() directly
+                  if (capturedLambda != null && capturedLambdaClass != null) {
+                      try {
+                          Method invokeM = null;
+                          for (Method m : capturedLambdaClass.getDeclaredMethods()) {
+                              if (m.getName().equals("invoke")) { invokeM = m; break; }
+                          }
+                          if (invokeM != null) {
+                              invokeM.setAccessible(true);
+                              int paramCount = invokeM.getParameterCount();
+                              Object[] args = new Object[paramCount]; // null args
+                              invokeM.invoke(capturedLambda, args);
+                              sendLog(act, "✅ Lambda.invoke() called!");
+                              XposedBridge.log("[AutoDriver] ✅ Lambda.invoke OK");
+                              return true;
+                          }
+                      } catch (Throwable e) {
+                          sendLog(act, "⚠️ Lambda.invoke: " + e.getMessage());
+                          XposedBridge.log("[AutoDriver] ⚠️ Lambda: " + e.getMessage());
+                      }
+                  }
+
+                  // Method 2: performClick on Accept button view
+                  try {
+                      android.view.View root = act.getWindow().getDecorView();
+                      android.view.View btn = findAcceptButton(root);
+                      if (btn != null) {
+                          String info = btn.getClass().getSimpleName() + " w=" + btn.getWidth();
+                          sendLog(act, "🖱️ performClick: " + info);
+                          btn.performClick();
+                          sendLog(act, "✅ performClick done!");
+                          return true;
+                      }
+                      sendLog(act, "⚠️ Accept view not found → swipe");
+                      logViewTree(root, 0);
+                      return false;
+                  } catch (Throwable e) {
+                      sendLog(act, "❌ performClick: " + e.getMessage());
+                      return false;
+                  }
+              }
+
+              private android.view.View findAcceptButton(android.view.View v) {
+                  if (v == null || v.getVisibility() == android.view.View.GONE) return null;
+                  // Check TextView text
+                  if (v instanceof android.widget.TextView) {
+                      String txt = ((android.widget.TextView) v).getText().toString().trim();
+                      if (isAcceptText(txt) && v.isClickable()) return v;
+                  }
+                  // Check content description
+                  CharSequence cd = v.getContentDescription();
+                  if (cd != null && isAcceptText(cd.toString()) && v.isClickable()) return v;
+                  // Check clickable views with accept-like class names
+                  String cls = v.getClass().getSimpleName().toLowerCase();
+                  if (v.isClickable() && (cls.contains("button") || cls.contains("accept") || cls.contains("slide"))) {
+                      // Try to read text via tag or toString
+                      Object tag = v.getTag();
+                      if (tag != null && isAcceptText(tag.toString())) return v;
+                  }
+                  // Recurse
+                  if (v instanceof android.view.ViewGroup) {
+                      android.view.ViewGroup vg = (android.view.ViewGroup) v;
+                      for (int i = vg.getChildCount()-1; i >= 0; i--) {
+                          android.view.View found = findAcceptButton(vg.getChildAt(i));
+                          if (found != null) return found;
+                      }
+                  }
+                  return null;
+              }
+
+              private boolean isAcceptText(String s) {
+                  if (s == null || s.isEmpty()) return false;
+                  String u = s.toUpperCase().trim();
+                  for (String k : new String[]{"ACCEPT","SWIPE","SLIDE","CONFIRM","APPROVE",">>","قبول","موافق","اقبل"})
+                      if (u.contains(k)) return true;
+                  return false;
+              }
+
+              private void logViewTree(android.view.View v, int depth) {
+                  if (depth > 6 || v == null) return;
+                  String indent = "  ".repeat(depth);
+                  String info = v.getClass().getSimpleName()
+                      + (v instanceof android.widget.TextView ? " txt='" + ((android.widget.TextView)v).getText() + "'" : "")
+                      + " click=" + v.isClickable()
+                      + " vis=" + v.getVisibility();
+                  XposedBridge.log("[AutoDriver] " + indent + info);
+                  if (v instanceof android.view.ViewGroup) {
+                      android.view.ViewGroup vg = (android.view.ViewGroup) v;
+                      for (int i = 0; i < vg.getChildCount(); i++)
+                          logViewTree(vg.getChildAt(i), depth+1);
                   }
               }
 
@@ -715,7 +860,7 @@ jobs:
                       double price     = intent.getDoubleExtra("price",       0);
                       double bonus     = intent.getDoubleExtra("bonus",       0);
                       saveLog("🪝 id=" + requestId + " drop=" + fmt2(dropDist) + "km ₿" + price + "+" + bonus);
-                      processOrder(requestId, hasVm, pickupLat, pickupLon, dropDist);
+                      processOrder(requestId, pickupLat, pickupLon, dropDist);
                   }
               };
               private final BroadcastReceiver toggleReceiver = new BroadcastReceiver() {
@@ -742,7 +887,7 @@ jobs:
                   startLocationUpdates();
                   showNotification();
                   grantSu();
-                  saveLog("✅ AutoService v30 started");
+                  saveLog("✅ AutoService v32 started");
               }
 
               void grantSu() {
@@ -785,7 +930,7 @@ jobs:
               @Override public int onStartCommand(Intent i, int flags, int id) { return START_STICKY; }
               @Override public IBinder onBind(Intent i) { return null; }
 
-              void processOrder(String requestId, boolean hasVm,
+              void processOrder(String requestId,
                                 double pickupLat, double pickupLon, double dropDist) {
                   if (!prefs.getBoolean("enabled", false)) { saveLog("⏸ Disabled"); return; }
                   long now = System.currentTimeMillis();
@@ -815,13 +960,12 @@ jobs:
                   }
 
                   int delay = prefs.getInt("scan_delay", 300);
-                  saveLog("✅ Filter pass! " + (hasVm ? "VM accept" : "Swipe") + " in " + delay + "ms");
+                  saveLog("✅ Filter pass! Click/Swipe in " + delay + "ms → id=" + requestId);
 
-                  // Send to Saned process — VM accept or swipe
+                  // Send to Saned process — performClick primary, swipe fallback
                   Intent swipe = new Intent("JAHEZ_DO_SWIPE");
                   swipe.setPackage("net.jahez.fleets");
                   swipe.putExtra("scan_delay", delay);
-                  swipe.putExtra("use_vm", hasVm);
                   sendBroadcast(swipe);
               }
 
@@ -977,7 +1121,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v30 — ViewModelStore Hook" android:textSize="12sp"
+                android:text="v32 — Lambda Hook + performClick" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -1085,7 +1229,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v30
+          name: AutoDriver-v32
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
