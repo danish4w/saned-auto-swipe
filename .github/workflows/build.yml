@@ -62,7 +62,7 @@ jobs:
             defaultConfig {
               applicationId 'com.auto.driver'
               minSdk 26; targetSdk 34
-              versionCode 32; versionName '32.0'
+              versionCode 33; versionName '33.0'
             }
             buildTypes { release { minifyEnabled false } }
             compileOptions {
@@ -128,7 +128,7 @@ jobs:
               android:roundIcon="@mipmap/ic_launcher_round" android:theme="@style/AppTheme"
               android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
               <meta-data android:name="xposedmodule" android:value="true"/>
-              <meta-data android:name="xposeddescription" android:value="Auto Driver v32"/>
+              <meta-data android:name="xposeddescription" android:value="Auto Driver v33"/>
               <meta-data android:name="xposedminversion" android:value="82"/>
               <activity android:name=".MainActivity" android:exported="true"
                 android:windowSoftInputMode="stateHidden|adjustPan">
@@ -196,7 +196,7 @@ jobs:
               @Override
               public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
                   if (!TARGET.equals(lp.packageName)) return;
-                  XposedBridge.log("[AutoDriver] v32 loading into " + lp.packageName);
+                  XposedBridge.log("[AutoDriver] v33 loading into " + lp.packageName);
 
                   // Hook 1: IncomingDispatchActivity$a/$b — onClick lambdas (classes6)
                   hookAcceptLambdas(lp);
@@ -208,52 +208,65 @@ jobs:
                   hookURLConnection(lp);
               }
 
-              // Hook Accept button click lambdas
-              // These are in classes6.dex — accessible via lp.classLoader!
+              // Hook Accept button click lambdas (classes6.dex — accessible!)
+              // $a and $b are Kotlin SAM lambdas with call() method
+              // IncomingDispatchScreen.kt:124 calls these when Accept is tapped
               private void hookAcceptLambdas(XC_LoadPackage.LoadPackageParam lp) {
                   int hooked = 0;
                   for (String lambdaClass : new String[]{LAMBDA_A, LAMBDA_B}) {
                       try {
                           Class<?> cls = lp.classLoader.loadClass(lambdaClass);
-                          // Hook all methods — invoke() is the click handler
-                          XposedBridge.hookAllMethods(cls, "invoke", new XC_MethodHook() {
-                              @Override
-                              protected void beforeHookedMethod(MethodHookParam p) {
-                                  XposedBridge.log("[AutoDriver] 🎯 Lambda.invoke: "
-                                      + cls.getSimpleName() + " called!");
-                                  // This fires when Accept button is clicked
-                                  // We intercept but let it proceed normally
-                                  // When WE want to accept, we call this
-                              }
-                          });
-                          // Also try onClick
-                          try {
-                              XposedBridge.hookAllMethods(cls, "onClick", new XC_MethodHook() {
-                                  @Override protected void beforeHookedMethod(MethodHookParam p) {
-                                      XposedBridge.log("[AutoDriver] 🎯 Lambda.onClick: " + cls.getSimpleName());
-                                  }
-                              });
-                          } catch (Throwable ignored) {}
 
-                          // Capture lambda instance for later use
+                          // Log ALL methods to see exact names
+                          XposedBridge.log("[AutoDriver] 📋 " + cls.getSimpleName() + " methods:");
+                          for (java.lang.reflect.Method m : cls.getDeclaredMethods()) {
+                              XposedBridge.log("[AutoDriver]   " + m.getName()
+                                  + " params=" + m.getParameterCount());
+                          }
+
+                          // Hook call() — Kotlin SAM interface method
+                          // Also try invoke() and onClick() as fallback
+                          boolean methodHooked = false;
+                          for (String methodName : new String[]{"call", "invoke", "onClick", "run"}) {
+                              try {
+                                  XposedBridge.hookAllMethods(cls, methodName, new XC_MethodHook() {
+                                      @Override
+                                      protected void beforeHookedMethod(MethodHookParam p) {
+                                          // Capture instance EVERY TIME manual accept fires
+                                          capturedLambda = p.thisObject;
+                                          capturedLambdaClass = cls;
+                                          XposedBridge.log("[AutoDriver] 🎯 " + cls.getSimpleName()
+                                              + "." + p.method.getName() + "() called!"
+                                              + " ← manual accept detected");
+                                      }
+                                  });
+                                  methodHooked = true;
+                                  XposedBridge.log("[AutoDriver] ✅ Hooked " + cls.getSimpleName()
+                                      + "." + methodName + "()");
+                              } catch (Throwable ignored) {}
+                          }
+
+                          // Hook constructor to capture fresh instance
                           XposedBridge.hookAllMethods(cls, "<init>", new XC_MethodHook() {
                               @Override protected void afterHookedMethod(MethodHookParam p) {
                                   capturedLambda = p.thisObject;
                                   capturedLambdaClass = cls;
-                                  XposedBridge.log("[AutoDriver] 📦 Lambda instance: " + cls.getSimpleName());
+                                  XposedBridge.log("[AutoDriver] 📦 Lambda instance captured: "
+                                      + cls.getSimpleName());
                               }
                           });
 
-                          hooked++;
-                          XposedBridge.log("[AutoDriver] ✅ Lambda hook: " + cls.getSimpleName());
+                          if (methodHooked) {
+                              hooked++;
+                              XposedBridge.log("[AutoDriver] ✅ Lambda hook OK: " + cls.getSimpleName());
+                          }
                       } catch (Throwable e) {
-                          XposedBridge.log("[AutoDriver] ⚠️ " + lambdaClass.substring(lambdaClass.lastIndexOf('.')+1)
+                          XposedBridge.log("[AutoDriver] ⚠️ Lambda "
+                              + lambdaClass.substring(lambdaClass.lastIndexOf('.')+1)
                               + ": " + e.getMessage());
                       }
                   }
-                  if (hooked > 0) {
-                      XposedBridge.log("[AutoDriver] ✅ " + hooked + " lambda hooks OK — accept will work!");
-                  }
+                  XposedBridge.log("[AutoDriver] ✅ " + hooked + "/2 lambda classes hooked");
               }
 
               // Hook ViewModelStore.put() — fires when ANY ViewModel is created
@@ -617,8 +630,12 @@ jobs:
                   if (capturedLambda != null && capturedLambdaClass != null) {
                       try {
                           Method invokeM = null;
-                          for (Method m : capturedLambdaClass.getDeclaredMethods()) {
-                              if (m.getName().equals("invoke")) { invokeM = m; break; }
+                          // Try call(), invoke(), onClick(), run() in order
+                          for (String mn : new String[]{"call", "invoke", "onClick", "run"}) {
+                              for (Method m : capturedLambdaClass.getDeclaredMethods()) {
+                                  if (m.getName().equals(mn)) { invokeM = m; break; }
+                              }
+                              if (invokeM != null) break;
                           }
                           if (invokeM != null) {
                               invokeM.setAccessible(true);
@@ -887,7 +904,7 @@ jobs:
                   startLocationUpdates();
                   showNotification();
                   grantSu();
-                  saveLog("✅ AutoService v32 started");
+                  saveLog("✅ AutoService v33 started");
               }
 
               void grantSu() {
@@ -1121,7 +1138,7 @@ jobs:
                 android:text="Auto Driver" android:textSize="30sp" android:textColor="#4CAF50"
                 android:textStyle="bold" android:gravity="center" android:layout_marginBottom="4dp"/>
               <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="v32 — Lambda Hook + performClick" android:textSize="12sp"
+                android:text="v33 — Lambda call() Hook" android:textSize="12sp"
                 android:textColor="#555" android:gravity="center" android:layout_marginBottom="20dp"/>
               <TextView android:id="@+id/tv_status" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:text="AUTO ACCEPT: OFF"
@@ -1229,7 +1246,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AutoDriver-v32
+          name: AutoDriver-v33
           path: |
             app/build/AutoDriver.apk
             app/build/outputs/apk/**/*.apk
